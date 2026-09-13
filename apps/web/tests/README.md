@@ -41,3 +41,7 @@ scenarios mirror `conversationContextKey` in `support.ts` instead of importing
 its Client owner.
 
 Nothing mechanically enforces this rule; keep it in review.
+
+## Scenario clocks
+
+The reference-order scenario gives its target session a fixed nonzero `createdAt` header and sets the page clock to the same instant before opening it. `seedSession` uses that header to anchor event times. The page closes during suite teardown, discarding the fixed clock.

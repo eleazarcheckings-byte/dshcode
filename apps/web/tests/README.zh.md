@@ -33,3 +33,7 @@ harness 的用途，且这两个包本来就在 Host 图中。chat 场景则在 
 `conversationContextKey`，而不 import 其 Client owner。
 
 没有任何机制强制这条规则；靠 review 守住它。
+
+## 场景时钟
+
+引用顺序场景为目标会话设置固定且非零的 `createdAt` 头字段，并在打开会话前将页面时钟设为同一时刻。`seedSession` 以该头字段为事件时间基准。测试套件清理时会关闭页面，同时丢弃固定时钟。

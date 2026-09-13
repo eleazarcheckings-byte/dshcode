@@ -46,4 +46,6 @@ type @ → parallel file/session Remote calls → pick folder text or atomic fil
 
 ## 后果
 
+引用顺序浏览器 fixture 固定目标事件时间和浏览器时间，因此 CI runner 跨过午夜时，当天的时钟文本不会变成带日期的标签。日期格式仍然可观察，不通过扩大共享快照归一化范围来隐藏它。
+
 Web 现在使用共享的 `@file` 发现 seam 和结构化会话引用身份，宿主服务仍然是文件系统与会话访问的权威来源。文件和会话发现都是所属服务上的一元 Remote 契约，因此生成的客户端类型会替代手写 RPC 接口，浏览器 bundle 中也不包含 Node API。候选查询失败仍会让菜单静默降级。引用准备失败发生在提示词已接受之后，并会结束 agent 轮次。文件引用只产生路径文本和稳定的条件式指引成本，而会话引用仍保留 `dsh-session-reference` 所拥有的有界快照开销与信任限定文本。

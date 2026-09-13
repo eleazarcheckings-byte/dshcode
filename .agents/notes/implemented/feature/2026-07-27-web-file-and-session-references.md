@@ -46,4 +46,6 @@ Package tests pin shared file grammar and ranking, cache invalidation and lifecy
 
 ## Consequences
 
+The reference-order browser fixture fixes both target event time and browser time, so crossing midnight on a CI runner cannot turn its same-day clock into a dated label. Date formatting remains observable instead of broadening the shared snapshot normalizer to hide it.
+
 Web now uses the shared `@file` discovery seam and structured session-reference identity, while Host services remain the authority for filesystem and session access. File and session discovery are unary Remote contracts on the owning services, so generated client types replace handwritten RPC interfaces and browser bundles remain free of Node APIs. Candidate lookup failures remain quiet menu degradation. Reference preparation failures occur after prompt acceptance and end the agent turn. File references cost only path text plus stable conditional guidance, whereas session references retain the bounded snapshot cost and trust framing owned by `dsh-session-reference`.

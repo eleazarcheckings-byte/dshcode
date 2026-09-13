@@ -34,6 +34,7 @@ const ORDER_EXPECTED = join(SNAPSHOT_DIR, 'order.expected.md')
 const MODE = webSnapshotMode()
 const SOURCE_SESSION_ID = 'reference-source-session'
 const TARGET_SESSION_ID = 'reference-order-target-session'
+const TARGET_TIME = Date.UTC(2026, 8, 13, 4)
 
 /** Build one closed source session with a stable title for reference discovery. */
 function sourceSessionFixture(): string {
@@ -103,7 +104,7 @@ function targetSessionFixture(): string {
       type: 'session',
       version: SESSION_FORMAT_VERSION,
       id: '{{sessionId}}',
-      createdAt: 0,
+      createdAt: TARGET_TIME,
       cwd: '{{cwd}}',
     }),
     ...session.snapshotEvents().map(event => JSON.stringify(event)),
@@ -358,6 +359,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
 
   it('renders the durable direct-message then recall order', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-reference-order'))
+    await page.clock.setFixedTime(TARGET_TIME)
     const group = page.getByRole('treeitem', { name: /Ungrouped/ })
     await group.waitFor({ timeout: 15_000 })
     if (await group.getAttribute('aria-expanded') !== 'true') await group.click()
