@@ -6,6 +6,8 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+归档列表读取持久化会话头，并优先采用实时或经过日志身份校验的标题投影缓存，包括已缓存的无标题 Session。仅缺少投影时回退到 session-query；会话头不能确定继承前缀，因此有种子的冷 Session 也需要精确折叠日志。冷会话标题可能反映最近一次持久检查点，与侧边栏一致。空归档不读取持久化数据；标题读取失败时保留会话行。
+
 ## 概述
 
 `@deepseek-ai/dsh-api-workspace-controller` 拥有 Host 的 `ctx.workspaceController` 服务和生成的 Client `ctx.remote.workspace` namespace。它的 Remote 方法负责创建、重命名、移除和重排 Workspace，在 Workspace 内重排 Session，从 Workspace 导航中归档 Session，以尽力折叠的标题列出归档集合，恢复或彻底删除已归档 Session，以及跟随完整的 Workspace 投影。当 Client 必须修改或跟随 Workspace 导航时，请通过 API Gateway 使用它。本包同时拥有 `ctx.directoryPickerController` 与生成的 `ctx.remote.directoryPicker` namespace，因为它承载的选目录 seam 是抽象的，自身从不作为 Loader entry。

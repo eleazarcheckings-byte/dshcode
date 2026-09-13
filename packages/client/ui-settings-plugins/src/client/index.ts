@@ -126,7 +126,10 @@ export function apply(ctx: ClientContext): void {
           if (version !== tabsVersion || revision !== tabsRevision) {
             tabsVersion = version
             tabsRevision = revision
-            tabs = ctx.slots.entries('settings.plugins.tab')
+            const entries = ctx.slots.entries('settings.plugins.tab')
+            const hasInstaller = entries.some(entry => entry.options.id === 'plugins')
+            tabs = entries
+              .filter(entry => !hasInstaller || entry.options.id !== 'family-plugins')
               .map(entry => ({
                 /* v8 ignore next -- list-slot registration requires id */
                 id: entry.options.id ?? '',

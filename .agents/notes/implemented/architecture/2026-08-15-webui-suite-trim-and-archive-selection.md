@@ -16,6 +16,8 @@ The shipped desktop carried a nine-package webui suite (`packages/bundle/web-app
 
 **Archive search and multi-select (`dsh-client-ui-settings-archive`).** The section gains a search box (filters by folded title or session id), a per-row selection checkbox with a select-all toggle over the filtered rows, and a bulk toolbar: 恢复所选 runs immediately (restore is non-destructive), 删除所选 requires the existing irreversible-deletion confirmation modal; bulk mutations run sequentially over the selection and refresh the list once.
 
+**Coexisting management pages.** The Settings owners hide `family-plugins` when the built-in `plugins` tab exists and `archive-manager` when the built-in `archive` section exists. The live slot ledger controls visibility in either load order and restores community entries after built-in disposal. Exact ids avoid locale-dependent label matching and leave other plugin features available. Archive listing reuses the sidebar’s live or identity-checked cached title projection before folding missing titles from logs; cached null titles need no fold. This keeps checkpoint age semantics consistent with the sidebar, avoids reading every archived log on each visit, and performs no storage reads for an empty archive. The existing search and bulk actions remain; a failed initial list request can be retried.
+
 ## Alternatives considered
 
 **Dedupe by rendered label.** Matching sidebar entries by display text would need a label registry across client plugins and still cannot tell intentional same-label entries apart. Rejected: removing the redundant packages from the shipped closure is the honest fix.

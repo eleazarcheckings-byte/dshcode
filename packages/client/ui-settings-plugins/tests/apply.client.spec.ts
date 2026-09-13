@@ -130,6 +130,24 @@ describe('ui-settings-plugins apply', () => {
     }
   })
 
+  it('hides the family manager only while the built-in installer is registered', async () => {
+    const { ctx, slots } = await bench()
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    const section = slots.entries('settings.section')[0]!
+    const face = (section.inject as unknown as () => PluginsSettingsSectionInjected)()
+    slots.register({ name: 'settings.plugins.tab', id: 'family-plugins', label: 'Plugins' } as never, () => null)
+    slots.register({ name: 'settings.plugins.tab', id: 'other', label: 'Plugins' } as never, () => null)
+    const ids = () => face.hooks.tabs.getSnapshot().map(row => row.id)
+    expect(ids()).toContain('family-plugins')
+    const dispose = slots.register({ name: 'settings.plugins.tab', id: 'plugins' } as never, () => null)
+    expect(ids()).toContain('plugins')
+    expect(ids()).toContain('other')
+    expect(ids()).not.toContain('family-plugins')
+    dispose()
+    expect(ids()).toContain('family-plugins')
+  })
+
   it('keys each card it ships on the settings namespace that card edits', async () => {
     const { ctx, slots } = await bench()
     declareRoot(slots)

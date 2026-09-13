@@ -77,6 +77,16 @@ describe('ArchiveSessionsSection', () => {
     expect(list).toHaveBeenCalledOnce()
   })
 
+  it('retries a failed list request and displays the returned sessions', async () => {
+    const list = vi.fn().mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce([{ sessionId: 'retry-session', title: 'Retry result' }])
+    mount({ list })
+    await screen.findByText('加载归档失败，请重试。')
+    fireEvent.click(screen.getByRole('button', { name: 'retry' }))
+    expect(await screen.findByText('Retry result')).toBeTruthy()
+    expect(list).toHaveBeenCalledTimes(2)
+  })
+
   it('restores a session and refreshes the list', async () => {
     const { list, restore } = mount()
     await screen.findByText('归档对话')

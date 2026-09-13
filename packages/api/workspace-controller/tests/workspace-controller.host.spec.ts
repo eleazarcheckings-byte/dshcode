@@ -297,6 +297,71 @@ describe('WorkspaceController commands', () => {
     })
   })
 
+  it('does not read persistence for an empty archive', async () => {
+    const { controller, ctx } = await harness()
+    const list = vi.spyOn(ctx.sessionPersistence, 'list')
+    await expect(controller.listArchived()).resolves.toEqual({ items: [] })
+    expect(list).not.toHaveBeenCalled()
+  })
+
+  it('uses cached titles, including null, and folds only missing title projections', async () => {
+    const { controller, ctx, persisted } = await harness()
+    const ids = ['cached', 'untitled', 'missing'].map(SessionId)
+    for (const id of ids) {
+      persisted.headers.push({ id, createdAt: 1000 })
+      await controller.archiveSession({ sessionId: id })
+    }
+    const cachedSnapshot = vi.fn((header: { id: SessionId }) => header.id === ids[2]
+      ? undefined
+      : { values: { title: header.id === ids[0] ? 'Cached title' : null } })
+    ctx.provide('sessionProjectionCache', { cachedSnapshot } as never)
+    const readTitleSnapshots = vi.fn().mockResolvedValue([
+      { status: 'fulfilled', value: { session: { id: ids[2] }, title: { title: 'Folded title' } } },
+    ])
+    ctx.provide('sessionQuery', { readTitleSnapshots } as never)
+    await expect(controller.listArchived()).resolves.toEqual({ items: [
+      { sessionId: ids[0], createdAt: 1000, title: 'Cached title' },
+      { sessionId: ids[1], createdAt: 1000 },
+      { sessionId: ids[2], createdAt: 1000, title: 'Folded title' },
+    ] })
+    expect(readTitleSnapshots).toHaveBeenCalledExactlyOnceWith([ids[2]])
+    await controller.restoreSession({ sessionId: ids[2]! })
+    readTitleSnapshots.mockClear()
+    await controller.listArchived()
+    expect(readTitleSnapshots).not.toHaveBeenCalled()
+  })
+
+  it('prefers live projections and falls back when cached projection reads fail', async () => {
+    const { controller, ctx } = await harness()
+    const session = ctx.sessions.create(SessionId('live-cached-archive'))
+    await controller.archiveSession({ sessionId: session.id })
+    const cachedSnapshot = vi.fn().mockReturnValue({ values: { title: 'Live title' } })
+    ctx.provide('sessionProjections', { cachedSnapshot } as never)
+    const readTitleSnapshots = vi.fn().mockResolvedValue([])
+    ctx.provide('sessionQuery', { readTitleSnapshots } as never)
+    await expect(controller.listArchived()).resolves.toEqual({ items: [
+      { sessionId: session.id, title: 'Live title' },
+    ] })
+    expect(readTitleSnapshots).not.toHaveBeenCalled()
+    cachedSnapshot.mockImplementationOnce(() => { throw new Error('broken checkpoint') })
+    await expect(controller.listArchived()).resolves.toEqual({ items: [{ sessionId: session.id }] })
+    expect(readTitleSnapshots).toHaveBeenCalledExactlyOnceWith([session.id])
+  })
+
+  it('does not treat a seeded cold Session as a zero-prefix checkpoint identity', async () => {
+    const { controller, ctx, persisted } = await harness()
+    const id = SessionId('seeded-archive')
+    persisted.headers.push({ id, createdAt: 1000, isSeeded: true } as never)
+    await controller.archiveSession({ sessionId: id })
+    const cachedSnapshot = vi.fn()
+    ctx.provide('sessionProjectionCache', { cachedSnapshot } as never)
+    const readTitleSnapshots = vi.fn().mockResolvedValue([])
+    ctx.provide('sessionQuery', { readTitleSnapshots } as never)
+    await expect(controller.listArchived()).resolves.toEqual({ items: [{ sessionId: id, createdAt: 1000 }] })
+    expect(cachedSnapshot).not.toHaveBeenCalled()
+    expect(readTitleSnapshots).toHaveBeenCalledExactlyOnceWith([id])
+  })
+
   it('refuses permanent delete for unarchived and still-live Sessions', async () => {
     const { controller, ctx, root } = await harness()
     await expect(controller.deleteSession({ sessionId: SessionId('never-archived') }))

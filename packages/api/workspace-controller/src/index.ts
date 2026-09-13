@@ -113,7 +113,7 @@ export class WorkspaceController extends TypertRemoteService {
   }
 
   /**
-   * List the registry-global archive set with best-effort folded titles.
+   * List archives with live or checkpoint-cached titles, folding missing projections.
    * @returns one row per archived Session, in archive-set order.
    */
   @Remote('listArchived')

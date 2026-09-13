@@ -7,6 +7,8 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+当内置 `plugins` 标签页已注册时，分区隐藏 DSH-Web 的 `family-plugins` 管理标签页。移除内置贡献后，社区标签页重新显示；其他标签页保持可用。
+
 ## 概述
 
 `dsh-client-ui-settings-plugins` 是 dsh Web 客户端的**插件**设置分区：用户在其**插件配置**标签页上编辑宿主平面插件配置，功能插件则通过 `settings.plugins.tab` 贡献自己的页面。本包自己的标签页为每个配置由用户拥有的 Host 插件展示一张可展开卡片：卡片展示插件名称及其管辖范围，展开后是绑定到该插件 settings 命名空间的手写控件，每个字段标注用户是否覆盖过它，并提供重置回部署组装值的入口。卡片暂存用户输入，只有用户保存时才写入，且每次写入都以表单读取时的命名空间 revision 设栅。

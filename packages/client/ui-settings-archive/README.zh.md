@@ -7,6 +7,8 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
+列表请求失败后可通过重试重新加载归档。[Workspace 控制器](../../api/workspace-controller/README.zh.md)负责标题缓存与持久化读取。
+
 ## 概述
 
 Web 设置中的归档会话页面。一个 section（`settings.section`，id `archive`）列出每个注册表级归档会话及其折叠标题与创建时间；搜索框按标题或会话 id 过滤行，选择复选框与批量工具栏跨选中行驱动恢复（非破坏性）与彻底删除（不可逆）。单行操作镜像同样的两项操作。线面（`list` / `restore` / `remove`）由 `apply` 注入，走共享的 `/api` fetch 载体，响应在客户端边界校验，RPC 失败以携带宿主错误码的 `ArchiveActionError` 拒绝，供区块把已知错误码映射为可操作的文案。
@@ -65,7 +67,7 @@ Web 设置中的归档会话页面。一个 section（`settings.section`，id `a
 
 #### 模型看到的内容
 
-归档区块不产生任何模型可见内容。本页不发起任何模型请求，不持有对话上下文，也不注册任何面向模型的内容；列表由宿主的 `session-query` 服务经 `workspace/listArchived` 从持久化会话日志折叠而来。
+归档区块不产生任何模型可见内容。本页不发起任何模型请求，不持有对话上下文，也不注册任何面向模型的内容；列表通过 `workspace/listArchived` 从宿主获取。
 
 #### Token 影响
 

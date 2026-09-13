@@ -6,6 +6,8 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+Archive listing reads persisted headers and prefers live or identity-checked cached title projections, including cached untitled Sessions. Only missing projections fall back to session-query; seeded cold Sessions also require exact log folding because their inherited prefix is not known from a header. Cold titles can reflect the last durable checkpoint, matching the sidebar. Empty archives perform no persistence reads; title failures retain the row.
+
 ## Summary
 
 `@deepseek-ai/dsh-api-workspace-controller` owns the Host `ctx.workspaceController` service and the generated Client `ctx.remote.workspace` namespace. Its Remote methods create, rename, remove, and reorder Workspaces, reorder Sessions within a Workspace, archive Sessions from Workspace navigation, list the archive set with best-effort titles, restore or permanently delete archived Sessions, and follow the complete Workspace projection. Use it through API Gateway when a Client must change or follow Workspace navigation. The package also owns `ctx.directoryPickerController` and the generated `ctx.remote.directoryPicker` namespace, because the directory-picking seam it carries is abstract and never a Loader entry of its own.

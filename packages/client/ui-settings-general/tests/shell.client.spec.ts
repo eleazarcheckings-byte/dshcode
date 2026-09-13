@@ -127,6 +127,23 @@ describe('ui-settings apply', () => {
     expect(b.reconnect).toHaveBeenCalledOnce()
   })
 
+  it('hides the community archive only while the built-in archive is registered', async () => {
+    const b = await bench()
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const { sections } = injectedOf(b.slots).hooks
+    b.slots.register({ name: 'settings.section', id: 'archive-manager', label: 'Community archive' } as never, () => null)
+    b.slots.register({ name: 'settings.section', id: 'other', label: 'Community archive' } as never, () => null)
+    const ids = () => sections.getSnapshot().map(row => row.id)
+    expect(ids()).toContain('archive-manager')
+    const dispose = b.slots.register({ name: 'settings.section', id: 'archive' } as never, () => null)
+    expect(ids()).toContain('archive')
+    expect(ids()).toContain('other')
+    expect(ids()).not.toContain('archive-manager')
+    dispose()
+    expect(ids()).toContain('archive-manager')
+  })
+
   it('projects onboarding entries into stable coordinator order', async () => {
     const b = await bench()
     declare(b.slots)

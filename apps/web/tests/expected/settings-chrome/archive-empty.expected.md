@@ -1,0 +1,23 @@
+- dialog "设置":
+  - navigation:
+    - text: 设置
+    - button "通用设置":
+      - img
+      - text: 通用设置
+    - button "模型":
+      - img
+      - text: 模型
+    - button "插件":
+      - img
+      - text: 插件
+    - button "Agent 预设":
+      - img
+      - text: Agent 预设
+    - button "归档会话":
+      - img
+      - text: 归档会话
+  - button "打开配置文件"
+  - button "关闭":
+    - img
+    - text: 关闭
+  - text: 没有归档的对话。在侧边栏归档的会话会显示在这里，可在此恢复或彻底删除。

@@ -7,6 +7,8 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
+Failed list requests expose a retry action that reloads the archive. The [workspace controller](../../api/workspace-controller/README.md) owns title caching and persistence reads.
+
 ## Summary
 
 The archived-conversations page in Web Settings. One section (`settings.section`, id `archive`) lists every registry-global archived session with its folded title and creation time; a search box filters rows by title or session id, and a selection checkbox with a bulk toolbar drives restore (non-destructive) and permanent delete (irreversible) across the selection. Single-row actions mirror those same two operations. The wire face (`list` / `restore` / `remove`) is injected from `apply` and talks to the shared `/api` fetch carrier, with responses validated at the client boundary and RPC failures rejecting as `ArchiveActionError` mapping known host error codes to actionable copy.
@@ -65,7 +67,7 @@ The section renders rows from the workspace archive-set snapshot. Restore remove
 
 #### What the model sees
 
-Nothing from the `archive` section. The page performs no model requests, holds no conversation context, and registers no model-facing content; its list is folded from persisted session logs by the host `session-query` service through `workspace/listArchived`.
+Nothing from the `archive` section. The page performs no model requests, holds no conversation context, and registers no model-facing content; its list comes from the host through `workspace/listArchived`.
 
 #### Token effect
 

@@ -1,11 +1,15 @@
 /** Workspace command implementation and stable Remote failure mapping. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: activates the `sessionPersistence` / `sessionQuery` Context merges
 // the archive commands read.
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-session-projection'
+import type {} from '@deepseek-ai/dsh-session-projection-cache'
+import type {} from '@deepseek-ai/dsh-session-title'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import {
   WorkspaceId,
@@ -169,30 +173,47 @@ export class WorkspaceCommands {
   }
 
   /**
-   * List the registry-global archive set with best-effort folded titles and
-   * header ages. Without the session-query service (cold harnesses, disabled
-   * search) rows carry only identity and age.
+   * List the archive with live or checkpoint-cached titles and header ages.
+   * Missing title projections use session-query when available; empty archives
+   * require no persistence reads. Seeded cold Sessions need exact log folding.
    * @returns one row per archived Session, in archive-set order.
    */
   async listArchived(): Promise<WorkspaceListArchivedValue> {
     const ids = this.ctx.workspaceRegistry.archivedSessionIds
-    // Optional service: compositions without session query (cold harnesses,
-    // disabled search) serve the settings surface with identity and age only.
-    const sessionQuery = this.ctx.get('sessionQuery')
-    let titles: ReadonlyMap<SessionId, string> | undefined
-    if (sessionQuery !== undefined && ids.length > 0) {
-      const observations = await sessionQuery.readTitleSnapshots(ids)
-      titles = new Map(observations.flatMap((result) => {
-        if (result.status === 'rejected') return []
-        return result.value.title === undefined ? [] : [[result.value.session.id, result.value.title.title] as const]
-      }))
-    }
+    if (ids.length === 0) return { items: [] }
     const headers = await this.ctx.sessionPersistence.list()
     const byId = new Map(headers.map(header => [header.id, header] as const))
+    const titles = new Map<SessionId, string>()
+    const missing: SessionId[] = []
+    for (const sessionId of ids) {
+      const live = this.ctx.sessions.get(sessionId)
+      const header = byId.get(sessionId)
+      let title: string | null | undefined
+      try {
+        title = live !== undefined
+          ? this.ctx.get('sessionProjections')?.cachedSnapshot(live, ['title'])?.values.title
+          : header === undefined || header.isSeeded
+            ? undefined
+            : this.ctx.get('sessionProjectionCache')?.cachedSnapshot(header, SessionLogOffset(0), ['title'])?.values.title
+      } catch (error) {
+        this.ctx.logger.warn(`workspace.listArchived: cached title for "${sessionId}" failed: ${String(error)}`)
+      }
+      // Null is a cached untitled Session, not a cache miss.
+      if (title === undefined) missing.push(sessionId)
+      else if (title !== null) titles.set(sessionId, title)
+    }
+    const sessionQuery = this.ctx.get('sessionQuery')
+    if (sessionQuery !== undefined && missing.length > 0) {
+      const observations = await sessionQuery.readTitleSnapshots(missing)
+      for (const result of observations) {
+        if (result.status === 'rejected' || result.value.title === undefined) continue
+        titles.set(result.value.session.id, result.value.title.title)
+      }
+    }
     return {
       items: ids.map((sessionId) => {
         const createdAt = byId.get(sessionId)?.createdAt
-        const title = titles?.get(sessionId)
+        const title = titles.get(sessionId)
         return {
           sessionId,
           ...title === undefined ? {} : { title },

@@ -2845,7 +2845,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: '@Remote(\'listArchived\') listArchived(): Promise<WorkspaceListArchivedValue>',
-        description: 'List the registry-global archive set with best-effort folded titles.',
+        description: 'List archives with live or checkpoint-cached titles, folding missing projections.',
         parameters: [],
         returns: 'one row per archived Session, in archive-set order.',
       },

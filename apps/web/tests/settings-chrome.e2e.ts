@@ -52,6 +52,39 @@ describe('web e2e: settings modal and General preferences', () => {
     await scaffold?.close()
   })
 
+  it('retries archive loading and shows the empty archive', async () => {
+    let attempts = 0
+    await page.route('**/api/workspace/listArchived', async (route) => {
+      attempts += 1
+      if (attempts > 1) return route.continue()
+      const envelope = route.request().postDataJSON() as { rpcId: string }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          type: 'server-response', rpcId: envelope.rpcId,
+          result: { ok: false, error: { code: 'gateway/internal', message: 'Temporary archive failure', details: {} } },
+        }),
+      })
+    })
+    try {
+      await page.getByRole('button', { name: '设置', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: '设置' })
+      await dialog.getByRole('button', { name: '归档会话', exact: true }).click()
+      await dialog.getByRole('button', { name: '重试', exact: true }).click()
+      await dialog.getByText('没有归档的对话。', { exact: false }).waitFor()
+      expect(attempts).toBe(2)
+      await compareOrRefreshGolden(
+        join(SNAPSHOT_DIR, 'archive-empty.expected.md'),
+        await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd),
+        MODE,
+      )
+    } finally {
+      await page.unroute('**/api/workspace/listArchived')
+      await page.keyboard.press('Escape')
+    }
+  })
+
   it('opens the settings dialog, switches sections, and closes by every path', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-shell'))
     const trigger = page.getByRole('button', { name: '设置', exact: true })

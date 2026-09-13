@@ -104,7 +104,10 @@ export function apply(ctx: ClientContext): void {
           if (version !== rowsVersion || revision !== rowsRevision) {
             rowsVersion = version
             rowsRevision = revision
-            rows = ctx.slots.entries('settings.section')
+            const entries = ctx.slots.entries('settings.section')
+            const hasArchive = entries.some(entry => entry.options.id === 'archive')
+            rows = entries
+              .filter(entry => !hasArchive || entry.options.id !== 'archive-manager')
               .map(e => ({
                 /* v8 ignore next -- list-slot registration requires id (SlotCore rejects an entry without one) */
                 id: e.options.id ?? '',

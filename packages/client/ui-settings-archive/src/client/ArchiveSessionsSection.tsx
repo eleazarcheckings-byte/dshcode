@@ -68,6 +68,7 @@ export function ArchiveSessionsSection(props: ArchiveSessionsSectionProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [query, setQuery] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
 
   useEffect(() => {
@@ -78,7 +79,7 @@ export function ArchiveSessionsSection(props: ArchiveSessionsSectionProps) {
       if (!cancelled) setView({ status: 'error' })
     })
     return () => { cancelled = true }
-  }, [list])
+  }, [list, loadAttempt])
 
   const rows = useMemo(() => view.status === 'ready' ? view.items : [], [view])
   const normalizedQuery = query.trim().toLowerCase()
@@ -172,7 +173,7 @@ export function ArchiveSessionsSection(props: ArchiveSessionsSectionProps) {
     return (
       <div className={css.state}>
         {t('loadError')}
-        <button type="button" className={css.retry} onClick={() => { setView({ status: 'loading' }) }}>
+        <button type="button" className={css.retry} onClick={() => { setView({ status: 'loading' }); setLoadAttempt(attempt => attempt + 1) }}>
           {t('retry')}
         </button>
       </div>
