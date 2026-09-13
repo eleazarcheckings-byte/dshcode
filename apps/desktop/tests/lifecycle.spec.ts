@@ -16,7 +16,7 @@ import {
 
 describe('desktop web service policy', () => {
   it('binds loopback on an OS-assigned port and accepts only the activated address', () => {
-    expect(desktopWebArguments()).toEqual(['--host', '127.0.0.1', '--port', '0'])
+    expect(desktopWebArguments()).toEqual(['--host', '127.0.0.1', '--port', '0', '--no-open'])
     expect(desktopApplicationUrl('127.0.0.1', 43_127)).toBe('http://127.0.0.1:43127/')
     expect(() => desktopApplicationUrl('0.0.0.0', 43_127)).toThrow('unexpected host')
     expect(() => desktopApplicationUrl('127.0.0.1', 0)).toThrow('invalid port')

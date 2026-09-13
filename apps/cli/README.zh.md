@@ -4,6 +4,8 @@
 
 `dsh` 是唯一受支持的 Node 应用启动器；profile 由多个插件组合包 patch 层按顺序叠加而成，其上再应用用户自己的覆盖配置。SDK 与 ACP 都是 profile，而不是独立的公开 bin。Python 运行时 wheel 会打包同一个命令；SDK 默认使用 `sdk`，极简示例选择 `sdk-minimal`。[`src/args.ts`](src/args.ts) 负责命令语法，[`src/bin.ts`](src/bin.ts) 只加载选中的运行器。无效命令、来自其他模式的选项、配置错误和启动失败都会以非零状态退出。
 
+原生产品外壳通过 `@deepseek-ai/dsh/profile-boot` 导入 `runProfile`；包导出构建后的 JavaScript 入口及 TypeScript 声明。SDK 启动器仍可通过 `@deepseek-ai/dsh/package.json` 定位已安装的 CLI。
+
 ## 入口模式
 
 | 命令 | 用途 |

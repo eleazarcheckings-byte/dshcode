@@ -10,6 +10,8 @@ The Electron main process calls the shared `@deepseek-ai/dsh/profile-boot` entry
 
 Packaged Electron does not expose the Node loader internals required by Cordis HMR. The desktop launcher therefore disables live watching of the profile-level and home-level `cordis.patch.yml` files; their contents are still loaded at startup, and ordinary settings managed by the Web UI keep their own live behavior. Restart DSHCode after manually editing either patch file.
 
+The desktop passes `--no-open` and loads the authenticated loopback URL from the connection service in its own BrowserWindow. The launch token is exchanged for the renderer session cookie before the clean application URL loads.
+
 ## Plugin boot-failure recovery
 
 One incompatible plugin must never brick the application. Startup failures are attributed to installed plugins and recorded in a bounded per-plugin ring (`$DSH_HOME/boot-failures.json`, at most 8 records, 90-day retention); a native recovery dialog then offers 继续（禁用插件并重启） (disable the blamed plugins and restart — the same patch-row write the settings switch performs), 安全模式启动 (start with the user patch layers skipped, via `$DSH_HOME/safe-mode`), or 退出. The plugin list in Settings shows a 启动失败 badge per affected plugin with 让 Agent 修复 (opens a conversation whose workspace is the plugin install root `$DSH_HOME/profiles`, seeded with the failure record and install path) and 复制错误. Hard crashes and hangs are covered by a boot lifecycle marker (`$DSH_HOME/boot-marker.json`): a launch that dies before the marker reaches `ok` continues the failure streak, and after three consecutive failures the dialog defaults to safe mode.
@@ -50,6 +52,8 @@ pnpm --filter @dshcode/desktop run dist:win:x64
 ```
 
 The `Desktop` GitHub Actions workflow runs the same targets on native macOS and Windows runners. Cross-compiling the Windows installer on macOS is not the supported verification path.
+
+`node apps/desktop/scripts/smoke-packaged-startup.mjs` launches the packaged main entry with an isolated Harness home and Electron user-data directory, waits for the workspace interface on its loopback URL, then quits through the application shutdown path. Every desktop packaging job requires this check before uploading installers.
 
 `node apps/desktop/scripts/test-electron-picker.mjs` runs the directory-picker binding tests inside Electron's Node runtime on both platforms. COM calls are mocked; selected paths use real koffi decoding. The Windows packaged smoke additionally opens and aborts the actual dialog; completing a selection in the installed application remains a manual check.
 

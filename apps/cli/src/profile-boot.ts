@@ -186,7 +186,7 @@ export interface RunProfileOptions {
   patchFiles: readonly string[]
   /** The invocation's inner arguments, handed to the tree through `ctx.cmdlineArgs`. */
   args: readonly string[]
-  /** Whether profile and home patch-layer files remain watched after boot. */
+  /** Permit watching profile and home patch layers when the profile declares live reload. */
   watchUserPatches: boolean
   /**
    * Skip the profile's and the home-level user patch layers entirely (safe
@@ -289,7 +289,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // own liveness; the initial check skips a tree that already exited, and the
   // catch below re-checks for an exit that landed mid-setup. Startup-frozen
   // profiles apply every user layer above but install no HMR fallback or watcher.
-  if (composed.profile.patchReload === 'live'
+  if (options.watchUserPatches && composed.profile.patchReload === 'live'
     && !signalShutdown.signal.aborted
     && ctx.fiber.state === FiberState.ACTIVE
     && ctx.get('loader') !== undefined) {

@@ -36,6 +36,10 @@ electron-builder 使用在源码工作区之外暂存的仅生产依赖 `pnpm de
 
 Windows 原生目录选择器 worker 会在受控子进程的环境中设置 `ELECTRON_RUN_AS_NODE=1`，并 spawn 打包后的可执行文件。因此 Electron 会以 Node 执行 worker 入口，而不是重新启动 DSHCode 并失去单实例锁；父应用仍以普通 Electron 模式运行，用户不需要配置该变量。
 
+CLI 清单显式导出 `./profile-boot` 和 `./package.json`。TypeScript 路径映射无法证明安装后的 ESM 解析正确：即使构建文件存在，缺少包子路径导出仍会在 Electron 开始启动应用前失败。每个原生平台打包任务均使用隔离的应用数据启动真实主入口，等待工作区界面渲染后才允许上传安装包；仅测试目录选择器无法覆盖这条启动路径。
+
+桌面通过 `--no-open` 关闭 Web profile 的外部浏览器交接，并将连接服务的已认证回环 URL 交给 BrowserWindow。即使 profile 声明实时重载，profile 启动器仍尊重 `watchUserPatches: false`，因此桌面不会挂载仅用于配置的 HMR 后备实例。
+
 ## Verification
 
 桌面生命周期测试固定回环地址／端口零参数、已激活地址校验、导航策略、打包版 Electron 缺少主模块参数时的补全，以及合并关闭请求后的执行顺序。运行时闭包门禁覆盖已安装的工作区对等依赖图。生产暂存冒烟测试启动真实 Web profile，在操作系统分配的回环端口收到 HTTP 200，释放它，并确认该端口不再接受连接；原生 Electron 启动会运行同一暂存目录与窗口。Windows 打包任务还会启动带 DSHCode 品牌的未封装可执行文件，并要求真实目录选择器 worker 到达原生对话框后成功中止，从而固定仅对子进程启用的 Node 模式。平台 CI 会在每个目标操作系统上构建安装包，tag 工作流则证明只有在全部矩阵任务成功后才会发布 Release。渲染器、模型可见输入和 transcript（文本记录）输出均未改变，因此现有 Web 快照继续作为组装应用覆盖，无需增加重复的桌面 transcript。

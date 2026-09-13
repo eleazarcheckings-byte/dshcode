@@ -18,6 +18,7 @@ import {
 } from '@deepseek-ai/dsh-host-plugin-installer'
 import { runProfile } from '@deepseek-ai/dsh/profile-boot'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import type {} from '@deepseek-ai/dsh-client-connection'
 import {
   buildTrayMenu,
   buildWindowMenu,
@@ -407,7 +408,9 @@ async function startDesktop(): Promise<void> {
     console.error(`${PRODUCT_NAME}: failed to clear resolved boot failures`, error)
   })
   quitCoordinator = createQuitCoordinator(running.shutdown, finishNativeExit)
-  applicationUrl = desktopApplicationUrl(running.ctx.webServer.host, running.ctx.webServer.port)
+  applicationUrl = running.ctx.connection.authenticatedUrl(
+    desktopApplicationUrl(running.ctx.webServer.host, running.ctx.webServer.port),
+  )
   // The title-bar menu button pops a native window menu; only a page of the
   // application origin may invoke it.
   ipcMain.handle(DESKTOP_SHOW_MENU_CHANNEL, (event) => {

@@ -10,6 +10,8 @@ Electron 主进程调用共享的 `@deepseek-ai/dsh/profile-boot` 入口，并�
 
 打包版 Electron 不开放 Cordis HMR（热模块替换）所需的 Node loader 内部能力。因此，桌面启动器会关闭 profile 级和 home 级 `cordis.patch.yml` 文件的实时监听；启动时仍会加载这两个文件的内容，Web UI 管理的普通设置也会保留各自的实时行为。手动编辑任一 patch 文件后，请重启 DSHCode。
 
+桌面传入 `--no-open`，并在自己的 BrowserWindow 中加载连接服务生成的已认证回环 URL。启动 token（令牌）会先交换为渲染器会话 cookie，然后加载干净的应用 URL。
+
 ## 插件启动失败恢复
 
 一个不兼容的插件绝不能让应用打不开。启动失败会被归因到已安装插件，并记录到有界的按插件环形文件（`$DSH_HOME/boot-failures.json`，至多 8 条、90 天留存）；随后弹出原生恢复对话框，提供「继续（禁用插件并重启）」（禁用被归咎插件并重启——与设置页开关相同的 patch 行写入）、「安全模式启动」（跳过用户 patch 层启动，通过 `$DSH_HOME/safe-mode` 标记）与「退出」。设置中的插件列表为受影响的插件显示「启动失败」徽标，带「让 Agent 修复」（打开一个工作区为插件安装根目录 `$DSH_HOME/profiles` 的对话，首条消息内嵌失败记录与安装路径）与「复制错误」。硬崩溃与挂起由启动生命周期标记（`$DSH_HOME/boot-marker.json`）兜底：在标记写入 `ok` 之前死掉的启动会延续失败计数，连续三次失败后对话框默认选择安全模式。
@@ -50,6 +52,8 @@ pnpm --filter @dshcode/desktop run dist:win:x64
 ```
 
 名为 `Desktop` 的 GitHub Actions 工作流会在原生 macOS 和 Windows runner 上执行相同目标。不支持把在 macOS 上交叉编译 Windows 安装包作为验证路径。
+
+`node apps/desktop/scripts/smoke-packaged-startup.mjs` 使用隔离的 Harness 主目录和 Electron 用户数据目录启动安装包中的主入口，等待回环地址上的工作区界面出现，再通过应用退出流程关闭。每个桌面打包任务都必须通过此检查才能上传安装包。
 
 `node apps/desktop/scripts/test-electron-picker.mjs` 在两个平台的 Electron Node 运行时中执行目录选择器绑定测试。COM 调用使用 mock，所选路径使用真实 koffi 解码。Windows 打包冒烟测试还会打开并中止实际对话框；在已安装应用中完成一次选择仍需手动检查。
 

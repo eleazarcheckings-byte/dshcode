@@ -9,6 +9,9 @@
   ],
   "references": [
     {
+      "path": "../../packages/client/connection/tsconfig.host.json"
+    },
+    {
       "path": "../cli"
     },
     {

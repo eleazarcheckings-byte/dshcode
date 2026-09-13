@@ -22,10 +22,10 @@ export function ensureMainModuleArgument(argv: string[], mainModulePath: string)
 
 /**
  * Build the immutable Web-profile arguments for a desktop launch.
- * @returns Arguments that bind only to loopback and request an ephemeral port.
+ * @returns Arguments that bind only to loopback, request an ephemeral port, and suppress the external browser.
  */
 export function desktopWebArguments(): readonly string[] {
-  return ['--host', DESKTOP_WEB_HOST, '--port', String(DESKTOP_WEB_PORT)]
+  return ['--host', DESKTOP_WEB_HOST, '--port', String(DESKTOP_WEB_PORT), '--no-open']
 }
 
 /**
