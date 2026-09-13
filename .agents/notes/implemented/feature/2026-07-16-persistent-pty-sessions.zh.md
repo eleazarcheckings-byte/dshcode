@@ -158,7 +158,7 @@ plugins:
 
 - 逐文件覆盖测试锁定了 owner 隔离、并发预留、写入前检查期间的取消、未发布 spawn 的取消与等待式 teardown、沙箱模式变更拒绝、可重试的生命周期清理、就绪层级、对写入前 stdin 等待与延迟到达的先前 prompt 的拒绝、配置化交接宽限把 idle fallback 顶过一次轮询以及低于 `pollIntervalMs` 时的拒绝、sanitizer carry state、完整 UTF-8 结果上限、task 集成、schema 和精确 render intent。
 - 子进程 fixture（测试前置数据）覆盖非 leader 与非主线程的 stdin 等待、线程本地 fd 表、`/dev/tty` 别名、用户态模拟下受支持的内核 ABI、拒绝把指向管道的 fd 0 当作终端输入、僵尸进程完全停稳、不可读进程状态、不支持的架构和其他误报拒绝；同一单元测试套件通过注入覆盖 macOS 检查器逻辑。
-- 真实 `node-pty` 与 PTY 消费方测试共同在受支持宿主上覆盖 shell 状态、通过 `/dev/tty` 读取控制终端输入、进程 syscall 可读时的精确归因、宿主策略拒绝读取时的有界 idle fallback、共享沙箱策略、环境清洗、raw mode 前台 `SIGINT`、忽略 `SIGTERM` 的后代进程，以及 dispose 返回后立即完全停稳。
+- 真实 `node-pty` 与 PTY 消费方测试共同在受支持宿主上覆盖 shell 状态、通过 `/dev/tty` 读取控制终端输入、进程 syscall 可读时的精确归因、宿主策略拒绝读取时的有界 idle fallback、共享沙箱策略、环境清洗、raw mode 前台 `SIGINT`、忽略 `SIGTERM` 的后代进程，以及 dispose 返回后立即完全停稳。 `/dev/tty` 回答断言等待保留输出中出现子进程生成的文本，因为前台就绪可能先于 PTY 输出送达。受控单元测试固定该顺序，并确认已结算的 viewport 保持不变。
 - Loader 驱动的 `cordis.yml` 测试挂载真实三包组合，并验证延迟到达的流水线输出随已完成命令返回，而不会被归类为终端输入就绪。SDK minimal 快照通过持久 Bash 工具固定该输出；ACP 与 headless 快照通过 opt-in overlay 固定 6 个终端 schema、有界结果和错误；TUI 快照固定 terminal 与 generic 卡片展示。
 - 包约定、架构图、子系统页面、生成目录和 website API 描述同一个已发布接口。
 

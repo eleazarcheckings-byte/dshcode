@@ -197,7 +197,12 @@ describe.skipIf(process.platform === 'win32')('terminal-bash real shell', () => 
     const answer = ctx.terminals.startSend(agent, created.sessionId, { text: 'accepted', submit: true })
     const answered = await answer.done
     expect(answered.waitReason).toBe('stdin_read')
-    expect(answered.viewport).toContain('ANSWER=accepted')
+    // Foreground readiness and PTY output delivery are independent observations.
+    // The send snapshot may contain only the echo; retained output owns the reply.
+    await expect.poll(
+      () => ctx.terminals.read(agent, created.sessionId, { offset: 0, count: 20 }).text,
+      { timeout: 8_000 },
+    ).toContain('ANSWER=accepted')
     await ctx.terminals.kill(agent, created.sessionId)
   }, 20_000)
 

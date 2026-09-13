@@ -525,6 +525,30 @@ describe('LocalPtySession readiness and output', () => {
     expect(operation.cancel()).toBe(false)
   })
 
+  it('retains output delivered after foreground readiness settles a send', async () => {
+    vi.useFakeTimers()
+    const terminal = new FakeTerminal()
+    const inspector = new FakeInspector()
+    const session = makeSession(terminal, inspector, config())
+    try {
+      await initialize(session, terminal)
+
+      const operation = session.startSend({ text: 'accepted', submit: true })
+      await vi.advanceTimersByTimeAsync(0)
+      terminal.emitData('accepted\r\n')
+      inspector.waiting = true
+      await vi.advanceTimersByTimeAsync(20)
+      const result = await operation.done
+      expect(result).toMatchObject({ waitReason: 'stdin_read', viewport: 'accepted\n' })
+
+      terminal.emitData('ANSWER=accepted\r\n')
+      expect(session.read({ offset: 0, count: 20 }).text).toContain('ANSWER=accepted')
+      expect(result.viewport).toBe('accepted\n')
+    } finally {
+      await session.close('test complete')
+    }
+  })
+
   it('does not reuse a pre-write stdin wait as post-write readiness', async () => {
     vi.useFakeTimers()
     const terminal = new FakeTerminal()
