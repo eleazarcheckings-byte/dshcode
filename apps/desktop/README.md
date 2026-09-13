@@ -51,6 +51,8 @@ pnpm --filter @dshcode/desktop run dist:win:x64
 
 The `Desktop` GitHub Actions workflow runs the same targets on native macOS and Windows runners. Cross-compiling the Windows installer on macOS is not the supported verification path.
 
+`node apps/desktop/scripts/test-electron-picker.mjs` runs the directory-picker binding tests inside Electron's Node runtime on both platforms. COM calls are mocked; selected paths use real koffi decoding. The Windows packaged smoke additionally opens and aborts the actual dialog; completing a selection in the installed application remains a manual check.
+
 A `desktop-v*` tag publishes the complete successful matrix and `SHA256SUMS.txt` to [GitHub Releases](https://github.com/whitelonng/dshcode/releases). Manual workflow runs retain their packages as ordinary Actions artifacts without creating a Release.
 
 ## Packaging

@@ -1,13 +1,15 @@
 /**
  * The koffi-backed bindings against a mocked `koffi` module (the same
  * technique as dsh-session-persistence-jsonl's win32 suite): a small in-memory
- * COM world stands in for ole32/user32/kernel32, keeping the vtable dispatch,
+ * COM world stands in for ole32/user32/kernel32; path strings use real koffi
+ * decoding of native addresses. This keeps the vtable dispatch,
  * result extraction, memory hygiene, and the WM_CLOSE poster covered on every
  * host. The worker entry is exercised the same way with a mocked process
  * boundary (env title + `process.send`). Real-COM behavior is pinned by the
  * win32-only smoke in win32-dialog.spec.ts.
  */
 
+import nativeKoffi from 'koffi'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HRESULT_CANCELLED, runFolderDialog } from '../src/win32-dialog-logic.ts'
 
@@ -30,6 +32,7 @@ interface ComWorld {
   /** Contexts `SetThreadDpiAwarenessContext` accepts; others return NULL. */
   supportedDpiContexts: number[]
   enumThrows: boolean
+  decodeThrows: boolean
   path: string
   titles: string[]
   options: number[]
@@ -45,7 +48,7 @@ interface ComWorld {
 function comWorld(overrides: Partial<ComWorld> = {}): ComWorld {
   return {
     coInitHr: 0, coCreateHr: 0, showHr: 0, getResultHr: 0, getDisplayNameHr: 0,
-    hasThreadDpi: true, supportedDpiContexts: [-4], enumThrows: false,
+    hasThreadDpi: true, supportedDpiContexts: [-4], enumThrows: false, decodeThrows: false,
     path: 'C:\\选中\\directory',
     titles: [], options: [], dpiContexts: [], freed: [], released: [], posted: [],
     registered: 0, unregistered: 0, uninitialized: 0,
@@ -59,7 +62,8 @@ interface FakePtr { kind: string; [key: string]: unknown }
 function installFakeKoffi(world: ComWorld): void {
   const dialogPtr: FakePtr = { kind: 'dialog' }
   const itemPtr: FakePtr = { kind: 'item' }
-  const namePtr: FakePtr = { kind: 'name', text: world.path }
+  const nameBytes = Buffer.from(`${world.path}\0`, 'utf16le')
+  const namePtr = nativeKoffi.address(nameBytes)
   const outBuffers = new Map<unknown, FakePtr>()
 
   const dispatch = (self: FakePtr, slot: number, args: unknown[]): number => {
@@ -104,7 +108,10 @@ function installFakeKoffi(world: ComWorld): void {
               outBuffers.set(args[4], dialogPtr)
               return 0
             }
-            case 'CoTaskMemFree': return (ptr: unknown) => { world.freed.push(ptr) }
+            case 'CoTaskMemFree': return (ptr: unknown) => {
+              expect(ptr).toBe(nativeKoffi.address(nameBytes))
+              world.freed.push(ptr)
+            }
             case 'GetCurrentThreadId': return () => 31337
             case 'SetThreadDpiAwarenessContext': {
               if (!world.hasThreadDpi) throw new Error(`${dll}: SetThreadDpiAwarenessContext not found`)
@@ -128,14 +135,13 @@ function installFakeKoffi(world: ComWorld): void {
       pointer: (type: unknown) => type,
       sizeof: (type: string) => { void type; return FAKE_POINTER_SIZE },
       view: (value: unknown, len: number): ArrayBuffer => {
-        const bytes = Buffer.alloc(len)
-        bytes.write((value as FakePtr).text as string, 'utf16le')
-        return bytes.buffer
+        if (len > nameBytes.length) throw new Error('read beyond the path allocation')
+        return nativeKoffi.view(value, len)
       },
       register: (fn: (hwnd: unknown, lparam: unknown) => number) => { world.registered += 1; return { fn } },
       unregister: () => { world.unregistered += 1 },
-      decode: (value: unknown, offsetOrType: unknown): unknown => {
-        if (offsetOrType === 'str16') return (value as FakePtr).text
+      decode: Object.assign((value: unknown, offsetOrType: unknown): unknown => {
+        if (offsetOrType === 'str16') throw new Error('path is not a pointer-to-pointer')
         if (typeof offsetOrType === 'number') {
           // Vtable slot read: offsets must be multiples of the fake width.
           if (offsetOrType % FAKE_POINTER_SIZE !== 0) throw new Error(`vtable offset ${offsetOrType} is not pointer-aligned`)
@@ -145,7 +151,12 @@ function installFakeKoffi(world: ComWorld): void {
         // decode(x, 'void *'): out-buffer read or vtable read.
         if (outBuffers.has(value)) return outBuffers.get(value)
         return { owner: value as FakePtr }
-      },
+      }, {
+        string16: (value: unknown): string => {
+          if (world.decodeThrows) throw new Error('path decoding failed')
+          return nativeKoffi.decode.string16(value)
+        },
+      }),
       call: (fn: { call: (args: unknown[]) => number }, _proto: unknown, _self: unknown, ...args: unknown[]) => fn.call(args),
     },
   }))
@@ -163,6 +174,29 @@ afterEach(() => {
 })
 
 describe('loadWin32DialogBindings over the fake COM world', () => {
+  it.runIf(process.env.DSHCODE_ELECTRON_PICKER_TEST === '1')('executes inside the Electron runtime', () => {
+    expect(process.versions.electron).toBeTruthy()
+    expect(process.env.ELECTRON_RUN_AS_NODE).toBe('1')
+  })
+
+  it.each(['C:\\项目\\开新文件夹', 'C:\\Ā\\一', 'C:\\项目\\😀', 'C:\\a'])('preserves the complete selected path %s', async (path) => {
+    const world = comWorld({ path })
+    installFakeKoffi(world)
+    const bindings = await (await loadBindingsModule()).loadWin32DialogBindings()
+    expect(runFolderDialog(bindings, 'Pick', vi.fn())).toBe(path)
+    expect(world.freed).toHaveLength(1)
+  })
+
+  it('frees the path and releases COM objects when decoding fails', async () => {
+    const world = comWorld({ decodeThrows: true })
+    installFakeKoffi(world)
+    const bindings = await (await loadBindingsModule()).loadWin32DialogBindings()
+    expect(() => runFolderDialog(bindings, 'Pick', vi.fn())).toThrow('path decoding failed')
+    expect(world.freed).toHaveLength(1)
+    expect(world.released).toEqual(['item', 'dialog'])
+    expect(world.uninitialized).toBe(1)
+  })
+
   it('drives the full selection conversation with memory hygiene', async () => {
     const world = comWorld()
     installFakeKoffi(world)

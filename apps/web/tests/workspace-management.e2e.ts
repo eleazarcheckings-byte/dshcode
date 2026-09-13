@@ -28,6 +28,7 @@ import {
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/workspace-management', import.meta.url))
+const PATH_EXPECTED_DIR = fileURLToPath(new URL('./expected/workspace-management', import.meta.url))
 // The seed is another scenario's committed fixture, reused read-only: this
 // spec needs any one cold session row, not new recorded content.
 const SEED = fileURLToPath(new URL('../../../snapshots/web/seeded-history/session.jsonl', import.meta.url))
@@ -692,10 +693,29 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 
+  it('adopts and displays a complete Chinese workspace path', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-ws-chinese-path'))
+    const name = '开新文件夹'
+    const path = join(scaffold.workspaceCwd, '项目', name)
+    await mkdir(path, { recursive: true })
+    await adoptDirectory(path, { waitForAgent: true })
+    await page.locator('[role="treeitem"]').filter({ hasText: name }).first().hover()
+    const action = page.getByRole('button', { name: `Workspace actions for ${name}` })
+    await action.waitFor({ state: 'attached', timeout: 10_000 })
+    const workspace = await scaffold.ctx.workspaceRegistry.resolveByPath(path)
+    const transcript = [
+      `title=${workspace?.title}`,
+      `path=${workspace?.path.slice(scaffold.workspaceCwd.length).split(sep).join('/')}`,
+      `action=${await action.getAttribute('aria-label')}`,
+    ].join('\n')
+    await compareOrRefreshGolden(join(PATH_EXPECTED_DIR, 'chinese-path.expected.txt'), transcript, MODE)
+    expect(tripwire.pageErrors).toEqual([])
+  }, 90_000)
+
   it.skipIf(MODE === 'record')('issued zero model calls and stayed clean', async () => {
     expect(tripwire.warnings).toEqual([])
-    // The directory-browser aria golden is this spec's one owned artifact;
-    // the seed it reuses is owned (and inventory-guarded) by seeded-history.
+    // The reused seed is owned and inventory-guarded by seeded-history.
     await assertFixtureInventory(SNAPSHOT_DIR, ['.gitkeep', 'directory-browser.expected.md'])
+    await assertFixtureInventory(PATH_EXPECTED_DIR, ['chinese-path.expected.txt'])
   })
 })

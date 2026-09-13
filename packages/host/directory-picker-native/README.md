@@ -35,6 +35,8 @@ Choose this backend for a workstation-local operator on macOS, Windows, or deskt
 
 Each call opens one native chooser on the host display and waits for the operator; aborting the caller's signal terminates the chooser process instead of leaving it open. On Linux the chooser needs either Zenity or KDialog installed; with neither present, `pick` rejects with an actionable error instead of falling back to a typed-path prompt. The browser half of this package registers a renderless flow occupant into the workspace flow — every `open` request drives `directoryPicker/pick` and reports the one outcome (picked path, cancel, or failure).
 
+Windows preserves the complete selected UTF-16 path, including characters such as `开` whose low byte is zero. The decoder reads through the NUL terminator of the COM allocation without creating an external ArrayBuffer, which Electron forbids; the allocation is freed even if decoding throws.
+
 ### Observable failures
 
 A cancel returns `null`, not an error. Missing platform tooling, a failed chooser launch, or an aborted pick surfaces as a rejection the UI can present; the [browse backend](../directory-picker-browse/README.md) remains the composition-level fallback for deployments where native picking is unreliable.

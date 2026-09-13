@@ -51,6 +51,8 @@ pnpm --filter @dshcode/desktop run dist:win:x64
 
 名为 `Desktop` 的 GitHub Actions 工作流会在原生 macOS 和 Windows runner 上执行相同目标。不支持把在 macOS 上交叉编译 Windows 安装包作为验证路径。
 
+`node apps/desktop/scripts/test-electron-picker.mjs` 在两个平台的 Electron Node 运行时中执行目录选择器绑定测试。COM 调用使用 mock，所选路径使用真实 koffi 解码。Windows 打包冒烟测试还会打开并中止实际对话框；在已安装应用中完成一次选择仍需手动检查。
+
 `desktop-v*` tag 会把完整且成功的构建矩阵与 `SHA256SUMS.txt` 发布到 [GitHub Releases](https://github.com/whitelonng/dshcode/releases)。手动运行工作流时，安装包只作为普通 Actions 产物保留，不会创建 Release。
 
 ## 打包

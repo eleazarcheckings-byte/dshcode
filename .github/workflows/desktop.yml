@@ -51,9 +51,12 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Test Windows dialog worker launch
+      - name: Test Windows directory picker
         if: runner.os == 'Windows'
-        run: pnpm exec vitest run packages/host/directory-picker-native/tests/win32-dialog-host.spec.ts
+        run: pnpm exec vitest run packages/host/directory-picker-native/tests/win32-dialog-host.spec.ts packages/host/directory-picker-native/tests/win32-dialog-bindings.spec.ts
+
+      - name: Test directory decoding in Electron
+        run: node apps/desktop/scripts/test-electron-picker.mjs
 
       - name: Package
         run: pnpm --filter @dshcode/desktop run ${{ matrix.command }}

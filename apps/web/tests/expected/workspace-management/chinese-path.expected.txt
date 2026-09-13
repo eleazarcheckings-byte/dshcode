@@ -1,0 +1,3 @@
+title=开新文件夹
+path=/项目/开新文件夹
+action=Workspace actions for 开新文件夹
