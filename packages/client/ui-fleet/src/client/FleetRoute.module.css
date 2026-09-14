@@ -1,0 +1,102 @@
+/* Fleet route surface: one hairline line per delegated worker, in the ambient
+   composer-dock tier beside the stats line and aligned to the shared message
+   column axis (--dsh-chat-content-width). No card, no border, no background of
+   its own — this is the dock's ambient register, not its card stack. */
+
+.root {
+  display: block;
+  max-width: var(--dsh-chat-content-width);
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 4px calc(var(--dsh-composer-side-clearance) + 16px) 0;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Zero delegated workers still reads as designed: one quiet line in the same
+   register as the stats line, with no dot and nothing to click. */
+.empty {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  /* Five workers are visible without scrolling; a deeper fleet scrolls inside
+     this block, so the composer above it never moves. */
+  max-height: 144px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  box-sizing: border-box;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* The skin draws the gold focus ring on every keyboard target; only the offset
+   is pulled in, so the ring stays inside the strip's own box. */
+.row:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Settled: the label recedes a tier (the jobs list's settled-row idiom). The
+   reminder is a fact, not a demand. */
+.row[data-status='done'] {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dot {
+  flex: none;
+}
+
+.label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.status {
+  /* `none` so the label absorbs every bit of give; the cap ellipsizes a long
+     named blocker instead of pushing the label out of the row. */
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Attention escalates by ink tier, one step per state — never by an extra
+   metric or a badge. */
+.row[data-status='blocked'] .status {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.row[data-status='waiting-for-you'] .status {
+  color: var(--dsw-alias-state-warn-primary);
+}
