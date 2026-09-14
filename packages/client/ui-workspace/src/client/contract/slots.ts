@@ -144,6 +144,17 @@ export type WorkspaceBrowserInjected = {
   insertSessionBefore: (workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId) => Promise<void>
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  /**
+   * Hand a path to the host desktop's own opener: a directory opens in the
+   * file manager, a file opens in its default application.
+   *
+   * Reuses the session controller's existing capability-gated opener (the same
+   * one the transcript's produced-file chips drive) rather than adding a second
+   * OS-integration mechanism. Callers pass a real absolute path — never a
+   * display-abbreviated one — and omit the affordance when they have none.
+   * Rejects when the host refuses the path.
+   */
+  openPath: (path: string) => Promise<void>
 }
 
 /** Full browser props: shell owner share + viewing store + injected actions + the locale seat. */

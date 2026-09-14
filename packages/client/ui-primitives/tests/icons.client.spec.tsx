@@ -57,28 +57,42 @@ describe('ic_ds_ icon set', () => {
   })
 })
 
-describe('FishLogo', () => {
-  it('renders the fish path in currentColor at the native ratio', () => {
-    const { container } = render(<primitives.FishLogo />)
+describe('SaturnLogo', () => {
+  it('renders the ringed-planet structure in currentColor on a square 64-unit viewBox', () => {
+    const { container } = render(<primitives.SaturnLogo />)
     const svg = container.querySelector('svg')!
     expect(svg.getAttribute('width')).toBe('24')
-    expect(Number(svg.getAttribute('height'))).toBeCloseTo(17.66, 1)
-    expect(svg.getAttribute('viewBox')).toBe('0 0 23.16 17.04')
-    expect(container.querySelectorAll('path')).toHaveLength(1)
+    expect(svg.getAttribute('height')).toBe('24')
+    expect(svg.getAttribute('viewBox')).toBe('0 0 64 64')
+    // Planet body plus the ring drawn twice (whole, then clipped to its
+    // front lower half so it passes behind the top and in front of the bottom).
+    expect(container.querySelectorAll('circle')).toHaveLength(1)
+    expect(container.querySelectorAll('ellipse')).toHaveLength(2)
+    expect(container.querySelectorAll('clipPath')).toHaveLength(1)
     expect(container.innerHTML).toContain('currentColor')
-    expect(container.innerHTML).not.toContain('M0 0L23.16')
   })
-})
 
-describe('BrandWordmark', () => {
-  it('can render the name artwork with or without its leading mark', () => {
-    const view = render(<primitives.BrandWordmark />)
-    const svg = view.container.querySelector('svg')!
-    expect(svg.getAttribute('width')).toBe('182')
-    expect(svg.getAttribute('viewBox')).toBe('0 0 182 24')
+  it('renders the requested size and className on the root svg', () => {
+    const { container } = render(<primitives.SaturnLogo size={34} className="x" />)
+    const svg = container.querySelector('svg')!
+    expect(svg.getAttribute('width')).toBe('34')
+    expect(svg.getAttribute('height')).toBe('34')
+    expect(svg.classList.contains('x')).toBe(true)
+  })
 
-    view.rerender(<primitives.BrandWordmark includeMark={false} />)
-    expect(svg.getAttribute('width')).toBe('156')
-    expect(svg.getAttribute('viewBox')).toBe('26 0 156 24')
+  it('scales the ring stroke so the mark stays legible when rasterized small', () => {
+    // The master 4.5-unit stroke renders at about 1.1px on a 16px edge, where
+    // the ring collapses into a clipped arrowhead. The stroke scales instead,
+    // and the ring's minor axis reopens the gap the thicker stroke would close.
+    const { container } = render(<primitives.SaturnLogo size={16} />)
+    const stroke = Number(container.querySelector('g')!.getAttribute('stroke-width'))
+    expect((stroke * 16) / 64).toBeGreaterThanOrEqual(1.6)
+    expect(Number(container.querySelector('ellipse')!.getAttribute('ry'))).toBeGreaterThan(9.5)
+  })
+
+  it('keeps the master geometry at and above the small-edge threshold', () => {
+    const { container } = render(<primitives.SaturnLogo size={24} />)
+    expect(Number(container.querySelector('g')!.getAttribute('stroke-width'))).toBe(4.5)
+    expect(Number(container.querySelector('ellipse')!.getAttribute('ry'))).toBe(9.5)
   })
 })

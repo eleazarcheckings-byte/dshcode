@@ -1,9 +1,10 @@
-import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
-  diffTotals,
+  CodeBlock, ContextMenu, DiffBlock, DisclosureRow, IconFolderOpen16, IconInspectOutline12, IconLinkOutline16, ReadBlock,
+  SearchBlock, StateDot, TerminalBlock, WebBlock, diffTotals, parentDirectory,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ContextMenuEntry, ContextMenuTarget } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { CHAT_DIFF_MAX_LINES, type DiffCardModel } from '../models/diff-card-model.ts'
 import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-model.ts'
@@ -111,6 +112,9 @@ export function ToolRow({
   inspect,
 }: ToolRowProps) {
   const [expanded, setExpanded] = useState(false)
+  // Context-menu state sits beside the expansion state: both are row-local UI.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuTarget, setMenuTarget] = useState<ContextMenuTarget | null>(null)
   const terminalLabels = useMemo(() => terminalBlockLabels(t), [t])
   const diffLabels = useMemo(() => diffBlockLabels(t), [t])
   const readLabels = useMemo(() => readBlockLabels(t), [t])
@@ -153,6 +157,36 @@ export function ToolRow({
     event.stopPropagation()
     if (filePath !== undefined) onOpenFile?.(filePath)
   }
+  // The right-click surface acts on exactly the path the summary link already
+  // opens, so the two affordances can never disagree about which file they
+  // mean. The reveal target is the file's containing directory, derived from
+  // the real path rather than from the (possibly clipped) summary label.
+  const revealDirectory = filePath === undefined ? undefined : parentDirectory(filePath)
+  const fileMenuItems: readonly ContextMenuEntry[] = [
+    ...(onOpenFile === undefined
+      ? []
+      : [{ id: 'open', label: t('row.openFile'), icon: <IconLinkOutline16 /> }]),
+    ...(onOpenFile === undefined || revealDirectory === undefined
+      ? []
+      : [{ id: 'reveal', label: t('row.showInFolder'), icon: <IconFolderOpen16 /> }]),
+  ]
+  // A row with no openable path, or a path with nothing above it (a bare file
+  // name, a drive root, a UNC share root), offers no rows: the menu stays shut
+  // instead of opening as an empty card.
+  const hasFileMenu = fileLink && fileMenuItems.length > 0
+  const openFileMenu = (event: MouseEvent<HTMLDivElement>): void => {
+    if (!hasFileMenu) return
+    event.preventDefault()
+    event.stopPropagation()
+    // The keyboard context-menu key carries no pointer point; the row's own
+    // rect keeps the card beside the affordance the operator is focused on.
+    const fromPointer = event.clientX > 0 || event.clientY > 0
+    setMenuTarget(fromPointer
+      ? { kind: 'point', x: event.clientX, y: event.clientY }
+      : { kind: 'element', rect: event.currentTarget.getBoundingClientRect() })
+    setMenuOpen(true)
+  }
+  const closeFileMenu = useCallback(() => { setMenuOpen(false) }, [])
   // Keep Enter/Space on the focused path link from bubbling to the row's
   // keydown handler, which would preventDefault() the key and toggle expand
   // instead of activating the link — the keyboard analogue of openFile's
@@ -164,7 +198,13 @@ export function ToolRow({
   // output joins the IN/OUT card; every other variant's input does too.
   const cardBody = variant === 'code' ? null : bodyText
   return (
-    <div className={css.root} data-variant={variant} data-tool={toolName} data-state={state}>
+    <div
+      className={css.root}
+      data-variant={variant}
+      data-tool={toolName}
+      data-state={state}
+      onContextMenu={openFileMenu}
+    >
       {status !== null && <span className={css.visuallyHidden}>{status}</span>}
       <DisclosureRow
         rowClassName={css.row}
@@ -281,6 +321,18 @@ export function ToolRow({
           )}
         </div>
       </DisclosureRow>
+      <ContextMenu
+        open={menuOpen}
+        target={menuTarget}
+        label={t('row.menu.aria')}
+        items={fileMenuItems}
+        onClose={closeFileMenu}
+        onSelect={(id) => {
+          setMenuOpen(false)
+          if (id === 'open' && filePath !== undefined) onOpenFile?.(filePath)
+          else if (id === 'reveal' && revealDirectory !== undefined) onOpenFile?.(revealDirectory)
+        }}
+      />
     </div>
   )
 }

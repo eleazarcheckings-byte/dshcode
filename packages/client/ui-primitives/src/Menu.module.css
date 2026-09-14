@@ -48,6 +48,21 @@
   z-index: 1100;
 }
 
+/* Cursor-anchored context menu (ContextMenu.tsx). Same card as the anchored
+ * dropdown above — only the placement differs: fixed at a viewport point with
+ * coordinates supplied inline, and layered above every in-app surface (the
+ * anchored portal list tops out at 1100, the modal overlay at 1000).
+ * Declared after `.list` so it wins the equal-specificity position/z-index
+ * overrides. */
+.context {
+  position: fixed;
+  top: auto;
+  left: auto;
+  z-index: 1200;
+  min-width: 208px;
+  max-width: 320px;
+}
+
 /* Open above the anchor (empty-state workspace chip: figma 122:9481). */
 .sideTop {
   top: auto;

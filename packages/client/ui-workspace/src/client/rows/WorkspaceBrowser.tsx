@@ -9,7 +9,7 @@
  * menu in between; the flow and its error dialog live in WorkspacePicker
  * (same package — direct composition, no slot between them).
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   Button, IconCloseFill14, IconPersonalizationOutline16,
@@ -237,6 +237,12 @@ type SessionTreeProps = Pick<
 > & {
   /** Host account home for POSIX hover-path abbreviation. */
   home?: string | undefined
+  /**
+   * Reveal a folder through the browser's error-handled opener. The rows hand
+   * over a real `cwd` and stay presentational; a refusal surfaces here rather
+   * than escaping as an unhandled rejection inside a row's menu.
+   */
+  onOpenFolder: (path: string) => void
   workspaces: readonly WorkspaceView[]
   /** Explicit persisted zero-or-five-session state by Workspace group. */
   groupExpansion: Readonly<Record<string, boolean>>
@@ -268,7 +274,7 @@ type SessionTreeProps = Pick<
 function SessionTree({
   useSessions, useSessionPendingInteraction, startSession, open, forkSession, workspaces, archivedSessionIds,
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
-  insertWorkspaceBefore, insertSessionBefore, orderBy,
+  insertWorkspaceBefore, insertSessionBefore, onOpenFolder, orderBy,
   groupExpansion, setGroupExpanded,
   sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, home, t,
 }: SessionTreeProps) {
@@ -499,6 +505,7 @@ function SessionTree({
                 group={group}
                 home={home}
                 t={t}
+                onOpenFolder={onOpenFolder}
                 onToggle={() => {
                   if (group.expanded) {
                     setExpandedSessionGroups(keys => keys.filter(key => key !== group.key))
@@ -564,6 +571,8 @@ function SessionTree({
                     onRename={onSessionRename}
                     onFork={forkSession}
                     onArchive={onSessionArchive}
+                    cwd={group.cwd}
+                    onOpenFolder={onOpenFolder}
                     drag={dragProps}
                     t={t}
                   />
@@ -594,7 +603,7 @@ function SessionTree({
 function FlatList({
   useSessions, useSessionPendingInteraction, open, forkSession, onSessionRename, onSessionArchive,
   archivedSessionIds,
-  orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
+  orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, onOpenFolder, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessions'
@@ -609,6 +618,7 @@ function FlatList({
   | 'sessionUpdatedAtByAccount'
   | 'syncSessionOrderAccount'
   | 'setSessionOrder'
+  | 'onOpenFolder'
   | 't'
 >) {
   const list = useSessions(s => s)
@@ -683,6 +693,8 @@ function FlatList({
               onRename={onSessionRename}
               onFork={forkSession}
               onArchive={onSessionArchive}
+              cwd={list.byId[node.id]?.cwd}
+              onOpenFolder={onOpenFolder}
               flat
               drag={{
                 start: () => {
@@ -817,6 +829,7 @@ export function WorkspaceBrowser({
   archiveSession,
   insertSessionBefore,
   createWorkspace,
+  openPath,
   searchSessions,
   searchResultLimit,
   useDirectoryFlow,
@@ -1039,6 +1052,18 @@ export function WorkspaceBrowser({
   const [deleting, setDeleting] = useState(false)
   const [deleteCommittedId, setDeleteCommittedId] = useState<WorkspaceId | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Reveal failures (a workspace directory that has since moved or been
+  // removed, or a host with no desktop opener) surface in the browser's own
+  // dialog idiom. The row stays presentational: it hands over a path, and the
+  // browser decides how a refusal reads. Nothing is swallowed and nothing
+  // reaches the console as an unhandled rejection.
+  const [revealError, setRevealError] = useState<string | null>(null)
+  const revealFolder = useCallback((path: string) => {
+    setRevealError(null)
+    openPath(path).catch((reason: unknown) => {
+      setRevealError(reason instanceof Error ? reason.message : String(reason))
+    })
+  }, [openPath])
   useEffect(() => {
     if (deleteCommittedId === null
       || workspaces.some(workspace => workspace.workspaceId === deleteCommittedId)) return
@@ -1228,6 +1253,7 @@ export function WorkspaceBrowser({
                 sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
                 syncSessionOrderAccount={actions.syncSessionOrderAccount}
                 setSessionOrder={actions.setSessionOrder}
+                onOpenFolder={revealFolder}
                 t={t}
               />
             )
@@ -1250,6 +1276,7 @@ export function WorkspaceBrowser({
                 open={open}
                 insertWorkspaceBefore={insertWorkspaceBefore}
                 insertSessionBefore={insertSessionBefore}
+                onOpenFolder={revealFolder}
                 orderBy={orderBy}
                 home={home}
                 t={t}
@@ -1356,6 +1383,17 @@ export function WorkspaceBrowser({
       >
         {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
         {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
+      </Modal>
+      <Modal
+        open={revealError !== null}
+        title={t('reveal.failed.title')}
+        closeLabel={t('close')}
+        onClose={() => { setRevealError(null) }}
+        footer={(
+          <Button variant="outline" onClick={() => { setRevealError(null) }}>{t('close')}</Button>
+        )}
+      >
+        <div className={css.renameError} role="alert">{revealError}</div>
       </Modal>
     </div>
   )

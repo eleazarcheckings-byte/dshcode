@@ -88,6 +88,13 @@ export interface ChatNodeOwnerProps {
    * resolves false when the host refused.
    */
   editAt?: ((seq: number, text: string) => Promise<boolean>) | undefined
+  /**
+   * Continue the Turn at `turn` after it closed without a completed answer:
+   * steers `continue` into the session, which resumes the pending work (an idle
+   * driver starts a turn; a live one folds it into the next step). Resolves
+   * false when the session moved on or the host refused.
+   */
+  continueTurn: (turn: number) => Promise<boolean>
   renderMessageImages: RenderMessageImages
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
   /** Turn-process state when this Node belongs to a projected Turn. */
@@ -158,6 +165,13 @@ export interface ChatViewInjected {
   deleteAt: (seq: number) => Promise<boolean>
   /** Edit the last user message at `seq` with `text` and regenerate; resolves false on refusal. */
   editAt: (seq: number, text: string) => Promise<boolean>
+  /**
+   * Continue the Turn at `turn` after it closed without a completed answer:
+   * steers `continue` into the session and resolves false when the session
+   * moved on (a later Turn owns the tail, or one is already open) or the host
+   * refused the admission.
+   */
+  continueTurn: (turn: number) => Promise<boolean>
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
 }
 

@@ -168,6 +168,7 @@ function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChat
     turn: end.event.data.turn,
     seq: end.event.seq,
     time: end.event.time,
+    endReason: end.event.data.reason,
     closing,
     branchUnavailable: closing === null || latestTranscriptSeq !== closing.finalNode.seq,
     ...metrics?.ttftMs === undefined ? {} : { ttftMs: metrics.ttftMs },

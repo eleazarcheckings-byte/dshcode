@@ -1,19 +1,20 @@
 /**
  * Workspace browser tree row components (figma Cell set 14:3080): pure presentational —
  * all data and callbacks arrive via props. Hover swaps (folder->chevron,
- * time->ellipsis, action buttons) are CSS-only. Row ... menus are visual-only
- * except workspace Rename/Delete and session Rename/Fork/Archive; the session
- * and workspace hover cards are suppressed while a menu is open.
+ * time->ellipsis, action buttons) are CSS-only. Both a row's "…" button and a
+ * right-click anywhere on it open the shared `ContextMenu` (workspace
+ * Rename/Delete, session Rename/Fork/Copy ID/Archive), which is also the
+ * keyboard route (context-menu key / Shift+F10) and returns focus to the
+ * button; the session and workspace hover cards are suppressed while it is open.
  */
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  HoverCard, IconAlarmClockOutline16, IconArchiveOutline20, IconBranchOutline16,
-  IconEditOutline16, IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16,
-  IconPlusOutline16, IconTrashOutline16, IconTriangleRightFill14, Menu, relativeTime,
-  StateDot,
+  ContextMenu, HoverCard, IconAlarmClockOutline16, IconArchiveOutline20, IconBranchOutline16,
+  IconCopyOutline16, IconEditOutline16, IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16,
+  IconPlusOutline16, IconTrashOutline16, IconTriangleRightFill14, relativeTime, StateDot, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ContextMenuEntry, ContextMenuTarget, StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
@@ -109,12 +110,18 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
  * @param props.t - the browser root's locale seat.
  * @returns the row element.
  */
-export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home, t }: {
+export function ProjectRowItem({ group, onToggle, onCreate, actions, onOpenFolder, drag, home, t }: {
   group: GroupNode
   onToggle: () => void
   onCreate: () => void
   /** Real-Workspace actions; absent for the ungrouped bucket (no menu shown). */
   actions?: { rename: () => void; delete: () => void } | undefined
+  /**
+   * Reveal a directory in the host file manager. Absent when the surface has no
+   * opener; the row also omits its reveal entry when the group carries no cwd,
+   * so a menu row can never act on a folder nobody named.
+   */
+  onOpenFolder?: ((path: string) => void) | undefined
   /** Present only for real Workspace rows in the grouped view. */
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
@@ -126,8 +133,25 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
   const active = group.expanded && group.containsCurrent
   const [menuOpen, setMenuOpen] = useState(false)
-  const workspaceMenuItems = [
+  const [menuTarget, setMenuTarget] = useState<ContextMenuTarget | null>(null)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  // Both the pointer and the keyboard (Shift+F10 / context-menu key) open the
+  // same card through this button, so the element that regains focus on close
+  // is always one the user can reach again.
+  const openMenuAtButton = useCallback(() => {
+    const rect = menuButton.current?.getBoundingClientRect()
+    if (rect === undefined) return
+    setMenuTarget({ kind: 'element', rect })
+    setMenuOpen(true)
+  }, [])
+  const closeMenu = useCallback(() => { setMenuOpen(false) }, [])
+  const workspaceMenuItems: readonly ContextMenuEntry[] = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
+    // The reveal entry rides the group's real cwd, never the display label:
+    // the menu opens the actual folder the Workspace points at.
+    ...(row.cwd === undefined || onOpenFolder === undefined
+      ? []
+      : [{ id: 'reveal', label: t('menu.showInFolder'), icon: <IconFolderOpen16 /> }]),
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutline16 />, danger: true },
   ]
   const ownRow = (
@@ -136,6 +160,14 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
       role="treeitem"
       aria-expanded={row.expanded}
       onClick={onToggle}
+      onContextMenu={actions === undefined
+        ? undefined
+        : (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setMenuTarget({ kind: 'point', x: e.clientX, y: e.clientY })
+          setMenuOpen(true)
+        }}
       draggable={drag !== undefined}
       onDragStart={drag === undefined
         ? undefined
@@ -157,32 +189,47 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
       </span>
       <span className={css.rowActions}>
         {actions !== undefined && (
-          <Menu
+          <ContextMenu
             open={menuOpen}
-            onClose={() => { setMenuOpen(false) }}
+            target={menuTarget}
+            align="end"
+            returnFocusTo={menuButton.current}
+            label={t('menu.workspace.aria')}
             items={workspaceMenuItems}
+            onClose={closeMenu}
             onSelect={(id) => {
               setMenuOpen(false)
               // Unknown ids leave before the dispatch: a future menu row must
               // not inherit the destructive branch as an else fallback.
-              /* v8 ignore next -- Menu can emit only the rename and delete rows supplied above. */
-              if (id !== 'rename' && id !== 'delete') return
+              /* v8 ignore next -- the menu can emit only the rows supplied above. */
+              if (id !== 'rename' && id !== 'delete' && id !== 'reveal') return
               if (id === 'rename') actions.rename()
+              else if (id === 'reveal') { if (row.cwd !== undefined) onOpenFolder?.(row.cwd) }
               else actions.delete()
             }}
-            portal
-            closeOnPointerLeave
-            anchor={(
-              <button
-                type="button"
-                className={css.iconButton}
-                aria-label={t('actions.workspace.aria', { name: label })}
-                onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
-              >
-                <IconEllipsisOutline16 />
-              </button>
-            )}
           />
+        )}
+        {actions !== undefined && (
+          <button
+            ref={menuButton}
+            type="button"
+            className={css.iconButton}
+            aria-label={t('actions.workspace.aria', { name: label })}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (menuOpen) closeMenu()
+              else openMenuAtButton()
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              openMenuAtButton()
+            }}
+          >
+            <IconEllipsisOutline16 />
+          </button>
         )}
         <button
           type="button"
@@ -375,7 +422,7 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
+export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, cwd, onOpenFolder, drag, flat = false, t }: {
   node: SessionNode
   currentId: string | undefined
   now: number
@@ -386,6 +433,14 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   onFork: (id: SessionNode['id']) => void
   /** Archive this session (row menu action; commits without a dialog). */
   onArchive: (id: SessionNode['id']) => void
+  /**
+   * The session's Workspace directory, when the surface knows it. Absent for a
+   * row whose session has no workspace on record — the reveal entry is then
+   * omitted rather than opening an unrelated folder.
+   */
+  cwd?: string | undefined
+  /** Reveal a directory in the host file manager; absent = no reveal affordance. */
+  onOpenFolder?: ((path: string) => void) | undefined
   /** Present only on draggable rows (workspace-group sessions outside search). */
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
@@ -399,13 +454,33 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   const primaryStatus = statuses[0]
   const showStatus = primaryStatus.state !== 'done' || row.completed
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuTarget, setMenuTarget] = useState<ContextMenuTarget | null>(null)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const closeMenu = useCallback(() => { setMenuOpen(false) }, [])
+  // Right-click anywhere on the row, the "…" button, and the keyboard's
+  // context-menu key / Shift+F10 all reach the same card; the button is the
+  // focusable affordance, so it is what regains focus when the card closes.
+  const openMenuAtButton = useCallback(() => {
+    const rect = menuButton.current?.getBoundingClientRect()
+    if (rect === undefined) return
+    setMenuTarget({ kind: 'element', rect })
+    setMenuOpen(true)
+  }, [])
   // Archive hides the row through the registry-global archive set and never
   // touches the session log, so it is not styled as destructive and needs no
   // confirmation dialog: the Archived sessions settings page restores or
-  // permanently deletes afterwards.
-  const sessionMenuItems = [
+  // permanently deletes afterwards. Permanent deletion is deliberately absent
+  // here — it lives only behind that settings page.
+  const sessionMenuItems: readonly ContextMenuEntry[] = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
     { id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> },
+    { id: 'copy-id', label: t('menu.copySessionId'), icon: <IconCopyOutline16 /> },
+    // Reveal uses the session's real Workspace directory, so it is offered only
+    // when the surface actually knows one.
+    ...(cwd === undefined || onOpenFolder === undefined
+      ? []
+      : [{ id: 'reveal', label: t('menu.showInFolder'), icon: <IconFolderOpen16 /> }]),
+    { type: 'separator', id: 'sep-archive' },
     // 20-native glyph in the menu's 16px icon slot (Menu.module.css .itemIcon).
     { id: 'archive', label: t('menu.archiveSession'), icon: <IconArchiveOutline20 size={16} /> },
   ]
@@ -420,6 +495,14 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
       role="treeitem"
       aria-selected={selected}
       onClick={() => { onOpen(node.id) }}
+      onContextMenu={row.blank
+        ? undefined
+        : (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setMenuTarget({ kind: 'point', x: e.clientX, y: e.clientY })
+          setMenuOpen(true)
+        }}
       draggable={drag !== undefined}
       onDragStart={drag === undefined
         ? undefined
@@ -462,30 +545,46 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
       {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
       {!row.blank && (
         <span className={css.rowActions}>
-          <Menu
-            open={menuOpen}
-            onClose={() => { setMenuOpen(false) }}
-            items={sessionMenuItems}
-            onSelect={(id) => {
-              setMenuOpen(false)
-              if (id === 'rename') onRename(node.id, row.title)
-              if (id === 'fork') onFork(node.id)
-              if (id === 'archive') onArchive(node.id)
+          <button
+            ref={menuButton}
+            type="button"
+            className={css.iconButton}
+            aria-label={t('actions.session.aria', { name: title })}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (menuOpen) closeMenu()
+              else openMenuAtButton()
             }}
-            portal
-            closeOnPointerLeave
-            anchor={(
-              <button
-                type="button"
-                className={css.iconButton}
-                aria-label={t('actions.session.aria', { name: title })}
-                onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
-              >
-                <IconEllipsisOutline16 />
-              </button>
-            )}
-          />
+            onContextMenu={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              openMenuAtButton()
+            }}
+          >
+            <IconEllipsisOutline16 />
+          </button>
         </span>
+      )}
+      {!row.blank && (
+        <ContextMenu
+          open={menuOpen}
+          target={menuTarget}
+          align="end"
+          returnFocusTo={menuButton.current}
+          label={t('menu.session.aria')}
+          items={sessionMenuItems}
+          onClose={closeMenu}
+          onSelect={(id) => {
+            setMenuOpen(false)
+            if (id === 'rename') onRename(node.id, row.title)
+            else if (id === 'fork') onFork(node.id)
+            else if (id === 'archive') onArchive(node.id)
+            else if (id === 'copy-id') void writeClipboard(String(node.id))
+            else if (id === 'reveal') { if (cwd !== undefined) onOpenFolder?.(cwd) }
+          }}
+        />
       )}
     </div>
   )

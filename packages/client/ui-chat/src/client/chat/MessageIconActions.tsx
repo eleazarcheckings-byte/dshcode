@@ -1,7 +1,7 @@
 // Shared IconActions chrome for user and assistant messages: copy
 // live, optional branch wiring, and an optional date-aware clock.
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   IconBranchOutline16, IconCheckOutline16, IconCopyOutline16, IconEditOutline16, IconTrashOutline16, Tooltip, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -48,6 +48,12 @@ export interface MessageIconActionsProps {
    * branch control at the end of the icon cluster.
    */
   usageAction?: ReactNode
+  /**
+   * Open the owning view's context menu from this row. The row is a turn's
+   * focusable affordance, so a context-menu key / Shift+F10 on any of its
+   * buttons lands here — the keyboard twin of a right-click on the turn.
+   */
+  onContextMenu?: ((event: MouseEvent<HTMLDivElement>) => void) | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -59,7 +65,7 @@ export interface MessageIconActionsProps {
  */
 export function MessageIconActions({
   text, time, clock, onBranch, branchUnavailable = false, className,
-  onDelete, deleteUnavailable = false, onEdit, extraActions, usageAction, t,
+  onDelete, deleteUnavailable = false, onEdit, extraActions, usageAction, onContextMenu, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
   const reasonId = useId()
@@ -107,7 +113,10 @@ export function MessageIconActions({
     </span>
   )
   return (
-    <div className={className === undefined ? css.actions : `${css.actions} ${className}`}>
+    <div
+      className={className === undefined ? css.actions : `${css.actions} ${className}`}
+      onContextMenu={onContextMenu}
+    >
       {clock === 'start' ? clockEl : null}
       <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
         <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>

@@ -372,6 +372,7 @@ function makeHarness(
     useTrajectory: (() => { throw new Error('unused') }),
     deleteAt: () => Promise.resolve(false),
     editAt: () => Promise.resolve(false),
+    continueTurn: () => Promise.resolve(false),
     useSessions: emptySessions(),
     useSessionPendingInteraction: bindSnapshotSelector(
       createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()),

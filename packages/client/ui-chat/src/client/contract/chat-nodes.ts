@@ -3,6 +3,7 @@ import type {
   ConversationLocation, ConversationViewNode, ModelRetryNode, RunningToolCall,
   ToolCallBlock,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { TurnEndReason } from '@deepseek-ai/dsh-session/types'
 
 /** Final Chat render unit produced by a Chat business Definition. */
 export interface ChatConversationViewNode extends ConversationViewNode {
@@ -87,6 +88,12 @@ export interface TurnTailChatData {
   readonly turn: number
   readonly seq: number
   readonly time: number
+  /**
+   * Why this Turn closed, verbatim from its `turn/end` reason. Absent only on
+   * hand-built fixtures; a crashed turn carries the persistence backend's
+   * `interrupted` marker here. Read through {@link canContinueTurn}.
+   */
+  readonly endReason?: TurnEndReason | undefined
   /** Last finalized content-bearing Assistant in this Turn. */
   readonly closing: FinalAssistantChatData | null
   /** Whether non-rendered later evidence makes the closing seq non-tail. */
@@ -95,6 +102,33 @@ export interface TurnTailChatData {
   readonly tokensPerSecond?: number
   /** Exact per-Turn accounting; absent when the loaded evidence is incomplete. */
   readonly tokenUsage?: TurnTokenUsage
+}
+
+/**
+ * Whether a closed Turn ended with work still owed, so a Continue affordance
+ * belongs at its tail.
+ *
+ * `interrupted` is the only reason a live loop never emits: the persistence
+ * backend writes it on reload for a turn whose `turn/end` never reached the log
+ * (crash, kill, closed app), and the events recorded before the crash stay
+ * intact. `aborted` is a cancellation request, and `error`/`max-tokens` close a
+ * turn whose answer never completed. `completed` and `blocked` are excluded:
+ * both ended the turn by design, so offering to continue would be a false
+ * positive.
+ * @param reason - the `turn/end` reason carried by the Turn's tail data.
+ * @returns whether the Turn stopped short of a completed answer.
+ */
+export function canContinueTurn(reason: TurnEndReason | undefined): boolean {
+  if (reason === undefined) return false
+  switch (reason.kind) {
+    case 'interrupted':
+    case 'aborted':
+    case 'error':
+    case 'max-tokens':
+      return true
+    default:
+      return false
+  }
 }
 
 /** Turn-level process disclosure projected before the finalized answer. */

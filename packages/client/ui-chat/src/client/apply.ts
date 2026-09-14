@@ -48,11 +48,24 @@ export const inject = [
 ]
 
 /**
+ * Text a Continue affordance steers into an interrupted Session. The harness
+ * documents this exact word as the resume prompt (see `message.maxTokens.hint`)
+ * and the model reads it as ordinary steering input.
+ */
+const CONTINUE_PROMPT = 'continue'
+
+/**
  * Mount all Chat-owned contributions.
  * @param ctx - Client root context.
  */
 export function apply(ctx: Context): void {
   const chatSources = new WeakMap<SessionBinding, ObservableSnapshot<ChatSnapshot>>()
+  /**
+   * Per-Session in-flight Continue admissions. A second click while the first
+   * round-trip is open joins that attempt instead of steering a second
+   * `continue` into the same Session (the host accepts, not dedupes, steering).
+   */
+  const continuations = new Map<SessionId, Promise<boolean>>()
   const chatSource = (binding: SessionBinding): ObservableSnapshot<ChatSnapshot> => {
     let source = chatSources.get(binding)
     if (source === undefined) {
@@ -153,6 +166,37 @@ export function apply(ctx: Context): void {
           editAt: async (seq, text) => {
             const result = await session.editMessage(seq, [{ type: 'text', text }]).catch(() => undefined)
             return result?.ok ?? false
+          },
+          continueTurn: (turn) => {
+            const inFlight = continuations.get(sessionId)
+            if (inFlight !== undefined) return inFlight
+            // Refuse to resume anything but the Session's live tail: a later Turn
+            // already owns the work, or one is open and streaming right now.
+            const timeline = chat.getSnapshot().timeline
+            if (timeline.turnOrder.at(-1) !== turn) return Promise.resolve(false)
+            if ([...timeline.turns.values()].some(entry => entry.status === 'open')) return Promise.resolve(false)
+            const attempt = (async (): Promise<boolean> => {
+              // Same client verbs as a composer send: register the echo, then
+              // admit the prompt under its identity so a rejection retires it.
+              const submission = session.beginSubmission({
+                mode: 'steer',
+                text: CONTINUE_PROMPT,
+                images: [],
+              })
+              const result = await session.prompt(
+                [{ type: 'text', text: CONTINUE_PROMPT }], 'steer', undefined, submission.requestId,
+              ).catch(() => undefined)
+              if (result?.ok !== true) {
+                submission.abandon()
+                return false
+              }
+              return true
+            })()
+            continuations.set(sessionId, attempt)
+            void attempt.then(() => {
+              if (continuations.get(sessionId) === attempt) continuations.delete(sessionId)
+            })
+            return attempt
           },
         }
       },

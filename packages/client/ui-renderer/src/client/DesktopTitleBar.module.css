@@ -18,25 +18,54 @@
 }
 
 /* Windows titleBarOverlay reserves the right side for the native window
-   controls; env(titlebar-area-width) is the safe content width. */
+   controls; env(titlebar-area-width) is the safe content width. The brand
+   group sits left and the menu right against the native controls. */
 .inner {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   width: env(titlebar-area-width, 100%);
   padding: 0 12px;
   box-sizing: border-box;
 }
 
+/* Brand (mark + name) and the muted session context stay grouped on the
+   left; min-width lets the context truncate instead of pushing the menu. */
+.left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--dsw-alias-label-primary, #0f1115);
   user-select: none;
 }
 
+.context {
+  flex: 1;
+  min-width: 0;
+  max-width: 45%;
+  font-size: 12px;
+  color: var(--dsw-alias-label-caption);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .menu {
   -webkit-app-region: no-drag;
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -50,13 +79,38 @@
   cursor: pointer;
 }
 
+/* The visible control stays 28px so the 38px title bar keeps its height, but
+   the pointer target grows to 44px through an invisible pseudo-element. The
+   extra 8px per edge lands on the bar's own padding and the frame's empty
+   padding-top, so it covers no other control. */
+.menu::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* The menu control carries the brand's signature mechanism instead of a
+   generic filled hover: a gold hairline ring, inset so the 28px box never
+   moves. Focus adds the one tight outer glow the ring mechanism permits. */
 .menu:hover {
-  background: var(--dsw-alias-bg-layer-2, rgb(0 0 0 / 6%));
   color: var(--dsw-alias-label-primary, #0f1115);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, #dda43a 45%, transparent);
+}
+
+.menu:focus-visible {
+  outline: none;
+  color: var(--dsw-alias-label-primary, #0f1115);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, #dda43a 70%, transparent),
+    0 0 0 3px color-mix(in oklch, #dda43a 18%, transparent);
 }
 
 /* The absolute title bar (38px + 1px border) overlays the top of the
-   application frame; the frame itself keeps its 100% height. */
+   application frame; the frame itself keeps its 100% height.
+   COUPLED: this 38px and the 39px padding below mirror
+   `titleBarOverlay.height` in apps/desktop/src/main.ts across a process
+   boundary, and that OS-drawn strip cannot read these tokens. Changing one
+   without the other leaves a seam along the top edge. */
 .body {
   height: 100%;
   padding-top: 39px;

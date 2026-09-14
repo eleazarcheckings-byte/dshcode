@@ -7,3 +7,59 @@
 .actions {
   margin-left: -6px;
 }
+
+/* Continue affordance for a Turn that closed without a completed answer:
+   the one action on an otherwise empty tail, so it borrows the sibling
+   icon-row pill geometry (28px hit height, 15px glyph, 13px label) while
+   carrying a hairline border to read as a control rather than a stat.
+   The 8px rebate keeps the row's rhythm against the actions below it. */
+.continueRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -8px;
+}
+
+.continue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: calc(28px + var(--dsh-content-font-delta, 0px));
+  padding: 0 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 28px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.continue svg {
+  width: calc(15px + var(--dsh-content-font-delta, 0px));
+  height: calc(15px + var(--dsh-content-font-delta, 0px));
+  flex: none;
+}
+
+.continue:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.continue:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+/* A pending admission keeps the control in place, visibly spent, until the
+   resumed Turn lands and the row unmounts. */
+.continue[aria-disabled] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.continue[aria-disabled]:hover {
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+}
