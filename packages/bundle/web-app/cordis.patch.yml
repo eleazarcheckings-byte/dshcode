@@ -276,9 +276,35 @@
     - id: ui-chat
       name: '@deepseek-ai/dsh-client-ui-chat'
 
-    # Official occupants for the generic sidebar and conversation brand slots.
-    - id: ui-brand-official
-      name: '@deepseek-ai/dsh-client-ui-brand-official'
+    # Saturn AI occupants for the generic sidebar and conversation brand slots.
+    - id: ui-brand-saturn
+      name: '@saturnai/dsh-client-ui-brand-saturn'
+
+    - id: ui-skin-saturn
+      name: '@saturnai/dsh-client-ui-skin-saturn'
+
+    # Saturn AI definition of done: the host plugin owns the `done` projection,
+    # the `done:policy` prompt section, the /done command, and the
+    # set_definition_of_done tool; the client row renders the composer strip.
+    - id: saturn-done
+      name: '@saturnai/dsh-done'
+
+    - id: saturn-done-strip
+      name: '@saturnai/dsh-client-ui-done'
+
+    # Saturn AI always-orchestrate mode: the host plugin owns the `orchestrate`
+    # projection, the `orchestrate:policy` prompt section, and the /orchestrate
+    # command; the client row is the composer multitask toggle.
+    - id: saturn-orchestrate
+      name: '@saturnai/dsh-orchestrate'
+
+    - id: saturn-orchestrate-toggle
+      name: '@saturnai/dsh-client-ui-orchestrate'
+
+    # Saturn AI fleet route: one fact-derived line per delegated worker in the
+    # composer's ambient dock, over subagent lineage and pending interactions.
+    - id: saturn-fleet
+      name: '@saturnai/dsh-client-ui-fleet'
 
     - id: ui-attachment
       name: '@deepseek-ai/dsh-client-ui-attachment'
