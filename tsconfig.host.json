@@ -272,6 +272,7 @@
     { "path": "./packages/acp/acp" },
     { "path": "./packages/bundle/acp-app" },
     { "path": "./packages/bundle/base" },
+    { "path": "./packages/saturn/checkpoints" },
     { "path": "./packages/bundle/headless" },
     { "path": "./packages/bundle/sdk-app" },
     { "path": "./packages/bundle/sdk-minimal" },
