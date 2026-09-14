@@ -72,10 +72,15 @@ export interface WriteFileAtomicOptions {
  * remains the rename source. On any remaining failure the temp file is
  * removed and the failure rethrown. Crash durability (fsync) is out of scope.
  * @param filename - final path receiving the content.
- * @param content - complete next file content.
+ * @param content - complete next file content; bytes are written verbatim, a
+ * string is encoded as UTF-8.
  * @param options - permission bits for the replacement inode.
  */
-export async function writeFileAtomic(filename: string, content: string, options: WriteFileAtomicOptions): Promise<void> {
+export async function writeFileAtomic(
+  filename: string,
+  content: string | Uint8Array,
+  options: WriteFileAtomicOptions,
+): Promise<void> {
   await mkdir(dirname(filename), {
     recursive: true,
     ...options.dirMode === undefined ? {} : { mode: options.dirMode },
