@@ -1,0 +1,24 @@
+{
+  "id": "saturn-premium",
+  "name": "Saturn Premium",
+  "nameEn": "Saturn Premium",
+  "author": "Saturn AI",
+  "tagline": "Cinematic deep space · cold near-black surfaces · one Saturn-gold accent · dark only",
+  "description": "The Saturn AI identity, shipped dark-only. Depth is carried by a five-step luminance ladder and hairline strokes rather than by shadow or gradient, every neutral sits on a faint blue-violet cast so the surface reads as space rather than charcoal, and Saturn gold is the single earned accent — brand, focus, selection, primary action. Dark-only is a deliberate choice: upstream keys its own palette on the dark attribute, so a skin shipping a light default renders a white product whenever the theme fails to resolve. This one has no light state to fall into.",
+  "tags": [
+    "saturn",
+    "cinematic",
+    "deep-space",
+    "gold",
+    "dark",
+    "hairline"
+  ],
+  "accent": "#dda43a",
+  "bodyAttr": "data-dsh-saturn",
+  "package": "@saturnai/dsh-client-ui-skin-saturn",
+  "wiring": {
+    "id": "ui-skin-saturn",
+    "bundleWired": true
+  },
+  "order": 8
+}

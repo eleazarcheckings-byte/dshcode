@@ -1,0 +1,92 @@
+/* Multi-task toggle: one quiet pill in the composer tool row, beside the
+   permission trigger and the plan chip. ON borrows the business tint (the mode
+   is in force); OFF is the plain label the idle permission trigger wears. The
+   28px pill, radius, hover, focus ring, and disabled dimming are the shared
+   chip chrome from ui-conversation's PermissionSelect. */
+
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 24px;
+  corner-shape: round;
+  outline: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.chip:focus-visible {
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+.chip:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: default;
+}
+
+/* In force: the tinted pill, the same weight the active plan chip carries. */
+.on,
+.on:hover:not(:disabled) {
+  background: var(--dsw-alias-state-business-tertiary);
+  color: var(--dsw-alias-state-business-primary);
+}
+
+/* A selection queued for the next step is not yet the mode: the dotted label
+   keeps the chip honest instead of painting the target as if it were in force. */
+.pending .label {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* The shared 16px glyph renders one step smaller on the exposed pill. */
+.icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* Narrow composer: the pill collapses to its glyph, the same 460px cut where
+   the permission and model triggers drop their labels (the row is the size
+   container — InputBar .row). */
+@container (max-width: 460px) {
+  .label {
+    display: none;
+  }
+}

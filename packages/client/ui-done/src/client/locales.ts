@@ -1,0 +1,66 @@
+/** `done` namespace dictionaries (the definition-of-done strip's copy). */
+
+/** Simplified Chinese dictionary (the key-set source of truth). */
+export const zh = {
+  'status.stated': '已声明',
+  'status.proven': '已证明',
+  'status.stated.aria': '仅声明，尚未证明',
+  'status.proven.aria': '已对照所记录的证据证明',
+  'statement.aria': '完成定义',
+  'action.edit': '修改完成定义',
+  'action.prove': '记录证据并标记为已证明',
+  'action.clear': '清除完成定义',
+  'action.save': '保存',
+  'action.cancel': '取消',
+  'form.statement.aria': '完成定义的表述',
+  'form.evidence.aria': '满足该定义的一行证据',
+  'form.evidence.placeholder': '运行了什么，显示了什么',
+  'failed': '更新完成定义失败',
+  'receipt.title': '本轮回执',
+  'receipt.summary.changedOne': '改动 1 个文件',
+  'receipt.summary.changed': '改动 {count} 个文件',
+  'receipt.summary.unchanged': '未改动文件',
+  'receipt.summary.unavailable': '无记录',
+  'receipt.verdict.proven': '已证明',
+  'receipt.verdict.notAssessed': '未评估',
+  'receipt.group.changed': '改动',
+  'receipt.group.evidence': '证据',
+  'receipt.turn': '第 {turn} 轮',
+  'receipt.changes.unavailable': '本轮没有发布产物记录，无法核对改动。',
+  'receipt.changes.empty': '本轮没有写入任何文件。',
+  'receipt.evidence.absent': 'NOT_ASSESSED：完成定义尚无证据支撑。',
+} satisfies Record<string, string>
+
+/** The done namespace key union. */
+export type DoneKey = keyof typeof zh
+
+/** English dictionary, checked complete against the zh key set. */
+export const en = {
+  'status.stated': 'Stated',
+  'status.proven': 'Proven',
+  'status.stated.aria': 'Stated only, not yet proven',
+  'status.proven.aria': 'Proven against the recorded evidence',
+  'statement.aria': 'Definition of done',
+  'action.edit': 'Amend definition of done',
+  'action.prove': 'Record evidence and mark proven',
+  'action.clear': 'Clear definition of done',
+  'action.save': 'Save',
+  'action.cancel': 'Cancel',
+  'form.statement.aria': 'Definition of done statement',
+  'form.evidence.aria': 'The one line of evidence that met it',
+  'form.evidence.placeholder': 'what you ran and what it showed',
+  'failed': 'Failed to update the definition of done',
+  'receipt.title': 'Turn receipt',
+  'receipt.summary.changedOne': '1 file changed',
+  'receipt.summary.changed': '{count} files changed',
+  'receipt.summary.unchanged': 'no files changed',
+  'receipt.summary.unavailable': 'no record',
+  'receipt.verdict.proven': 'Proven',
+  'receipt.verdict.notAssessed': 'NOT_ASSESSED',
+  'receipt.group.changed': 'Changed',
+  'receipt.group.evidence': 'Evidence',
+  'receipt.turn': 'turn {turn}',
+  'receipt.changes.unavailable': 'No produced-file record was published for this turn, so its changes cannot be checked.',
+  'receipt.changes.empty': 'This turn wrote no files.',
+  'receipt.evidence.absent': 'No evidence met the definition of done: NOT_ASSESSED.',
+} satisfies Record<DoneKey, string>

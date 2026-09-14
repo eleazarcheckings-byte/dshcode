@@ -1,0 +1,169 @@
+/* TurnReceipt: the definition-of-done card's second section — the paths this
+   turn changed, beside the evidence that met the contract.
+
+   A separator, not a surface: the card already carries the border, the radius,
+   and the surface fill, so the hairline across the top is the only thing that
+   marks where the contract stops and the receipt begins. It is drawn in both
+   states, so disclosing the panel moves no pixel of the card above it.
+
+   Gold stays spent on the two marks that carry the doctrine (the ring and the
+   status chip) one row up; the verdict here is a quiet stamp whose meaning is
+   in its word — PROVEN or NOT_ASSESSED — never in its colour. */
+
+.receipt {
+  /* Direct child of the card, so the hairline runs border to border and the
+     header's own 12px inset lines up with the contract row's. */
+  box-shadow: inset 0 1px 0 var(--dsw-alias-border-l1);
+}
+
+.header {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  /* Fixed, like the contract row above: a summary, a verdict, and a chevron
+     share one line that arriving data cannot grow. */
+  height: 36px;
+  /* Right inset 12px centres the chevron on the contract row's action column;
+     the card's own width supplies the 12px left inset. */
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The skin draws the gold focus ring globally and this row keeps it; only the
+   offset is pulled in, so the ring fits inside the card's hairline. */
+.header:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Hover lifts chrome, never status: the verdict stamp keeps its own tone. */
+.header:hover .label,
+.header:hover .chevron {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.label {
+  flex: none;
+  font: var(--dsw-font-xxxs-strong-11);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The summary rides beside the verdict it belongs to, so the pair reads as one
+   statement at the row's right edge instead of two orphans. */
+.summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+  font: var(--dsw-font-xxs-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verdict {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 18px;
+  padding: 0 7px;
+  border: 1px solid var(--dsw-alias-border-l4);
+  border-radius: 999px;
+  corner-shape: round;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-strong-11);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chevron {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+}
+
+/* The panel exists in both states — `hidden` removes it from layout and from
+   the accessibility tree — so the row does not remount and the card above it
+   does not move when the reader opens it. The disclosure changes layout only
+   on that explicit toggle, so there is no reduced-motion branch to keep. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.groupLabel,
+.turn {
+  font: var(--dsw-font-xxxs-strong-11);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.groupLabel {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.turn {
+  color: var(--dsw-alias-label-caption);
+}
+
+/* The substance of the receipt: the evidence that met the contract, or the
+   plain sentence saying no evidence stands behind it. */
+.note {
+  margin: 0;
+  color: var(--dsw-alias-label-primary-dimmed);
+  font: var(--dsw-font-xs-13);
+}
+
+/* Paths read as data, in the mono face, and wrap rather than truncate: a
+   receipt that hides half a path is not a receipt. A long list scrolls inside
+   the panel instead of running the card off the composer. */
+.paths {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.path {
+  color: var(--dsw-alias-label-primary-dimmed);
+  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
