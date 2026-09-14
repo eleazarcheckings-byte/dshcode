@@ -4,6 +4,7 @@
  * empty-root composition, and the installation module-fallback healing.
  */
 
+import { spawnSync } from 'node:child_process'
 import {
   existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync,
   unlinkSync, writeFileSync,
@@ -702,6 +703,23 @@ describe('healProfilesModuleFallback', () => {
     releaseLock?.()
     await Promise.all([holder, healer])
     expect(lstatSync(join(modules, 'dsh-app')).isSymbolicLink()).toBe(true)
+  })
+
+  it('reclaims a writer lock orphaned by a dead holder instead of failing the boot', async () => {
+    const anchor = stageInstallation({})
+    const home = tmp()
+    const modules = join(home, 'profiles', 'node_modules')
+    mkdirSync(modules, { recursive: true })
+    // Exactly what an unclean exit during a heal leaves behind: the lock file
+    // holds the pid of a process that is already gone.
+    const dead = spawnSync(process.execPath, ['-e', 'process.exit(0)'])
+    expect(dead.pid).toBeTypeOf('number')
+    writeFileSync(`${modules}.lock`, `${String(dead.pid)}\n`)
+
+    await healProfilesModuleFallback({ installAnchor: anchor, home })
+
+    expect(lstatSync(join(modules, 'dsh-app')).isSymbolicLink()).toBe(true)
+    expect(existsSync(`${modules}.lock`)).toBe(false)
   })
 
   it('writes real ESM proxies for a packaged executable', async () => {

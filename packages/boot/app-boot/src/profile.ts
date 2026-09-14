@@ -574,6 +574,52 @@ export interface ProfileModuleFallbackOptions {
 }
 
 /**
+ * How long a boot waits for another process to finish publishing the shared
+ * module fallback before failing. The heal publishes one link per installation
+ * dependency; a warm volume settles well under a second, but a cold or
+ * virus-scanned store can take far longer, and this wait is bounded by the
+ * wrong failure mode — giving up here costs the whole startup.
+ */
+const MODULE_FALLBACK_LOCK_WAIT_MS = 30_000
+
+/**
+ * Drop the module-fallback writer lock when the process that recorded it is
+ * gone. An unclean exit during a heal leaves `<modulesDir>.lock` behind, and
+ * the lock primitive deliberately never removes an existing lock (file age
+ * cannot prove the owner stopped), so without this the next boot waits out its
+ * entire acquisition budget and fails startup. Only this lock is reclaimed:
+ * unlike the user-data writers that share the primitive it guards a
+ * reconstructible symlink mirror, so an orphan is safe to drop and must not
+ * need an operator. A lock whose recorded pid is unreadable, malformed, or
+ * still running is left for {@link withFileLock} to contend with normally.
+ * @param modulesDir - the fallback directory whose lock to inspect.
+ */
+function clearOrphanedModuleFallbackLock(modulesDir: string): void {
+  const lockPath = `${modulesDir}.lock`
+  let recorded: string
+  try {
+    recorded = readFileSync(lockPath, 'utf8').trim()
+  } catch {
+    return
+  }
+  const pid = Number.parseInt(recorded, 10)
+  if (!Number.isInteger(pid) || pid <= 0) return
+  try {
+    process.kill(pid, 0)
+    return
+  } catch (error) {
+    // ESRCH is the only proof the owner is gone; a reused pid or a denied
+    // probe keeps the lock, which degrades to the previous behaviour.
+    if ((error as NodeJS.ErrnoException | null)?.code !== 'ESRCH') return
+  }
+  try {
+    rmSync(lockPath, { force: true })
+  } catch {
+    // A racing boot released the lock first; either way it is gone.
+  }
+}
+
+/**
  * Maintain module fallbacks for one profile launch. The shared
  * `$DSH_HOME/profiles/node_modules` mirrors the dsh installation dependency
  * closure. Plain Node writes symlinks; a packaged executable writes ESM
@@ -592,10 +638,11 @@ export async function healProfilesModuleFallback(options: ProfileModuleFallbackO
   mkdirSync(modulesDir, { recursive: true })
   const { entries, packageNames } = resolveModuleFallbackEntries(installAnchor)
   if (!moduleFallbackCurrent(modulesDir, entries)) {
+    clearOrphanedModuleFallbackLock(modulesDir)
     await withFileLock(modulesDir, () => {
       if (!moduleFallbackCurrent(modulesDir, entries)) healProfilesModuleFallbackLocked(entries, modulesDir)
       return Promise.resolve()
-    })
+    }, { waitMs: MODULE_FALLBACK_LOCK_WAIT_MS })
   }
   if (profile !== undefined) healProfileModuleFallback(profile, packageNames)
 }
