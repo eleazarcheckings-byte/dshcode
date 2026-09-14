@@ -25,6 +25,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 // Type-only: pulls the `done` SessionProjectionMap merge for useProjection.
 import type {} from '@saturnai/dsh-done/client'
+// Type-only: pulls the `checkpoints` SessionProjectionMap merge the restore row reads.
+import type {} from '@saturnai/dsh-checkpoints/client'
 import { DefinitionOfDone } from './DefinitionOfDone.tsx'
 import { en, zh, type DoneKey } from './locales.ts'
 
@@ -59,6 +61,15 @@ export interface DoneDockInjected {
    * @returns null on admitted execution; a user-visible failure line otherwise.
    */
   clear: () => Promise<string | null>
+  /**
+   * Put one checkpoint's recorded bytes back by executing /checkpoint restore <id>.
+   * The host verifies the whole plan before it writes anything, records the
+   * current state first (so the restore is itself undoable), and refuses
+   * wholesale rather than partially.
+   * @param id - the checkpoint id to restore.
+   * @returns null on admitted execution; a user-visible failure line otherwise.
+   */
+  restoreCheckpoint: (id: string) => Promise<string | null>
 }
 
 /** Required services: the seat's slot registry, commands Remote, and locale registry. */
@@ -84,6 +95,7 @@ export function apply(ctx: ClientContext): void {
       setStatement: async statement => await execute(ctx, sessionId, `/done -- ${statement}`),
       prove: async evidence => await execute(ctx, sessionId, `/done prove ${evidence}`),
       clear: async () => await execute(ctx, sessionId, '/done clear'),
+      restoreCheckpoint: async id => await execute(ctx, sessionId, `/checkpoint restore ${id}`),
     }),
   }, DefinitionOfDone))
 }

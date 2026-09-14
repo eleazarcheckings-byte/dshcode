@@ -40,6 +40,9 @@
     },
     {
       "path": "../../saturn/done"
+    },
+    {
+      "path": "../../saturn/checkpoints"
     }
   ]
 }

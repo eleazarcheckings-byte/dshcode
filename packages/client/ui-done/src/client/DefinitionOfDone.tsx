@@ -4,17 +4,23 @@
  * the one- or two-sentence statement; a proven one fills the ring, flips the
  * chip to PROVEN, and appends the evidence that met it after a gold middot —
  * the visible form of the doctrine "'done' means proven". Capability absence
- * (undefined) and no contract (null) render nothing, so an untouched composer
- * looks exactly as it did.
+ * (undefined) and no contract (null) render no contract row at all, so an
+ * untouched composer looks exactly as it did.
  *
- * Folded under that row, in the same card, is the turn receipt: the paths this
+ * Folded under that row, in the same card, are the turn receipt — the paths this
  * turn changed beside the evidence that met the contract, with NOT_ASSESSED
- * stated outright while none does. Row and receipt are both fixed-height, so
- * neither arriving data nor opening the editor moves the composer.
+ * stated outright while none does — and the checkpoint row: the files the
+ * harness recorded before this session changed them, with one-click restore.
+ * Row, receipt, and checkpoints are all fixed-height, so neither arriving data
+ * nor opening the editor moves the composer.
  *
- * Every verb is the `/done` command through `remote.commands.execute`: the
- * click and the slash command are one path with one logged result, so the strip
- * owns no client-side state beyond the open editor.
+ * The card is the composer's record of the work, so it renders when either half
+ * has something to say: a stated contract, or checkpoints a restore can put
+ * back. A session with neither stays invisible.
+ *
+ * Every verb is a slash command through `remote.commands.execute`: the click and
+ * the command are one path with one logged result, so the strip owns no
+ * client-side state beyond the open editor.
  *
  * The statement is written through `/done -- <statement>`: the `--` keeps the
  * wording literal, so a contract that happens to open with "clear", "prove", or
@@ -27,7 +33,9 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { CheckpointsProjection } from '@saturnai/dsh-checkpoints/client'
 import type { DoneDockInjected } from './index.ts'
+import { CheckpointRow } from './CheckpointRow.tsx'
 import { turnReceipt } from './turn-receipt.ts'
 import { TurnReceipt } from './TurnReceipt.tsx'
 import css from './DefinitionOfDone.module.css'
@@ -46,9 +54,13 @@ const MAX_EDIT_LENGTH = 400
 const NO_TIMELINE: ConversationTimelineSnapshot = { turnOrder: [], turns: new Map() }
 
 export function DefinitionOfDone({
-  useProjection, useConversation, setStatement, prove, clear, t,
+  useProjection, useConversation, setStatement, prove, clear, restoreCheckpoint, t,
 }: DefinitionOfDoneProps) {
   const projection = useProjection('done')
+  // The checkpoint row reads the host's `checkpoints` projection: the count and
+  // the newest catalog this session can restore from. Capability absence
+  // (undefined, the plugin not composed) renders no row.
+  const checkpoints: CheckpointsProjection | undefined = useProjection('checkpoints')
   // The receipt reads the Chat target's timeline: that target owns the
   // produced-file record published against a turn, and selecting the timeline
   // itself keeps its identity, so the strip re-reads the turn when its data
@@ -109,17 +121,36 @@ export function DefinitionOfDone({
     if (ok) setEditor(null)
   }, [draft, editor, prove, runAction, setStatement])
 
-  // Capability absence and no contract have no strip at all.
-  if (projection === undefined || projection === null || projection.at === clearedAt) return null
+  // The contract row this render shows: the projection, unless a clear just
+  // landed locally. No contract is a row of nothing, not a card of nothing —
+  // the checkpoint row below it stands on its own.
+  const contract = projection === undefined || projection === null || projection.at === clearedAt ? null : projection
+  const hasCheckpoints = checkpoints !== undefined && checkpoints.count > 0
 
-  const proven = projection.status === 'proven'
-  const evidence = proven ? projection.evidence ?? '' : ''
+  // The card renders for either half of the record; an untouched session has
+  // neither a contract nor a checkpoint and is invisible, exactly as before.
+  if (contract === null && !hasCheckpoints) return null
+
+  const checkpointRow = hasCheckpoints
+    ? <CheckpointRow checkpoints={checkpoints} restore={restoreCheckpoint} t={t} />
+    : null
+
+  if (contract === null) {
+    return (
+      <div className={css.dock} data-done-bar data-status="none">
+        <div className={css.card}>{checkpointRow}</div>
+      </div>
+    )
+  }
+
+  const proven = contract.status === 'proven'
+  const evidence = proven ? contract.evidence ?? '' : ''
   const statusLabel = proven ? t('status.proven') : t('status.stated')
   const statusTitle = proven ? t('status.proven.aria') : t('status.stated.aria')
-  const receipt = turnReceipt({ timeline: timeline ?? NO_TIMELINE, done: projection })
+  const receipt = turnReceipt({ timeline: timeline ?? NO_TIMELINE, done: contract })
 
   const statusMarker = (
-    <span className={css.marker} data-status={projection.status} aria-hidden="true">
+    <span className={css.marker} data-status={contract.status} aria-hidden="true">
       {proven && <IconCheckOutline16 size={9} />}
     </span>
   )
@@ -144,7 +175,7 @@ export function DefinitionOfDone({
           type="button"
           className={css.iconBtn}
           disabled={pending}
-          onClick={() => { setDraft(projection.statement); setEditor('statement') }}
+          onClick={() => { setDraft(contract.statement); setEditor('statement') }}
           aria-label={t('action.edit')}
         >
           <IconEditOutline16 size={14} />
@@ -158,7 +189,7 @@ export function DefinitionOfDone({
           aria-label={t('action.clear')}
           onClick={() => {
             void runAction(clear).then((ok) => {
-              if (ok) setClearedAt(projection.at)
+              if (ok) setClearedAt(contract.at)
             })
           }}
         >
@@ -218,15 +249,15 @@ export function DefinitionOfDone({
     : (
       <>
         {statusMarker}
-        <span className={css.chip} data-status={projection.status} title={statusTitle}>{statusLabel}</span>
+        <span className={css.chip} data-status={contract.status} title={statusTitle}>{statusLabel}</span>
         {/* One live region for the contract itself: the chip and the controls
             are chrome around it, never part of the announcement. */}
         <span
           className={css.text}
           aria-live="polite"
-          title={evidence === '' ? projection.statement : `${projection.statement} — ${evidence}`}
+          title={evidence === '' ? contract.statement : `${contract.statement} — ${evidence}`}
         >
-          <span className={css.statement}>{projection.statement}</span>
+          <span className={css.statement}>{contract.statement}</span>
           {evidence !== '' && <span className={css.evidence}>{evidence}</span>}
         </span>
         {actionError !== null && <span className={css.error} role="alert">{actionError}</span>}
@@ -235,12 +266,13 @@ export function DefinitionOfDone({
     )
 
   return (
-    <div className={css.dock} data-done-bar data-status={projection.status}>
+    <div className={css.dock} data-done-bar data-status={contract.status}>
       <div className={css.card}>
         <div className={css.bar} role="group" aria-label={t('statement.aria')}>
           {row}
         </div>
         <TurnReceipt receipt={receipt} t={t} />
+        {checkpointRow}
       </div>
     </div>
   )
