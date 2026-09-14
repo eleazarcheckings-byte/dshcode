@@ -35,7 +35,7 @@ type AttentionSnapshot = Parameters<Parameters<AppearanceRowComponentProps['useS
 const noAttention: AttentionSnapshot = new Map()
 const useSessionPendingInteraction: AppearanceRowComponentProps['useSessionPendingInteraction'] = selector => selector(noAttention)
 
-function mount(preference: ThemePreference = 'system') {
+function mount(preference: ThemePreference = 'dark') {
   // Real store instance — the sanctioned zero-machinery path for tests.
   const store = createAppearanceRowStore().create()
   store.actions.sync(preference, 0)

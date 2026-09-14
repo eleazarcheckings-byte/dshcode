@@ -17,8 +17,8 @@ export const FONT_SIZE_FIELD = 'fontSize'
 /** Theme preference persisted by the product Appearance row. */
 export type ThemePreference = typeof THEME_PREFERENCES[number]
 
-/** Default preference when the user-settings document has no override. */
-export const DEFAULT_PREFERENCE: ThemePreference = 'system'
+/** Default preference when the user-settings document has no override (the product ships premium dark). */
+export const DEFAULT_PREFERENCE: ThemePreference = 'dark'
 
 /** Smallest accepted content font size (px). */
 export const FONT_SIZE_MIN = 12
