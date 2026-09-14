@@ -306,6 +306,14 @@
     - id: saturn-fleet
       name: '@saturnai/dsh-client-ui-fleet'
 
+    # Saturn AI code checkpoints: the host plugin owns the `checkpoints`
+    # projection, the capture hook over first-party file mutations, and the
+    # /checkpoint command (list + one-click restore, undoable because a restore
+    # checkpoints the state it is about to overwrite); the done card's
+    # checkpoint row is the surface.
+    - id: saturn-checkpoints
+      name: '@saturnai/dsh-checkpoints'
+
     - id: ui-attachment
       name: '@deepseek-ai/dsh-client-ui-attachment'
 
