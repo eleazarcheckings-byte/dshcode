@@ -221,12 +221,18 @@ describe('DeepSeekOnboardingDialog', () => {
     }
   })
 
-  it('allows configure-later dismissal without opening settings', async () => {
+  it('offers no configure-later escape: the key is the only way through', async () => {
     const h = harness()
     render(<DeepSeekOnboardingDialog {...h.props} />)
     await screen.findByRole('dialog')
-    fireEvent.click(screen.getByRole('button', { name: en.onboardingLater }))
-    expect(h.complete).toHaveBeenCalledOnce()
+    // First Light is a hard gate, and this step inherits that posture: the
+    // footer renders no dismiss action, and neither Escape nor a mask click
+    // can complete it.
+    expect(screen.queryByRole('button', { name: en.cancel })).toBeNull()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(document.querySelector('[class*="mask"]')!)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(h.complete).not.toHaveBeenCalled()
     expect(h.openSection).not.toHaveBeenCalled()
     expect(h.set).not.toHaveBeenCalled()
     expect(h.mutate).not.toHaveBeenCalled()

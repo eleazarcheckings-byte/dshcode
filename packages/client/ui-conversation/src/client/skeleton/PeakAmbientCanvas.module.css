@@ -1,0 +1,22 @@
+/**
+ * PeakAmbientCanvas — chip-scoped ambient particle field.
+ * Sits behind the chip label via absolute positioning; never leaks outside
+ * the chip's own rounded capsule (overflow:hidden on .chip).
+ */
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Canvas is purely decorative — no pointer interaction or a11y surface. */
+  pointer-events: none;
+  border-radius: inherit;
+  /* Never rendered by reduce-motion preference; the JS guard mirrors this. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas {
+    display: none;
+  }
+}

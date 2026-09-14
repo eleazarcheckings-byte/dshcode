@@ -37,3 +37,27 @@ export interface SettingsDocumentOpenValue {
 export type AgentPresetDirectoryOpenValue =
   | { readonly opened: true }
   | { readonly opened: false; readonly path: string }
+
+/**
+ * Identity and voice facts the setup sequence asks the Harness to remember as
+ * agent memory. Deliberately closed and free of credential material: this is
+ * what the model reads about the user, so it holds preferences only.
+ */
+export interface ProfileMemoryFacts {
+  /** The name the user goes by. */
+  readonly name: string
+  /** What the user is building, in their own words. */
+  readonly building: string
+  /** Primary working language the user chose. */
+  readonly language: string
+  /** Preferred answer voice. */
+  readonly tone: string
+  /** Whether the model must consult the design brain before inventing UI. */
+  readonly consultDesignBrain: boolean
+}
+
+/** Confirmation that the user-global memory file carries the profile. */
+export interface ProfileMemoryWriteValue {
+  /** Absolute path of the memory file that now holds the block. */
+  readonly path: string
+}

@@ -113,7 +113,7 @@ export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): 
           credentialOnly
           credentialRequired
           autoFocusCredential
-          cancelLabelKey="onboardingLater"
+          hideCancel
           submitLabelKey="onboardingSave"
           submitBusyLabelKey="onboardingSaving"
           onClose={finishCredential}

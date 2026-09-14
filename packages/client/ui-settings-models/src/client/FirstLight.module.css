@@ -1,0 +1,129 @@
+/* First Light setup sequence: a quiet step body inside the shared onboarding modal. */
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--dsh-color-text-secondary, #b6b6be);
+}
+
+.copy p {
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.label {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--dsh-color-text-tertiary, #8b8b95);
+}
+
+.input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--dsh-color-border, #34343d);
+  border-radius: 6px;
+  background: var(--dsh-color-surface, #14141a);
+  color: var(--dsh-color-text-primary, #f2f2f5);
+  font: inherit;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--dsh-color-accent, #7c6cff);
+  outline-offset: 1px;
+}
+
+.note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dsh-color-text-secondary, #b6b6be);
+}
+
+.status {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dsh-color-success, #62c98f);
+}
+
+.error {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dsh-color-danger, #e2685f);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.secondary {
+  padding: 8px 14px;
+  border: 1px solid var(--dsh-color-border, #34343d);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsh-color-text-primary, #f2f2f5);
+  font: inherit;
+  cursor: pointer;
+}
+
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.choice {
+  padding: 8px 12px;
+  border: 1px solid var(--dsh-color-border, #34343d);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsh-color-text-primary, #f2f2f5);
+  font: inherit;
+  cursor: pointer;
+}
+
+.choice[aria-pressed='true'] {
+  border-color: var(--dsh-color-accent, #7c6cff);
+  background: color-mix(in srgb, var(--dsh-color-accent, #7c6cff) 18%, transparent);
+}
+
+.editor {
+  margin-top: 14px;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.summaryTerm {
+  color: var(--dsh-color-text-tertiary, #8b8b95);
+}
+
+.summaryValue {
+  color: var(--dsh-color-text-primary, #f2f2f5);
+}

@@ -1,0 +1,103 @@
+/**
+ * PeakChip — DeepSeek API pricing tier indicator.
+ * Sits in the composer trailing row, beside the model selector.
+ *
+ * Design notes:
+ *   - Capsule form matches the model selector chip height (22px).
+ *   - It is a status light, not a badge: the dot is the lamp — PEAK is a red
+ *     light, OFF-PEAK is a green light — and the fill, hairline border and
+ *     label colour are all derived from that same hue so the capsule reads as
+ *     one object. The hues are the skin's own static-scale tokens
+ *     (`--dsw-static-red-400` / `--dsw-static-green-400`), not pinned literals,
+ *     so the chip tracks the Saturn palette.
+ *   - Colour is reinforcement, never the only channel: the uppercase label
+ *     still spells the tier, which is what carries for red/green colour
+ *     blindness.
+ *   - `overflow: hidden` clips the ambient canvas to the capsule bounds.
+ */
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  border-radius: 11px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  /* Clip the ambient canvas to the capsule. */
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+  /* Smooth the state switch (label fades, dot colour transitions). */
+  transition: color 400ms ease, background 400ms ease, border-color 400ms ease;
+}
+
+/* ── peak: a red light (the expensive tier) ───────────────────────────── */
+.peak {
+  /* One hue source for fill, text, border and lamp. `--dsw-static-red-400`
+     (#e0685f) is a muted coral, not a saturated web red — it reads as an
+     instrument light on the near-black surface rather than an alarm. */
+  --peak-tint: var(--dsw-static-red-400, #e0685f);
+  background: color-mix(in srgb, var(--peak-tint) 10%, transparent);
+  color: var(--peak-tint);
+  border: 1px solid color-mix(in srgb, var(--peak-tint) 20%, transparent);
+}
+
+/* ── off-peak: a green light (the cheap tier) ─────────────────────────── */
+.offPeak {
+  /* `--dsw-static-green-400` (#5cab70): the softest green on the scale, and
+     the only one that clears 4.5:1 as 11px text on the tinted fill. */
+  --peak-tint: var(--dsw-static-green-400, #5cab70);
+  background: color-mix(in srgb, var(--peak-tint) 10%, transparent);
+  color: var(--peak-tint);
+  border: 1px solid color-mix(in srgb, var(--peak-tint) 20%, transparent);
+}
+
+/* ── status dot ─────────────────────────────────────────────────────────── */
+.dot {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  /* Sits above the ambient canvas. */
+  position: relative;
+  z-index: 1;
+  transition: background 400ms ease, box-shadow 400ms ease;
+}
+
+.peak .dot {
+  background: var(--peak-tint);
+  /* Restrained aura — a lit lamp, not neon. */
+  box-shadow: 0 0 5px color-mix(in srgb, var(--peak-tint) 50%, transparent);
+}
+
+.offPeak .dot {
+  background: var(--peak-tint);
+  /* Steady and one notch quieter than the red: "all clear", not "alert". */
+  box-shadow: 0 0 5px color-mix(in srgb, var(--peak-tint) 40%, transparent);
+}
+
+/* ── label (keeps above canvas) ─────────────────────────────────────────── */
+.label {
+  position: relative;
+  z-index: 1;
+  /* Prevents the chip from resizing as text switches — both labels are close
+     in width but measuring the wider one avoids a layout shift. The chip
+     parent flex row shrinks to content so no extra space is added. */
+  white-space: nowrap;
+}
+
+/* Reduce-motion: remove transitions and hide canvas (canvas is also hidden
+   via its own CSS @media rule). */
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .dot {
+    transition: none;
+  }
+}

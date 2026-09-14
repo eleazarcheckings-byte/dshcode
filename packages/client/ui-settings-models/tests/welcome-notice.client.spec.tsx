@@ -99,10 +99,17 @@ function mount(
 
 describe('WelcomeNotice', () => {
   it('uses the exact owner copy in both GUI locales', () => {
+    // The notice is the first surface a new install meets, so it is plain
+    // product language now — no Harness developers, no plugin ecosystem.
     expect(WELCOME_NOTICE_COPY.en).toEqual({
-      title: 'Internal Testing Notice',
-      body: "DeepSeek Harness 0.1 remains in testing for Harness developers. Many areas need further improvement, and we welcome feedback from the developer community. DeepSeek Harness's core plugins and foundational APIs will continue to evolve rapidly over the coming months.\n\nWe look forward to exploring the limits of intelligence with developers around the world, building on open-source, open, reusable, and composable infrastructure. We welcome Harness developers everywhere to join the DSH plugin ecosystem.",
+      title: 'Welcome to Saturn AI',
+      body: 'Saturn AI is ready when you are.\n\nOpen a project, pick a model, and start building.',
       continueLabel: 'Continue',
+    })
+    expect(WELCOME_NOTICE_COPY.zh).toEqual({
+      title: '欢迎使用 Saturn AI',
+      body: 'Saturn AI 已准备好。\n\n打开项目，选择模型，开始构建。',
+      continueLabel: '继续',
     })
     expect(en.welcomeBody).toBe(WELCOME_NOTICE_COPY.en.body)
     expect(zh.welcomeBody).toBe(WELCOME_NOTICE_COPY.zh.body)

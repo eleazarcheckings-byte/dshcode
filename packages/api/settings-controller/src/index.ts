@@ -25,7 +25,10 @@ import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typer
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { z } from 'zod'
 import { CredentialsController } from './credentials.ts'
-import type { AgentPresetDirectoryOpenValue, SettingsDocumentOpenValue } from './types.ts'
+import { writeProfileMemory } from './profile-memory.ts'
+import type {
+  AgentPresetDirectoryOpenValue, ProfileMemoryFacts, ProfileMemoryWriteValue, SettingsDocumentOpenValue,
+} from './types.ts'
 
 export { CredentialsController } from './credentials.ts'
 export type * from './types.ts'
@@ -257,6 +260,41 @@ export class SettingsController extends TypertRemoteService {
     }
   }
 
+  /**
+   * Remember the setup profile as agent memory in the user-global instruction
+   * file, which is what the model actually reads. A Host path on purpose: the
+   * browser never writes a file, and the block is delimited so replaying setup
+   * replaces it instead of appending a second copy. Nothing secret is rendered.
+   * @param facts - identity and voice preferences the user chose.
+   * @returns the memory file that now holds the block.
+   * @throws RemoteError when the request is malformed, the deployment keeps no
+   *   local document to sit beside, or the file cannot be written.
+   */
+  @Remote('writeProfileMemory')
+  async writeProfileMemory(facts: ProfileMemoryFacts): Promise<ProfileMemoryWriteValue> {
+    if (!isProfileMemoryFacts(facts)) {
+      throw new RemoteError('gateway/bad-request', 'the profile has empty fields', {})
+    }
+    const documentPath = this.provider().documentPath
+    if (documentPath === undefined) {
+      throw new RemoteError(
+        'gateway/internal',
+        'this deployment keeps settings outside the harness home, so the profile has no memory file',
+        {},
+      )
+    }
+    try {
+      return await writeProfileMemory(documentPath, facts)
+    } catch (error: unknown) {
+      throw new RemoteError(
+        'gateway/internal',
+        `could not save your profile: ${messageOf(error)}`,
+        {},
+        { cause: error },
+      )
+    }
+  }
+
   private async write(
     ns: string,
     mode: 'update' | 'replace' | 'mutate',
@@ -297,6 +335,23 @@ export class SettingsController extends TypertRemoteService {
     }
     return settings
   }
+}
+
+/**
+ * Guard the wire payload before it reaches the renderer. The Remote boundary
+ * carries whatever a client sent, so a missing field must be a refused request
+ * rather than a block containing the string "undefined".
+ * @param facts - the candidate payload.
+ * @returns true when every required field is a non-blank string and the
+ *   preference is a boolean.
+ */
+function isProfileMemoryFacts(facts: ProfileMemoryFacts): boolean {
+  const { name, building, language, tone, consultDesignBrain } = facts
+  return typeof name === 'string' && name.trim().length > 0
+    && typeof building === 'string' && building.trim().length > 0
+    && typeof language === 'string' && language.trim().length > 0
+    && typeof tone === 'string' && tone.trim().length > 0
+    && typeof consultDesignBrain === 'boolean'
 }
 
 function messageOf(error: unknown): string {

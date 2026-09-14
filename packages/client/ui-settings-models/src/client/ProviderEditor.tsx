@@ -81,6 +81,8 @@ export interface ProviderEditorProps {
   autoFocusCredential?: boolean
   /** Override the dismiss action copy. */
   cancelLabelKey?: keyof typeof en
+  /** Omit the dismiss action (hard-gate flows with no way back). */
+  hideCancel?: boolean
   /** Override the idle commit action copy. */
   submitLabelKey?: keyof typeof en
   /** Override the in-flight commit action copy. */
@@ -508,6 +510,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         submitLabelKey={props.submitLabelKey ?? 'apply'}
         submitBusyLabelKey={props.submitBusyLabelKey ?? 'applying'}
         {...props.cancelLabelKey === undefined ? {} : { cancelLabelKey: props.cancelLabelKey }}
+        {...props.hideCancel === true ? { hideCancel: true } : {}}
         onCancel={() => { props.onClose(false) }}
         onSubmit={() => { void apply() }}
       />

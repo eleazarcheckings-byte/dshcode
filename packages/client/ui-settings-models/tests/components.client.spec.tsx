@@ -522,7 +522,7 @@ describe('ModelsSection', () => {
       credentialOnly
       credentialRequired
       autoFocusCredential
-      cancelLabelKey="onboardingLater"
+      hideCancel
       submitLabelKey="onboardingSave"
       submitBusyLabelKey="onboardingSaving"
       onClose={onClose}
@@ -533,7 +533,8 @@ describe('ModelsSection', () => {
     expect(document.activeElement).toBe(key)
     expect(key.required).toBe(true)
     expect(save.disabled).toBe(true)
-    expect(screen.getByText(en.onboardingLater)).toBeTruthy()
+    // The hard-gate form offers no dismiss action at all.
+    expect(screen.queryByRole('button', { name: en.cancel })).toBeNull()
     expect(screen.queryByText(en.customized)).toBeNull()
     expect(screen.queryByLabelText(en.baseUrl)).toBeNull()
 

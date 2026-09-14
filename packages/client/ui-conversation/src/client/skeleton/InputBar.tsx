@@ -35,6 +35,7 @@ import { registerComposerKeymap } from '../input/editor/keymap.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
+import { PeakChip } from './PeakChip.tsx'
 import css from './InputBar.module.css'
 
 export type InputBarProps = ComposerBarProps
@@ -464,6 +465,8 @@ export const InputBar = memo(function InputBar({
             {input === undefined || sessionId === undefined
               ? null
               : renderSlot('conversation.input.right', {})}
+            {/* DeepSeek API peak/off-peak pricing indicator — quiet chip beside the model selector. */}
+            <PeakChip t={t as Translate} />
             {sessionId === undefined ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
             <ContextMeter useProjection={useProjection} t={t} />
             {interruptible && (

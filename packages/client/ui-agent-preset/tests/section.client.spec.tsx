@@ -126,9 +126,9 @@ describe('the preset list', () => {
     renderSection()
 
     // The page has no create button: the intro is what tells a first-time
-    // reader that copying an existing preset — or drafting one in Creator
-    // mode — IS the way to make one.
-    expect(screen.getByText(new RegExp('Creator mode'))).toBeTruthy()
+    // reader that copying an existing mode — or drafting one in Creator
+    // — IS the way to make one.
+    expect(screen.getByText(new RegExp('Creator'))).toBeTruthy()
   })
 
   it('picks a preset by clicking its card, and the one in use is inert', () => {

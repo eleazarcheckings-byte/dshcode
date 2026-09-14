@@ -82,6 +82,7 @@ describe('the settings Remote namespace a configuration page calls', () => {
       { method: 'mutate', invocation: { kind: 'direct' } },
       { method: 'openSettingsDocument', invocation: { kind: 'direct' } },
       { method: 'openAgentPresetDirectory', invocation: { kind: 'direct' } },
+      { method: 'writeProfileMemory', invocation: { kind: 'direct' } },
     ])
   })
 

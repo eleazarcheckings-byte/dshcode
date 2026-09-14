@@ -11,6 +11,7 @@ import {
   WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_SETTINGS_NAMESPACE, WELCOME_NOTICE_VERSION,
 } from '../src/onboarding-copy.ts'
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
+import { FirstLight } from '../src/client/FirstLight.tsx'
 import { DeepSeekOnboardingDialog } from '../src/client/DeepSeekOnboardingDialog.tsx'
 import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
 import { apply as hostApply } from '../src/index.ts'
@@ -41,6 +42,20 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
     // Models join itself never fetches until a section actually loads. The real
     // ui-settings apply also provides the settingsSchema service.
     settings: settings ?? scriptedSettingsRemote().settings,
+    // First Light registers the chosen folder as the session default; the
+    // namespace must be mounted for the plugin's inject to be satisfied.
+    workspace: {
+      create: vi.fn(() => Promise.resolve({
+        ok: true,
+        value: {
+          created: true,
+          workspace: {
+            workspaceId: 'ws-1', path: 'C:\\built', title: 'built',
+            sessionIds: [], createdAt: '0', updatedAt: '0',
+          },
+        },
+      })),
+    },
   })
   // The fixed Host facts the settings provider reads its persistence from.
   remote.$host = { home: undefined, isLoopback }
@@ -69,7 +84,7 @@ describe('ui-settings-models apply', () => {
   it('declares the services it uses', () => {
     expect(inject).toEqual([
       'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
-      'settingsScope', 'settingsSchema',
+      'remote.workspace', 'settingsScope', 'settingsSchema',
     ])
   })
 
@@ -92,7 +107,11 @@ describe('ui-settings-models apply', () => {
     expect(injected.hooks.snapshot).toBe(injected.controller.store)
     expect(typeof injected.operations.writeSettings).toBe('function')
     const onboarding = before.slots.entries('settings.onboarding')
-    expect(onboarding).toHaveLength(2)
+    expect(onboarding).toHaveLength(3)
+    expect(onboarding.find(entry => entry.options.id === 'first-light')).toMatchObject({
+      component: FirstLight,
+      options: { id: 'first-light', order: -1000 },
+    })
     expect(onboarding.find(entry => entry.options.id === 'welcome-notice')).toMatchObject({
       component: WelcomeNotice,
       options: { id: 'welcome-notice', order: -100 },
@@ -113,7 +132,7 @@ describe('ui-settings-models apply', () => {
     declare(after.slots)
     await Promise.resolve()
     expect(after.slots.entries('settings.section')[0]!.component).toBe(ModelsSection)
-    expect(after.slots.entries('settings.onboarding')).toHaveLength(2)
+    expect(after.slots.entries('settings.onboarding')).toHaveLength(3)
     // The self-inflicted ledger notifications hit the duplicate guard.
     expect(after.slots.entries('settings.section')).toHaveLength(1)
   })
@@ -152,7 +171,7 @@ describe('ui-settings-models apply', () => {
     declare(b.slots)
     await Promise.resolve()
     expect(b.slots.entries('settings.section')[0]!.component).toBe(ModelsSection)
-    expect(b.slots.entries('settings.onboarding')).toHaveLength(2)
+    expect(b.slots.entries('settings.onboarding')).toHaveLength(3)
     // The locale path also recovers through the same ledger re-check.
     b.locale.setLocale('en')
     expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('Models')

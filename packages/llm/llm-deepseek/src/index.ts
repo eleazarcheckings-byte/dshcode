@@ -44,6 +44,7 @@ import {
   DEFAULT_REQUEST_IMAGE_MAX_BYTES,
   DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET,
 } from './request-pricing.ts'
+import { probeDeepSeekConnection } from './probe.ts'
 
 export {
   DEFAULT_CONTEXT_WINDOW,
@@ -510,6 +511,23 @@ export function apply(ctx: Context, config: Config): void {
   ctx.llm.registerConfigurableProviders([
     { provider: PROVIDER, displayName: 'DeepSeek', settingsNs: NS, settingsPath: [] },
   ])
+  // Discovery for this namespace is a live probe, not a catalog read: First
+  // Light uses its reply as the model step's key gate, and the catalog a
+  // catalog provider already ships cannot prove a key works. One authenticated
+  // chat request answers both questions — reachability/credential for the gate
+  // and adoptable model metadata for the Models page — so the catalog is
+  // returned only after the provider actually answered.
+  ctx.llm.registerModelDiscovery(NS, async (request, signal) => {
+    const connection = options()
+    const baseURL = request.baseURL !== undefined && request.baseURL.length > 0
+      ? request.baseURL
+      : connection.baseURL
+    const typed = request.apiKey?.trim()
+    const apiKey = typed !== undefined && typed.length > 0
+      ? typed
+      : await resolveApiKey(connection)
+    return probeDeepSeekConnection({ ...connection, baseURL }, apiKey, signal)
+  })
   // Route effects bind to this apply fiber via the stable `ctx` reference,
   // even when a swap runs inside the scoped settings callback below.
   const registration = ctx.llm.registerAdapter([PROVIDER], adapter)

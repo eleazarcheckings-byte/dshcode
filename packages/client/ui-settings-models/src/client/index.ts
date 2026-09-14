@@ -22,11 +22,15 @@ import type { DeepSeekOnboardingInjected } from './DeepSeekOnboardingDialog.tsx'
 import { WelcomeNotice } from './WelcomeNotice.tsx'
 import type { WelcomeNoticeInjected } from './WelcomeNotice.tsx'
 import { decodeWelcomeSection, WelcomeNoticeStore } from './welcome-store.ts'
+import { FirstLight } from './FirstLight.tsx'
+import type { FirstLightInjected } from './FirstLight.tsx'
+import { decodeFirstLightSection, FirstLightStore } from './first-light-store.ts'
+import { verifyDesignBrain } from './design-brain.ts'
 import { ModelsSettingsStore } from './store.ts'
 import { createModelsOperations } from './operations.ts'
 import { createSettingsSchemaOperations } from './schema-operations.ts'
 import { en, zh, type ModelsKey } from './locales.ts'
-import { WELCOME_NOTICE_SETTINGS_NAMESPACE } from '../onboarding-copy.ts'
+import { FIRST_LIGHT_SETTINGS_NAMESPACE, WELCOME_NOTICE_SETTINGS_NAMESPACE } from '../onboarding-copy.ts'
 
 export type { ModelsSectionInjected, ModelsSectionProps } from './ModelsSection.tsx'
 export type { ModelsFooterOwnerProps, ProviderCardExtrasOwnerProps } from './slot-contract.ts'
@@ -63,7 +67,7 @@ export function refreshIfLoaded(controller: ModelsSettingsStore): void {
  */
 export const inject = [
   'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
-  'settingsScope', 'settingsSchema',
+  'remote.workspace', 'settingsScope', 'settingsSchema',
 ]
 
 /**
@@ -108,6 +112,45 @@ export function apply(ctx: ClientContext): void {
     hooks: { welcome: welcomeController.store },
     t,
   })
+  // First Light owns its own durable namespace so replaying the versioned
+  // notice can never replay setup, and vice versa.
+  const firstLightController = new FirstLightStore(ctx.settingsScope.bind({
+    namespace: FIRST_LIGHT_SETTINGS_NAMESPACE,
+    decode: decodeFirstLightSection,
+  }))
+  const firstLightInjected = (): FirstLightInjected => ({
+    controller: firstLightController,
+    modelsController: controller,
+    operations,
+    schema,
+    hooks: { firstLight: firstLightController.store, models: controller.store },
+    // Both verifiers are real: the brain probe performs the MCP handshake and
+    // reports failure when it cannot, and the picker is the Host's own.
+    verifyDesignBrain: () => verifyDesignBrain(),
+    pickWorkspace: async () => {
+      const response = await ctx.remote.directoryPicker.pick()
+      return response.ok ? response.value : null
+    },
+    registerWorkspace: async (path) => {
+      try {
+        const result = await ctx.remote.workspace.create({ path })
+        return result.ok ? { kind: 'registered' } : { kind: 'failed', message: result.error.message }
+      } catch {
+        // A carrier failure is not a refusal to register: saying "the app could
+        // not be reached" keeps the retry honest instead of blaming the folder.
+        return { kind: 'failed', message: t('firstLightWorkspaceUnreachable') }
+      }
+    },
+    writeAgentMemory: async (facts) => {
+      try {
+        const result = await ctx.remote.settings.writeProfileMemory(facts)
+        return result.ok ? { kind: 'stored' } : { kind: 'failed', message: result.error.message }
+      } catch {
+        return { kind: 'failed', message: t('firstLightMemoryUnreachable') }
+      }
+    },
+    t,
+  })
 
   // Pushed invalidations converge every open surface without polling. The
   // settingsScope injection makes ui-settings activate first, and remote
@@ -124,6 +167,7 @@ export function apply(ctx: ClientContext): void {
     ]
     return () => {
       welcomeController.dispose()
+      firstLightController.dispose()
       for (const dispose of disposers) dispose()
     }
   }, 'ui-settings-models: pushed invalidations')
@@ -139,6 +183,15 @@ export function apply(ctx: ClientContext): void {
       'settings.models.footer': { kind: 'list', scope: 'root' },
     },
   }, ModelsSection))
+  // First Light runs before the versioned notice: while setup is incomplete
+  // only this step is mounted, and once sealed it self-completes at boot so
+  // the notice and the DeepSeek prompt resume their own, independent roles.
+  ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
+    name: 'settings.onboarding',
+    id: 'first-light',
+    order: -1000,
+    inject: firstLightInjected,
+  }, FirstLight))
   ctx.slots.inject('settings.onboarding', () => ctx.slots.register({
     name: 'settings.onboarding',
     id: 'welcome-notice',
