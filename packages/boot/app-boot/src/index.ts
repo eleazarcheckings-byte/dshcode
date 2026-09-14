@@ -595,11 +595,35 @@ async function observeLoaderRejectionCheckpoint(reasons: readonly unknown[]): Pr
 export const FAIL_LOUD_RELEASE_TIMEOUT_MS = 2_000
 
 /**
+ * The guard {@link installFailLoud} installs.
+ *
+ * Call it to remove the rejection handler — correct only on a surface that is
+ * already tearing down, because with no handler at all Node's default
+ * unhandled-rejection action throws and kills the process with no labelled
+ * diagnostic.
+ */
+export interface FailLoudHandle {
+  /** Remove the rejection handler entirely. */
+  (): void
+  /**
+   * Close the startup window: after this, an unhandled rejection is still
+   * reported (one stderr diagnostic plus `report`) but no longer exits.
+   *
+   * The guard exists to make a failed *boot* loud. A launcher that has reached
+   * readiness is serving a live session, where a stray rejection from a
+   * long-lived subsystem (detached plugin work, a stream or pty error, a
+   * storage write, a transport teardown) must not take the user's work down
+   * with it — the surface can report it and keep running.
+   */
+  seal(): void
+}
+
+/**
  * Install before boot to turn a late unhandled plugin-init rejection into one
  * labelled stderr diagnostic and `exit(1)`. A rejection already included by
  * {@link assertEntriesActivated} is ignored during its process checkpoint;
- * every other rejection remains fatal. Stdout remains untouched for ACP; the
- * returned function removes the handler.
+ * every other rejection remains fatal **until {@link FailLoudHandle.seal}**,
+ * after which it is reported without exiting. Stdout remains untouched for ACP.
  *
  * The Loader mounts entries concurrently, so a surface that owns the terminal
  * can already hold it when a sibling entry rejects. Exiting straight from the
@@ -626,24 +650,43 @@ export const FAIL_LOUD_RELEASE_TIMEOUT_MS = 2_000
  *   terminal-owning surface to restore the terminal. Its own failure is
  *   swallowed because the pending fatal exit already owns the outcome.
  * @param report - optional observer of the fatal rejection, invoked before
- *   release and exit.
- * @returns the uninstaller that removes the rejection handler.
+ *   release and exit. It is also invoked for a rejection that arrives after
+ *   {@link FailLoudHandle.seal}, which is how a surface records a cause it
+ *   would otherwise never see.
+ * @returns the guard: callable to remove the handler, with `seal` to close the
+ *   startup window.
  */
 export function installFailLoud(
   binName: string,
   proc: FailLoudProcess = process,
   release?: () => Promise<void> | void,
   report?: (error: unknown) => void,
-): () => void {
+): FailLoudHandle {
   let exiting = false
+  let sealed = false
+  const describe = (err: unknown): string =>
+    err instanceof Error ? err.stack ?? err.message : String(err)
   const handler = (err: unknown): void => {
     if (assembledActivationRejections.has(err)) return
     // A release in flight already owns the exit. Swallow later rejections
     // (teardown's own included) rather than reporting a second failure over the
     // real one or letting Node kill the process before the terminal is back.
+    // Checked before `sealed`: a surface that seals during teardown must not
+    // reopen reporting over the exit that is already committed.
     if (exiting) return
+    // Sealed: startup succeeded, so the process is serving a session. A
+    // rejection here comes from a long-lived subsystem (detached plugin work, a
+    // stream or pty error, a storage write, a transport teardown) — a defect
+    // worth reporting, never a reason to kill live work. Uninstalling instead
+    // would be worse: Node's default action throws, which kills the process
+    // with no labelled diagnostic at all.
+    if (sealed) {
+      proc.stderr.write(`${binName}: late rejection after startup (non-fatal): ${describe(err)}\n`)
+      report?.(err)
+      return
+    }
     exiting = true
-    proc.stderr.write(`${binName}: fatal load failure: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`)
+    proc.stderr.write(`${binName}: fatal load failure: ${describe(err)}\n`)
     report?.(err)
     if (release === undefined) {
       proc.exit(1)
@@ -669,8 +712,10 @@ export function installFailLoud(
     })()
   }
   const uninstall = (): void => void proc.off('unhandledRejection', handler)
+  const handle = uninstall as FailLoudHandle
+  handle.seal = (): void => { sealed = true }
   proc.on('unhandledRejection', handler)
-  return uninstall
+  return handle
 }
 
 /**

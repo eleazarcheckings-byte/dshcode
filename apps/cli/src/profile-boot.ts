@@ -242,7 +242,9 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // complete; SIGINT is a user interrupt and reports 130.
   process.on('SIGTERM', () => { interrupt(0) })
   process.on('SIGINT', () => { interrupt(130) })
-  installFailLoud(NAME, process, async () => {
+  // Held, not discarded: the guard stays fatal for the whole startup window and
+  // is sealed at readiness, where a late rejection stops being a boot failure.
+  const failLoud = installFailLoud(NAME, process, async () => {
     await app.current?.fiber.dispose()
   }, options.failLoud)
 
@@ -324,6 +326,12 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     && ctx.fiber.state === FiberState.ACTIVE
     && ctx.get('loader') !== undefined) {
     appReady.commit()
+    // Startup is over and the surface is serving. Close the fail-loud window
+    // here and only here: past this point a stray unhandled rejection (detached
+    // plugin work, a stream or pty error, a storage write, a transport teardown)
+    // is reported instead of killing a live session, which is what silently took
+    // the desktop app down mid-turn.
+    failLoud.seal()
   }
   return { ctx, shutdown }
 }

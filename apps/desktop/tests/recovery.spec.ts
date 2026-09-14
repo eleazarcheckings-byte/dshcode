@@ -14,6 +14,7 @@ import {
   failureMessage,
   hangSuspects,
   recordBootFailures,
+  recordLateRejection,
   recoveryDecision,
   withBootTimeout,
 } from '../src/recovery.ts'
@@ -175,5 +176,37 @@ describe('recovery records', () => {
     expect(records).toHaveLength(1)
     expect(records[0]?.message).toBe('attempt 11')
     expect(bootFailuresPath(dir)).toBe(join(dir, 'boot-failures.json'))
+  })
+})
+
+// A late rejection that blames no installed plugin is the one that used to
+// leave no evidence at all: the fail-loud guard wrote a stderr line a packaged
+// desktop has no sink for and then exited. It must be recorded either way.
+describe('late rejection records', () => {
+  it('records an unattributable late rejection with an empty plugin id', async () => {
+    const dir = await root()
+    await recordLateRejection(dir, new Error('stream errored after startup'), installed('@scope/other'))
+    const { readBootFailures } = await import('@deepseek-ai/dsh-host-plugin-installer')
+    const records = readBootFailures(dir)
+    expect(records).toHaveLength(1)
+    expect(records[0]).toMatchObject({
+      pluginId: '',
+      kind: 'late-rejection',
+      installPath: '',
+      message: 'stream errored after startup',
+    })
+    expect(records[0]?.stack).toContain('stream errored after startup')
+    expect(records[0]?.at).not.toBe('')
+  })
+
+  it('blames the installed plugin whose name appears in the rejection', async () => {
+    const dir = await root()
+    await recordLateRejection(dir, new Error('@scope/broken: detached task rejected'), installed('@scope/broken', '@scope/other'))
+    const { readBootFailures } = await import('@deepseek-ai/dsh-host-plugin-installer')
+    const records = readBootFailures(dir)
+    expect(records).toHaveLength(1)
+    expect(records[0]?.pluginId).toBe('@scope/broken')
+    expect(records[0]?.kind).toBe('late-rejection')
+    expect(records[0]?.installPath.startsWith(join(dir, 'profiles', 'node_modules'))).toBe(true)
   })
 })

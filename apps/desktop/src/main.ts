@@ -8,13 +8,11 @@ import { PROFILE_PATCH_FILENAME, resolveProfileDir } from '@deepseek-ai/dsh-app-
 import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import {
-  fallbackModulesDir,
   pruneBootFailures,
   readPluginState,
   readSafeMode,
   setPluginRowEnabled,
   setSafeMode,
-  writeBootFailure,
 } from '@deepseek-ai/dsh-host-plugin-installer'
 import { runProfile } from '@deepseek-ai/dsh/profile-boot'
 import type {} from '@deepseek-ai/dsh-host-webserver'
@@ -40,12 +38,11 @@ import {
 } from './lifecycle.ts'
 import { readBootMarker, writeBootMarker } from './boot-marker.ts'
 import {
-  attributeLoadFailure,
   clearResolvedFailures,
   CONSECUTIVE_FAILURE_THRESHOLD,
   DESKTOP_BOOT_TIMEOUT_MS,
-  failureMessage,
   recordBootFailures,
+  recordLateRejection,
   recoveryDecision,
   withBootTimeout,
 } from './recovery.ts'
@@ -230,30 +227,22 @@ function requestQuit(code: number): void {
 }
 
 /**
- * Record a late unhandled plugin-init rejection before the fail-loud exit
- * (the tree is suspect, so the default hard exit stays). The failure is
- * attributed to an installed plugin when its name appears in the rejection;
- * next launch the plugin list shows the badge, and a startup that dies
- * before `ok` still triggers the recovery dialog through the boot marker.
+ * Record a late unhandled rejection. The fail-loud guard reports every late
+ * rejection here, both the startup-window ones (the tree is suspect, so the
+ * default hard exit still follows) and the post-readiness ones (the session
+ * keeps running). The failure is attributed to an installed plugin when its
+ * name appears in the rejection; next launch the plugin list shows the badge,
+ * and a startup that dies before `ok` still triggers the recovery dialog
+ * through the boot marker.
  */
 function reportLateRejection(error: unknown): void {
   const home = resolveDshHome()
-  const { message, stack } = failureMessage(error)
   try {
-    const [pluginId] = attributeLoadFailure(error, readPluginState(home).plugins)
-    if (pluginId === undefined) return
-    void writeBootFailure(home, {
-      pluginId,
-      kind: 'late-rejection',
-      message,
-      stack,
-      installPath: join(fallbackModulesDir(home), pluginId),
-      at: new Date().toISOString(),
-    }).catch((writeError: unknown) => {
-      console.error(`${PRODUCT_NAME}: failed to record late plugin failure`, writeError)
+    void recordLateRejection(home, error, readPluginState(home).plugins).catch((writeError: unknown) => {
+      console.error(`${PRODUCT_NAME}: failed to record late rejection`, writeError)
     })
-  } catch (attributeError) {
-    console.error(`${PRODUCT_NAME}: failed to attribute late plugin failure`, attributeError)
+  } catch (recordError) {
+    console.error(`${PRODUCT_NAME}: failed to record late rejection`, recordError)
   }
 }
 

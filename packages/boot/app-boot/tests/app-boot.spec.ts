@@ -424,6 +424,44 @@ describe('installFailLoud', () => {
     await vi.waitFor(() => { expect(proc.exits).toEqual([1]) })
     expect(released).toBe(true)
   })
+
+  // The guard makes a failed *boot* loud. A launcher that reached readiness is
+  // serving a live session, so a stray rejection from a long-lived subsystem
+  // must be reported without taking the user's work down with it.
+  it('seal() turns a later rejection into a reported diagnostic and never exits', () => {
+    const proc = fakeProc()
+    const reported: unknown[] = []
+    const handle = installFailLoud(NAME, proc, undefined, (error) => { reported.push(error) })
+    handle.seal()
+    const error = new Error('stream errored after startup')
+    proc.handlers[0]!(error)
+    expect(proc.written[0]).toContain(`${NAME}: late rejection after startup (non-fatal): `)
+    expect(proc.written[0]).toContain(error.stack)
+    expect(reported).toEqual([error])
+    expect(proc.exits).toEqual([])
+    // The handler stays installed: removing it would hand the next rejection to
+    // Node's default action, which throws instead of reporting.
+    expect(proc.handlers).toHaveLength(1)
+  })
+
+  it('seal() does not weaken the startup window it closes', async () => {
+    const proc = fakeProc()
+    const handle = installFailLoud(NAME, proc)
+    proc.handlers[0]!(new Error('startup rejection'))
+    expect(proc.exits).toEqual([1])
+    handle.seal()
+    proc.handlers[0]!(new Error('after the fatal exit'))
+    // Already exiting: the latch owns the outcome, so neither path re-reports.
+    expect(proc.written).toHaveLength(1)
+  })
+
+  it('still removes the handler after seal() when the surface is torn down', () => {
+    const proc = fakeProc()
+    const handle = installFailLoud(NAME, proc)
+    handle.seal()
+    handle()
+    expect(proc.handlers).toHaveLength(0)
+  })
 })
 
 describe('assertEntriesLoaded', () => {

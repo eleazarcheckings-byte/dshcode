@@ -186,3 +186,33 @@ export async function clearResolvedFailures(home: string, profilePatchPath: stri
     await clearBootFailures(home, record.pluginId)
   }
 }
+
+/**
+ * Record one late unhandled rejection — a rejection that surfaced after the
+ * tree was built, from a session that may still be running.
+ *
+ * Attribution is best-effort by design. A rejection that names no installed
+ * plugin is still recorded, with an empty `pluginId` and `installPath`: the
+ * rejection that blames nothing is exactly the one that used to leave no
+ * evidence at all, and the ring format already reserves the empty id for it.
+ * @param home - the Harness home.
+ * @param error - the rejection reason.
+ * @param installed - the recorded installed plugins.
+ * @returns resolution after the record settles.
+ */
+export async function recordLateRejection(
+  home: string,
+  error: unknown,
+  installed: readonly InstalledPluginRecord[],
+): Promise<void> {
+  const { message, stack } = failureMessage(error)
+  const [pluginId] = attributeLoadFailure(error, installed)
+  await writeBootFailure(home, {
+    pluginId: pluginId ?? '',
+    kind: 'late-rejection',
+    message,
+    stack,
+    installPath: pluginId === undefined ? '' : join(fallbackModulesDir(home), pluginId),
+    at: new Date().toISOString(),
+  })
+}
