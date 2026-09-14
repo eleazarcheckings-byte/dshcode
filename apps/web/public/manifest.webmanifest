@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "DeepSeek Harness",
-  "short_name": "DSH",
+  "name": "Saturn AI",
+  "short_name": "Saturn",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",

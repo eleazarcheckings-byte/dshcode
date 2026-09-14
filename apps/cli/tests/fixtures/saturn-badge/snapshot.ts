@@ -7,16 +7,16 @@ import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-tools'
 
 const overlayPath = process.argv[2]
-if (overlayPath === undefined) throw new Error('dsh-badge snapshot requires an overlay path')
+if (overlayPath === undefined) throw new Error('saturn-badge snapshot requires an overlay path')
 const rootConfigPath = fileURLToPath(new URL('../../../../../packages/bundle/base/tests/fixtures/root.cordis.yml', import.meta.url))
 const basePatchPath = fileURLToPath(new URL('../../../../../packages/bundle/base/cordis.patch.yml', import.meta.url))
-const ctx = await boot('dsh-badge-snapshot', rootConfigPath, [
-  ...loadOverlayPatches('dsh-badge-snapshot', basePatchPath),
-  ...loadOverlayPatches('dsh-badge-snapshot', overlayPath),
+const ctx = await boot('saturn-badge-snapshot', rootConfigPath, [
+  ...loadOverlayPatches('saturn-badge-snapshot', basePatchPath),
+  ...loadOverlayPatches('saturn-badge-snapshot', overlayPath),
 ])
 
 try {
-  const agentId = SessionId('dsh-badge-snapshot')
+  const agentId = SessionId('saturn-badge-snapshot')
   const session = ctx.sessions.create(agentId, { meta: { cwd: process.cwd() } })
   const agent: Agent = {
     ctx,
@@ -28,7 +28,7 @@ try {
     send: () => {},
     followup: () => {},
     steer: () => {},
-    inject: () => { throw new Error('dsh-badge snapshot must receive the catalog at the step boundary') },
+    inject: () => { throw new Error('saturn-badge snapshot must receive the catalog at the step boundary') },
     cancel: () => {},
     runMaintenance: job => job(new AbortController().signal),
     whenIdle: () => Promise.resolve(),
@@ -42,11 +42,11 @@ try {
     ? decision.messages.find(message => message.role === 'user'
       && message.source.kind === 'skill-catalog')?.content
     : undefined
-  const summary = (await ctx.skills.list()).find(skill => skill.name === 'dsh-badge')
+  const summary = (await ctx.skills.list()).find(skill => skill.name === 'saturn-badge')
   const result = await ctx.tools.execute({
-    callId: ToolCallId('dsh-badge-snapshot'),
+    callId: ToolCallId('saturn-badge-snapshot'),
     name: 'skill',
-    arguments: { name: 'dsh-badge' },
+    arguments: { name: 'saturn-badge' },
     signal: new AbortController().signal,
   })
   process.stdout.write(`${JSON.stringify({ catalog: catalog ?? null, summary: summary ?? null, result })}\n`)

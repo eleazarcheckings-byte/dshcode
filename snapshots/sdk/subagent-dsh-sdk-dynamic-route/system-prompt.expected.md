@@ -1,4 +1,4 @@
-You are an AI agent powered by DeepSeek Harness.
+You are an AI agent powered by Saturn AI.
 
 You are a coding agent powered by the mock-delegate model. Your working directory is {{cwd}}.
 

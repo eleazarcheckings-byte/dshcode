@@ -20,7 +20,7 @@
 - button "Settings":
   - img
   - text: Settings
-- text: Into the Unknown Preview
+- text: Build something extraordinary. Saturn
 - button "Choose workspace":
   - img
   - text: workspace

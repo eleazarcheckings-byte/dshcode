@@ -12,8 +12,8 @@ it('ships install metadata with the built web application', async () => {
   const manifest: unknown = JSON.parse(await readFile(join(DIST_ROOT, 'manifest.webmanifest'), 'utf8'))
   expect(manifest).toEqual({
     id: '/',
-    name: 'DeepSeek Harness',
-    short_name: 'DSH',
+    name: 'Saturn AI',
+    short_name: 'Saturn',
     start_url: '/',
     scope: '/',
     display: 'fullscreen',
@@ -26,10 +26,10 @@ it('ships install metadata with the built web application', async () => {
   })
 })
 
-it('ships a favicon that switches to a light mark under dark color scheme', async () => {
+it('ships the gold Saturn mark as the favicon', async () => {
   const favicon = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
-  // The light fill must live inside the dark-scheme media query, so the icon
-  // stays black in light mode and only turns white under a dark scheme.
-  expect(favicon).toMatch(/@media \(prefers-color-scheme: dark\)\s*{\s*path\s*{[^}]*fill:\s*#fff/i)
-  expect(favicon).toContain('fill="#000"')
+  // The mark is a single gold-tinted SVG; both fill and stroke use the accent.
+  expect(favicon).toContain('fill="#DDA43A"')
+  expect(favicon).toContain('stroke="#DDA43A"')
+  expect(favicon).toContain('viewBox="0 0 64 64"')
 })
