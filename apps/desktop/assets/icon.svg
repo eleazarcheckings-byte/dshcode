@@ -1,18 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Saturn AI - application icon. CANONICAL VECTOR SOURCE for the app icon at
+  every raster size 24 px and above, and for the Windows .ico entries and the
+  macOS icon.
+
+  A 1024 canvas carrying the ring mark of saturn-mark.svg inside a rounded
+  square tile. The mark is not re-authored here: it is the 64-unit grid below
+  scaled 12x about the canvas centre, so the glyph, the tray icons, the About
+  surface and the in-app brand mark are all literally the same geometry.
+
+  Tile: 896 px edge, 224 px corner radius (25%), inset 64 px (6.25%) so the
+  rounded square breathes inside the icon frame. Fill is the cold near-black
+  ramp #121216 -> #0a0a0c at 135 degrees; the ring and planet are the locked
+  Saturn gold #DDA43A.
+
+  Ring occlusion is the three-pass construction documented in saturn-mark.svg
+  (far ring, planet, near ring clipped to y = 33 of the mark grid). Keep the
+  split line in lockstep with SaturnLogo.tsx.
+
+  Below 24 px use saturn-icon-small.svg instead: at 16 px this master's ring
+  stroke rasterizes under a pixel and the two openings close.
+
+  electron-builder consumes the committed .ico for the Windows target and
+  converts this file for the macOS target. Render the rasters with
+  scripts/icons/build-icons.mjs - never upscale a bitmap.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" role="img" aria-label="Saturn AI">
+  <title>Saturn AI</title>
   <defs>
-    <linearGradient id="background" x1="152" y1="128" x2="872" y2="896" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5865F2"/>
-      <stop offset="0.52" stop-color="#7C3AED"/>
-      <stop offset="1" stop-color="#0891B2"/>
+    <linearGradient id="saturn-tile" x1="152" y1="128" x2="872" y2="896" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#141414" />
+      <stop offset="1" stop-color="#0a0a0b" />
     </linearGradient>
-    <linearGradient id="panel" x1="264" y1="248" x2="760" y2="776" gradientUnits="userSpaceOnUse">
-      <stop stop-color="white" stop-opacity="0.24"/>
-      <stop offset="1" stop-color="white" stop-opacity="0.10"/>
-    </linearGradient>
+    <clipPath id="saturn-ring-near-icon" clipPathUnits="userSpaceOnUse">
+      <rect x="0" y="33" width="64" height="31" />
+    </clipPath>
   </defs>
-  <rect x="64" y="64" width="896" height="896" rx="224" fill="url(#background)"/>
-  <rect x="212" y="236" width="600" height="552" rx="112" fill="url(#panel)" stroke="white" stroke-opacity="0.34" stroke-width="12"/>
-  <path d="M438 382L326 512L438 642" stroke="white" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M586 382L698 512L586 642" stroke="white" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M558 348L466 676" stroke="white" stroke-width="52" stroke-linecap="round"/>
+  <rect x="64" y="64" width="896" height="896" rx="224" fill="url(#saturn-tile)" />
+  <g transform="translate(512 512) scale(12) translate(-32 -32)">
+    <ellipse cx="32" cy="32" rx="27" ry="9.5" transform="rotate(-18 32 32)" stroke="#DDA43A" stroke-width="4.5" />
+    <circle cx="32" cy="32" r="15" fill="#DDA43A" />
+    <g clip-path="url(#saturn-ring-near-icon)">
+      <ellipse cx="32" cy="32" rx="27" ry="9.5" transform="rotate(-18 32 32)" stroke="#DDA43A" stroke-width="4.5" />
+    </g>
+  </g>
 </svg>

@@ -1,5 +1,10 @@
 /** Desktop-shell lifecycle and navigation policies independent of Electron globals. */
 
+// Type-only: erased at build, so this module still runs without an Electron
+// global (the sandboxed preload inlines it) while the application-menu roles
+// stay the exact union Electron accepts.
+import type { MenuItemConstructorOptions } from 'electron'
+
 /** Result of classifying a renderer navigation target. */
 export type NavigationDisposition = 'application' | 'external' | 'blocked'
 
@@ -113,10 +118,19 @@ export interface TrayMenuTemplateItem {
   click?: () => void
 }
 
-/** The two tray actions the main process wires to window and quit flows. */
+/**
+ * The tray actions the main process wires to the window, About, and quit
+ * flows. `productName` is supplied by the main process rather than written
+ * here so this module holds no product-identity literal; every user-visible
+ * label that names the product is composed from it.
+ */
 export interface TrayActions {
+  /** The application product name the tray labels are composed from. */
+  productName: string
   /** Show and focus the main window, recreating it when it does not exist. */
   show: () => void
+  /** Show the About surface for the running build. */
+  about: () => void
   /** Request a real application exit through the Harness shutdown controller. */
   quit: () => void
 }
@@ -135,16 +149,20 @@ export function windowCloseDisposition(quitArmed: boolean): CloseDisposition {
 }
 
 /**
- * Build the tray context-menu template. Product copy is Chinese, matching the
- * embedded Web UI.
- * @param actions - the show and quit callbacks the menu wires.
+ * Build the tray context-menu template: the window action, the About
+ * surface, and the exit. macOS also renders the application menu built by
+ * `buildApplicationMenu`, so the tray stays the two-action surface there and
+ * the About item is the shared entry point on every platform.
+ * @param actions - the product name and the show, about, and quit callbacks.
  * @returns the menu template for `Menu.buildFromTemplate`.
  */
 export function buildTrayMenu(actions: TrayActions): TrayMenuTemplateItem[] {
   return [
-    { label: '显示主界面', click: actions.show },
+    { label: `Show ${actions.productName}`, click: actions.show },
     { type: 'separator' },
-    { label: '退出', click: actions.quit },
+    { label: `About ${actions.productName}\u2026`, click: actions.about },
+    { type: 'separator' },
+    { label: `Quit ${actions.productName}`, click: actions.quit },
   ]
 }
 
@@ -237,8 +255,12 @@ export function desktopIpcSenderIsApplication(senderUrl: string | undefined, app
   }
 }
 
-/** The two actions the title-bar window menu wires. */
+/** The four actions the title-bar window menu wires. */
 export interface WindowMenuActions {
+  /** The application product name the menu labels are composed from. */
+  productName: string
+  /** Show the About surface for the running build. */
+  about: () => void
   /** Hide the main window to the tray. */
   hide: () => void
   /** Restart the whole application in place (applies profile/patch changes). */
@@ -248,16 +270,112 @@ export interface WindowMenuActions {
 }
 
 /**
- * Build the window menu template popped by the title-bar menu button.
- * @param actions - the hide, restart, and quit callbacks the menu wires.
+ * Build the window menu template popped by the title-bar menu button. The
+ * rows group identity first, then the two application-lifecycle actions the
+ * shell owns (restart to apply profile and patch changes, hide to the tray),
+ * then the exit; no accelerator is declared because Electron registers a
+ * popup menu's accelerators only from an application menu, and a displayed
+ * binding that does not fire is worse than none.
+ * @param actions - the product name and the about, restart, hide, and quit callbacks.
  * @returns the menu template for `Menu.buildFromTemplate`.
  */
 export function buildWindowMenu(actions: WindowMenuActions): TrayMenuTemplateItem[] {
   return [
-    { label: '隐藏到托盘', click: actions.hide },
+    { label: `About ${actions.productName}\u2026`, click: actions.about },
     { type: 'separator' },
-    { label: '重启应用', click: actions.restart },
+    { label: `Restart ${actions.productName}`, click: actions.restart },
+    { label: 'Hide to Tray', click: actions.hide },
     { type: 'separator' },
-    { label: '退出', click: actions.quit },
+    { label: `Quit ${actions.productName}`, click: actions.quit },
+  ]
+}
+
+/**
+ * One application-menu item template: the Electron
+ * `MenuItemConstructorOptions` subset the macOS menu bar uses, with a
+ * zero-argument click callback and a recursive `submenu` so both the template
+ * and the tests stay free of Electron menu arguments.
+ */
+export interface ApplicationMenuTemplateItem {
+  label?: string
+  // NonNullable: an indexed access on Electron's optional `role` admits an
+  // explicit undefined, which this repo's exactOptionalPropertyTypes rejects.
+  role?: NonNullable<MenuItemConstructorOptions['role']>
+  type?: 'separator'
+  click?: () => void
+  submenu?: ApplicationMenuTemplateItem[]
+}
+
+/** The application-menu actions the macOS menu bar wires. */
+export interface ApplicationMenuActions {
+  /** The application product name naming the leading menu. */
+  productName: string
+  /** Show the About surface for the running build. */
+  about: () => void
+}
+
+/**
+ * Build the macOS application-menu template. Every row is an Electron role
+ * rather than a label, so the standard bindings (Cmd+Z/C/X/V/A, Cmd+Q, Cmd+W,
+ * Cmd+M, Cmd+R, the zoom pair, full screen) come from Electron exactly as the
+ * stock menu supplied them, and no product copy is written here. Only the
+ * About row is a custom item, because it must open the shell's own About
+ * surface instead of the native panel. The stock Help menu is dropped: its
+ * single row links to the Electron project, which is upstream shell branding
+ * rather than this product's.
+ * @param actions - the product name and the About callback.
+ * @returns the menu template for `Menu.setApplicationMenu`.
+ */
+export function buildApplicationMenu(actions: ApplicationMenuActions): ApplicationMenuTemplateItem[] {
+  return [
+    {
+      label: actions.productName,
+      submenu: [
+        { label: `About ${actions.productName}\u2026`, click: actions.about },
+        { type: 'separator' },
+        { role: 'services', submenu: [] },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { type: 'separator' },
+        { role: 'front' },
+      ],
+    },
   ]
 }

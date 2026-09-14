@@ -1,9 +1,9 @@
 {
   "name": "@dshcode/desktop",
-  "productName": "DSHCode",
-  "description": "Electron desktop shell for the DeepSeek Harness Web UI",
+  "productName": "Saturn AI",
+  "description": "Saturn AI desktop shell for the dsh web platform",
   "version": "1.1.0",
-  "author": "DSHCode contributors",
+  "author": "Saturn AI",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/whitelonng/dshcode.git",

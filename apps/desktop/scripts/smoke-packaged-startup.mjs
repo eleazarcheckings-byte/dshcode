@@ -9,13 +9,13 @@ const appRoot = resolve(import.meta.dirname, '..')
 const releaseRoot = resolve(appRoot, '../../.artifacts/desktop/release')
 const bundle = process.platform === 'win32'
   ? join(releaseRoot, 'win-unpacked')
-  : join(releaseRoot, process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'DSHCode.app', 'Contents')
-const executable = join(bundle, process.platform === 'win32' ? 'DSHCode.exe' : 'MacOS/DSHCode')
+  : join(releaseRoot, process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Saturn AI.app', 'Contents')
+const executable = join(bundle, process.platform === 'win32' ? 'Saturn AI.exe' : 'MacOS/Saturn AI')
 const resources = join(bundle, process.platform === 'win32' ? 'resources/app' : 'Resources/app')
 const manifestPath = join(resources, 'package.json')
 const fixture = join(resources, 'packaged-startup-smoke.mjs')
 const originalManifest = readFileSync(manifestPath, 'utf8')
-const temporaryRoot = mkdtempSync(join(tmpdir(), 'dshcode-启动-'))
+const temporaryRoot = mkdtempSync(join(tmpdir(), 'saturn-ai-startup-'))
 const resultPath = join(temporaryRoot, 'result.json')
 
 try {

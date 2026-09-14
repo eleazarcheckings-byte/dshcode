@@ -1,5 +1,5 @@
-appId: com.whitelonng.dshcode
-productName: DSHCode
+appId: tools.saturnai.desktop
+productName: Saturn AI
 electronVersion: 43.4.0
 artifactName: '${productName}-${version}-${os}-${arch}.${ext}'
 # Profile plugins resolve as ordinary packages and the Harness-home fallback
@@ -45,7 +45,12 @@ mac:
     - dmg
     - zip
 win:
-  icon: build/icon.svg
+  # An explicit multi-resolution ICO rather than the SVG master: electron-builder
+  # rasterizes an SVG once and downsamples, and the ring mark's hairline stroke
+  # does not survive at 16/20 px, where it collapses into a diagonal bar. The
+  # committed ICO carries one optically compensated raster per size.
+  # Regenerate with the repo-level scripts/icons/build-icons.mjs.
+  icon: build/icon.ico
   requestedExecutionLevel: asInvoker
   target:
     - nsis
@@ -54,5 +59,12 @@ nsis:
   perMachine: false
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: DSHCode
+  shortcutName: Saturn AI
   runAfterFinish: true
+  # Committed artwork staged into build/ by scripts/prepare-package.mjs
+  # (assets/installer*.ico, assets/uninstallerIcon.ico). Set explicitly rather
+  # than leaning on electron-builder's implicit build/ lookup, so a rename
+  # shows up as a hard error instead of a silent fall back to a default icon.
+  installerIcon: build/installerIcon.ico
+  uninstallerIcon: build/uninstallerIcon.ico
+  installerHeaderIcon: build/installerHeaderIcon.ico

@@ -214,19 +214,19 @@ One broken plugin must never brick the desktop: boot failures are attributed to 
 - `withBootTimeout(promise, 60_000)` — the watchdog; timeout throws `BootHangError`
 - `attributeLoadFailure(error, installed)` — installed plugin names appearing in the failure text (the Loader's activation audit names every failed entry)
 - `hangSuspects(installed, lastOkAt)` — plugins installed/updated after the last successful boot
-- `recoveryDecision` — `attributable` (blame list) vs `unattributable`; `recordBootFailures` writes one record per blamed plugin with the fallback install path; `clearResolvedFailures` drops the records of plugins that are enabled again after a successful boot
+- `recoveryDecision` — `attributable` (blame list) vs `unattributable`; `recordBootFailures` writes one record per blamed plugin with the fallback install path; `recordLateRejection` records one late unhandled rejection, blamed on the plugin its text names or with an empty `pluginId`/`installPath` when it names none; `clearResolvedFailures` drops the records of plugins that are enabled again after a successful boot and leaves the unattributable ones in place
 
 **`apps/cli/src/profile-boot.ts` + `packages/boot/app-boot/src/index.ts`:**
 
 - `runProfile` gains `skipUserPatches` (safe mode: profile + home user layers are skipped *without parsing*, so a broken `cordis.patch.yml` is a recovery case, not a boot blocker; bundle layers and overlays still apply) and `failLoud` (reports a late unhandled plugin-init rejection before the existing fail-loud exit; CLI default behavior unchanged)
-- `installFailLoud` gains an optional `report` hook invoked between the diagnostic and the exit
+- `installFailLoud` gains an optional `report` hook invoked between the diagnostic and the exit, and returns a guard whose `seal` closes the fatal window once `runProfile` reaches readiness — a rejection after that is reported without exiting; `runProfile` holds the guard and seals it exactly at `appReady.commit()`
 
 **`apps/desktop/src/main.ts`:**
 
 - Boot sequence: read previous marker → write `started` → sweep the failure ring → read safe mode → `runProfile` under the 60 s watchdog (with `skipUserPatches` and `failLoud: reportLateRejection`) → on success write `ok` + clear resolved failures; on failure `handleStartupFailure` records and shows the recovery dialog
 - Recovery dialog (`dialog.showMessageBox`, before any window): attributable → `继续（禁用插件并重启）` / `安全模式启动` / `退出`; unattributable → `安全模式启动` / `退出`; safe-mode-boot failure → `重启应用` / `退出`; after `CONSECUTIVE_FAILURE_THRESHOLD` (3) failed attempts the safe-mode button becomes the default
 - 继续 disables each blamed plugin via the installer's own `setPluginRowEnabled` (writes `disabled: true` to the managed insert row), then `app.relaunch()` + `requestQuit(0)`; 安全模式 writes the safe-mode marker and relaunches
-- `reportLateRejection` records an attributable late rejection before the hard exit; the boot marker covers startup deaths that produce no error
+- `reportLateRejection` records every late rejection through `recordLateRejection` — attributable ones name their plugin, unattributable ones keep an empty `pluginId` — so the cause survives even when nothing is blamed; the boot marker covers startup deaths that produce no error at all
 
 ## M9 Safe mode
 

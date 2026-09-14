@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  buildApplicationMenu,
   buildTrayMenu,
   buildWindowMenu,
   createQuitCoordinator,
@@ -74,21 +75,31 @@ describe('desktop tray and close-to-tray policy', () => {
     expect(windowCloseDisposition(true)).toBe('close')
   })
 
-  it('builds the tray menu with show and quit actions', () => {
+  it('builds the tray menu with show, about, and quit actions', () => {
     const show = vi.fn()
+    const about = vi.fn()
     const quit = vi.fn()
-    const menu = buildTrayMenu({ show, quit })
+    const menu = buildTrayMenu({ productName: 'Saturn AI', show, about, quit })
 
-    expect(menu.map(item => item.type === 'separator' ? '---' : item.label)).toEqual(['显示主界面', '---', '退出'])
-    const [showItem, , quitItem] = menu
-    if (showItem === undefined || quitItem === undefined
-      || showItem.type === 'separator' || quitItem.type === 'separator') {
+    expect(menu.map(item => item.type === 'separator' ? '---' : item.label))
+      .toEqual(['Show Saturn AI', '---', 'About Saturn AI\u2026', '---', 'Quit Saturn AI'])
+    const [showItem, , aboutItem, , quitItem] = menu
+    if (showItem === undefined || aboutItem === undefined || quitItem === undefined
+      || showItem.type === 'separator' || aboutItem.type === 'separator' || quitItem.type === 'separator') {
       throw new Error('menu items must be actions')
     }
     showItem.click?.()
     expect(show).toHaveBeenCalledOnce()
+    aboutItem.click?.()
+    expect(about).toHaveBeenCalledOnce()
     quitItem.click?.()
     expect(quit).toHaveBeenCalledOnce()
+  })
+
+  it('composes every product-naming tray label from the supplied product name', () => {
+    const menu = buildTrayMenu({ productName: 'Forked Name', show: vi.fn(), about: vi.fn(), quit: vi.fn() })
+    const labels = menu.flatMap(item => item.label === undefined ? [] : [item.label])
+    expect(labels).toEqual(['Show Forked Name', 'About Forked Name\u2026', 'Quit Forked Name'])
   })
 
   it('selects the 16 px logo on macOS and the 32 px one elsewhere', () => {
@@ -126,24 +137,74 @@ describe('desktop preload bridge policy', () => {
     expect(desktopIpcSenderIsApplication('not a url', origin)).toBe(false)
   })
 
-  it('builds the window menu with hide, restart, and quit actions', () => {
+  it('builds the window menu with about, restart, hide, and quit actions', () => {
+    const about = vi.fn()
     const hide = vi.fn()
     const restart = vi.fn()
     const quit = vi.fn()
-    const menu = buildWindowMenu({ hide, restart, quit })
+    const menu = buildWindowMenu({ productName: 'Saturn AI', about, hide, restart, quit })
 
     expect(menu.map(item => item.type === 'separator' ? '---' : item.label))
-      .toEqual(['隐藏到托盘', '---', '重启应用', '---', '退出'])
-    const [hideItem, , restartItem, , quitItem] = menu
-    if (hideItem === undefined || restartItem === undefined || quitItem === undefined
-      || hideItem.type === 'separator' || restartItem.type === 'separator' || quitItem.type === 'separator') {
+      .toEqual(['About Saturn AI\u2026', '---', 'Restart Saturn AI', 'Hide to Tray', '---', 'Quit Saturn AI'])
+    const [aboutItem, , restartItem, hideItem, , quitItem] = menu
+    if (aboutItem === undefined || restartItem === undefined || hideItem === undefined || quitItem === undefined
+      || aboutItem.type === 'separator' || restartItem.type === 'separator'
+      || hideItem.type === 'separator' || quitItem.type === 'separator') {
       throw new Error('menu items must be actions')
     }
-    hideItem.click?.()
-    expect(hide).toHaveBeenCalledOnce()
+    aboutItem.click?.()
+    expect(about).toHaveBeenCalledOnce()
     restartItem.click?.()
     expect(restart).toHaveBeenCalledOnce()
+    hideItem.click?.()
+    expect(hide).toHaveBeenCalledOnce()
     quitItem.click?.()
     expect(quit).toHaveBeenCalledOnce()
+  })
+
+  it('declares no window-menu accelerator Electron would display without binding', () => {
+    const menu = buildWindowMenu({
+      productName: 'Saturn AI',
+      about: vi.fn(),
+      hide: vi.fn(),
+      restart: vi.fn(),
+      quit: vi.fn(),
+    })
+    expect(menu.every(item => !('accelerator' in item))).toBe(true)
+  })
+})
+
+describe('desktop application menu policy', () => {
+  it('replaces the stock menu bar with the four branded top-level menus', () => {
+    const menu = buildApplicationMenu({ productName: 'Saturn AI', about: vi.fn() })
+    expect(menu.map(item => item.label)).toEqual(['Saturn AI', 'Edit', 'View', 'Window'])
+  })
+
+  it('routes the app menu About row to the shell About surface', () => {
+    const about = vi.fn()
+    const appMenu = buildApplicationMenu({ productName: 'Saturn AI', about }).at(0)
+    expect(appMenu?.submenu?.map(item => item.type === 'separator' ? '---' : item.label ?? item.role))
+      .toEqual(['About Saturn AI\u2026', '---', 'services', '---', 'hide', 'hideOthers', 'unhide', '---', 'quit'])
+    appMenu?.submenu?.[0]?.click?.()
+    expect(about).toHaveBeenCalledOnce()
+  })
+
+  it('keeps every stock role binding the system menu bar supplied', () => {
+    const menu = buildApplicationMenu({ productName: 'Saturn AI', about: vi.fn() })
+    const rolesOf = (label: string) => menu.find(item => item.label === label)?.submenu
+      ?.map(item => item.role)
+      .filter((role): role is NonNullable<typeof role> => role !== undefined)
+
+    expect(rolesOf('Edit')).toEqual(['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll'])
+    expect(rolesOf('View')).toEqual([
+      'reload', 'forceReload', 'toggleDevTools', 'resetZoom', 'zoomIn', 'zoomOut', 'togglefullscreen',
+    ])
+    expect(rolesOf('Window')).toEqual(['minimize', 'zoom', 'front'])
+  })
+
+  it('drops the stock Help menu and its upstream Electron link', () => {
+    const menu = buildApplicationMenu({ productName: 'Saturn AI', about: vi.fn() })
+    expect(menu.some(item => item.label === 'Help')).toBe(false)
+    expect(JSON.stringify(menu)).not.toContain('electronjs.org')
   })
 })

@@ -1,6 +1,7 @@
-/** Electron main process for the no-CLI DSHCode desktop application. */
+/** Electron main process for the no-CLI Saturn AI desktop application. */
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, session, shell, Tray } from 'electron'
+import type { NativeImage } from 'electron'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,6 +19,7 @@ import { runProfile } from '@deepseek-ai/dsh/profile-boot'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import {
+  buildApplicationMenu,
   buildTrayMenu,
   buildWindowMenu,
   createQuitCoordinator,
@@ -36,19 +38,30 @@ import {
   windowCloseDisposition,
   type QuitCoordinator,
 } from './lifecycle.ts'
+import { aboutSurface } from './about.ts'
 import { readBootMarker, writeBootMarker } from './boot-marker.ts'
+import { installCrashMonitor, type CrashMonitor } from './crash-monitor.ts'
 import {
   clearResolvedFailures,
   CONSECUTIVE_FAILURE_THRESHOLD,
   DESKTOP_BOOT_TIMEOUT_MS,
+  failureMessage,
   recordBootFailures,
   recordLateRejection,
   recoveryDecision,
   withBootTimeout,
 } from './recovery.ts'
 
-const PRODUCT_NAME = 'DSHCode'
-const APP_ID = 'com.whitelonng.dshcode'
+const PRODUCT_NAME = 'Saturn AI'
+const APP_ID = 'tools.saturnai.desktop'
+/**
+ * Window chrome colors, authored to the Saturn AI design ladder's darkest two
+ * rungs: `void` (the app background) and `ink` (the window-control symbols).
+ * The renderer's skin resolves the same two values, so the title-bar overlay
+ * and the OS-drawn window frame sit on one continuous surface with no seam.
+ */
+const CHROME_VOID = '#0a0a0c'
+const CHROME_INK = '#e8e8ee'
 /** Absolute directory of the bundled main module (Contents/Resources/app/lib). */
 const mainDir = fileURLToPath(new URL('.', import.meta.url))
 let mainWindow: BrowserWindow | undefined
@@ -57,6 +70,12 @@ let quitCoordinator: QuitCoordinator | undefined
 let nativeExitAllowed = false
 let quitArmed = false
 let tray: Tray | undefined
+/**
+ * The crash monitor for this launch. Installed as soon as the Harness home is
+ * known and before the Harness tree is built, so a death during startup still
+ * leaves a tombstone the next launch can read.
+ */
+let crashMonitor: CrashMonitor | undefined
 
 function reportExternalOpenFailure(error: unknown): void {
   console.error(`${PRODUCT_NAME}: failed to open external link`, error)
@@ -100,6 +119,65 @@ function showMainWindow(): void {
 }
 
 /**
+ * Load the ring glyph shown as the About surface's icon. A missing or
+ * unreadable asset yields undefined so the dialog opens without an icon
+ * rather than failing.
+ * @returns the About icon, or undefined when the asset is unavailable.
+ */
+function aboutIcon(): NativeImage | undefined {
+  const image = nativeImage.createFromPath(join(mainDir, '..', 'assets', 'about.png'))
+  return image.isEmpty() ? undefined : image
+}
+
+/**
+ * Show the About surface: the product name, the packaged version, the runtime
+ * stack the build shipped with, the Saturn ring glyph as its icon, and the MIT
+ * attribution line. A native message box rather than a BrowserWindow because
+ * the shell owns no local renderer document — its only page is the Harness web
+ * UI served over loopback — so a window would need a second page, its own
+ * navigation policy, and a lifecycle to close it, while the dialog is one call
+ * on the same `dialog` surface the recovery paths already use.
+ */
+function showAbout(): void {
+  const icon = aboutIcon()
+  const surface = aboutSurface(PRODUCT_NAME, app.getVersion(), {
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+  })
+  void dialog.showMessageBox({
+    type: 'info',
+    title: `About ${PRODUCT_NAME}`,
+    message: surface.message,
+    detail: surface.detail,
+    buttons: ['Close'],
+    defaultId: 0,
+    noLink: true,
+    ...(icon === undefined ? {} : { icon }),
+  })
+}
+
+/**
+ * Install the application menu. Windows and Linux remove it: the native menu
+ * bar would render as a full-width row below the custom title bar, and the
+ * tray, the title-bar menu button, and the embedded web UI own application
+ * commands there. macOS keeps a menu bar and cannot work without one — its
+ * Edit roles are what bind Cmd+C/V/X/A — so it receives the branded
+ * application menu, which replaces the stock File/Edit/View/Help/Window bar
+ * and its upstream Help link while preserving every role binding.
+ */
+function installMenus(): void {
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null)
+    return
+  }
+  Menu.setApplicationMenu(Menu.buildFromTemplate(buildApplicationMenu({
+    productName: PRODUCT_NAME,
+    about: showAbout,
+  })))
+}
+
+/**
  * Install the system tray: the colored app logo on every platform, with the
  * primary click showing the main window and the secondary click popping the
  * context menu. Creation is guarded because some Linux desktops provide no
@@ -122,7 +200,9 @@ function installTray(): void {
     const trayIcon = new Tray(image)
     trayIcon.setToolTip(PRODUCT_NAME)
     const menu = Menu.buildFromTemplate(buildTrayMenu({
+      productName: PRODUCT_NAME,
       show: showMainWindow,
+      about: showAbout,
       quit: () => {
         quitArmed = true
         requestQuit(0)
@@ -161,15 +241,15 @@ async function createMainWindow(rawUrl: string): Promise<void> {
     minWidth: 960,
     minHeight: 640,
     show: false,
-    backgroundColor: '#ffffff',
+    backgroundColor: CHROME_VOID,
     ...(customFrame
       ? {
         titleBarStyle: 'hidden' as const,
         titleBarOverlay: {
-          // Matches the shell's light-theme base surface; a theme-driven
-          // update is a follow-up.
-          color: '#ffffff',
-          symbolColor: '#0f1115',
+          // The shell's darkest rung and its ink: the overlay strip must be
+          // the same value the renderer paints beneath it, or the seam shows.
+          color: CHROME_VOID,
+          symbolColor: CHROME_INK,
           height: 38,
         },
       }
@@ -190,6 +270,7 @@ async function createMainWindow(rawUrl: string): Promise<void> {
   })
   mainWindow = window
   installRendererPolicy(window, origin)
+  crashMonitor?.attachWindow(window)
   window.on('page-title-updated', (event) => {
     event.preventDefault()
     window.setTitle(PRODUCT_NAME)
@@ -210,11 +291,18 @@ async function createMainWindow(rawUrl: string): Promise<void> {
 }
 
 function finishNativeExit(code: number): void {
+  // The single exit funnel for every graceful quit. Stamping the run clean
+  // here is what keeps a normal close from being reported as a crash next
+  // launch; it is synchronous and cannot fail the exit.
+  crashMonitor?.markClean(code)
   nativeExitAllowed = true
   app.exit(code)
 }
 
 function requestQuit(code: number): void {
+  // A quit is in flight: teardown noise (a renderer torn down mid-shutdown)
+  // must not be filed as a crash.
+  crashMonitor?.noteQuitStarted()
   const coordinator = quitCoordinator
   if (coordinator === undefined) {
     finishNativeExit(code)
@@ -237,6 +325,11 @@ function requestQuit(code: number): void {
  */
 function reportLateRejection(error: unknown): void {
   const home = resolveDshHome()
+  // A pre-readiness rejection is fatal through the fail-loud guard, so it is
+  // also a death worth a reviewable report. After readiness the guard keeps
+  // the session alive and the monitor declines, leaving the existing
+  // boot-failures.json late-rejection record as the soft-failure signal.
+  crashMonitor?.reportRejection(error)
   try {
     void recordLateRejection(home, error, readPluginState(home).plugins).catch((writeError: unknown) => {
       console.error(`${PRODUCT_NAME}: failed to record late rejection`, writeError)
@@ -264,16 +357,27 @@ async function handleStartupFailure(
 ): Promise<void> {
   const { home, profilePatchPath, lastOkAt, bootAttempts, safeMode } = context
   const decision = recoveryDecision({ error, installed: readPluginState(home).plugins, lastOkAt })
+  // Record the death before the dialog and before the exit: this is the one
+  // failure the user is about to be told about, and the report is what makes
+  // the next occurrence diagnosable without archaeology. The write is
+  // synchronous and defensive, so it cannot delay the dialog perceptibly.
+  crashMonitor?.reportBootFailure({
+    message: decision.message,
+    stack: decision.stack,
+    hang: decision.hang,
+    pluginIds: decision.pluginIds,
+    safeMode,
+  })
 
   // Safe mode failing still means a broken bundle layer or overlay, not a
   // user plugin; retry or exit, without disabling anything.
   if (safeMode) {
     const { response } = await dialog.showMessageBox({
       type: 'error',
-      title: `${PRODUCT_NAME} 启动失败`,
-      message: '安全模式下仍无法启动',
-      detail: `${decision.message}\n\n安全模式已跳过用户插件配置，问题可能来自内置组件或安装本身。请重试，或退出后检查安装。`,
-      buttons: ['重启应用', '退出'],
+      title: `${PRODUCT_NAME} failed to start`,
+      message: 'Could not start even in safe mode',
+      detail: `${decision.message}\n\nSafe mode already skipped user plugin configuration; the problem is likely in the bundled components or the installation itself. Retry, or exit and check the installation.`,
+      buttons: ['Restart App', 'Quit'],
       defaultId: 0,
       cancelId: 1,
       noLink: true,
@@ -290,17 +394,17 @@ async function handleStartupFailure(
   const attributable = decision.kind === 'attributable'
   if (attributable) await recordBootFailures(home, decision)
   const crashLoopHint = bootAttempts >= CONSECUTIVE_FAILURE_THRESHOLD
-    ? '\n\n连续多次启动失败，建议使用安全模式。'
+    ? '\n\nSeveral consecutive launches failed; try safe mode.'
     : ''
   const detail = attributable
-    ? `以下插件未能正常加载：${decision.pluginIds.join('、')}\n\n${decision.message}${crashLoopHint}`
-    : `无法确定是哪个插件导致启动失败。${crashLoopHint}\n\n${decision.message}`
+    ? `The following plugins failed to load: ${decision.pluginIds.join(', ')}\n\n${decision.message}${crashLoopHint}`
+    : `Could not determine which plugin caused the startup failure.${crashLoopHint}\n\n${decision.message}`
   const safeModeIndex = attributable ? 1 : 0
-  const buttons = attributable ? ['继续（禁用插件并重启）', '安全模式启动', '退出'] : ['安全模式启动', '退出']
+  const buttons = attributable ? ['Continue (disable plugins and restart)', 'Start in Safe Mode', 'Quit'] : ['Start in Safe Mode', 'Quit']
   const { response } = await dialog.showMessageBox({
     type: 'error',
-    title: `${PRODUCT_NAME} 启动失败`,
-    message: '插件启动失败',
+    title: `${PRODUCT_NAME} failed to start`,
+    message: 'Plugin startup failure',
     detail,
     buttons,
     defaultId: crashLoopHint !== '' ? safeModeIndex : 0,
@@ -338,7 +442,7 @@ async function startDesktop(): Promise<void> {
   // menu bar as a full-width row below the title bar; the tray context menu
   // and the embedded Web UI own application commands. macOS keeps its system
   // menu bar (app menu, standard edit roles, Cmd+Q).
-  if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
+  installMenus()
   installTray()
 
   // Deny every renderer permission except the sanitized clipboard write the
@@ -369,6 +473,32 @@ async function startDesktop(): Promise<void> {
   })
   const safeMode = readSafeMode(home)
 
+  // Crash reporting is installed here, before the Harness tree is built: the
+  // run tombstone must be on disk while the shell is still starting, or a
+  // death during startup would leave no witness. The previous marker state is
+  // passed through because that marker is the only record of a launch that
+  // died before the tombstone existed. The reporter is diagnostics, so a
+  // failure to install it must never keep the shell from starting.
+  try {
+    crashMonitor = installCrashMonitor({
+      home,
+      productName: PRODUCT_NAME,
+      appVersion: app.getVersion(),
+      appPath: app.getAppPath(),
+      mainModulePath: fileURLToPath(import.meta.url),
+      isPackaged: app.isPackaged,
+      runtime: {
+        electron: process.versions.electron,
+        chrome: process.versions.chrome,
+        node: process.versions.node,
+      },
+      ...previousMarker?.state === undefined ? {} : { bootMarkerState: previousMarker.state },
+      ...marker?.bootAttempts === undefined ? {} : { bootAttempts: marker.bootAttempts },
+    })
+  } catch (crashMonitorError) {
+    console.error(`${PRODUCT_NAME}: crash monitor unavailable`, crashMonitorError)
+  }
+
   let running: Awaited<ReturnType<typeof runProfile>>
   try {
     running = await withBootTimeout(runProfile({
@@ -393,6 +523,10 @@ async function startDesktop(): Promise<void> {
   await writeBootMarker(home, 'ok').catch((error: unknown) => {
     console.error(`${PRODUCT_NAME}: failed to write boot marker`, error)
   })
+  // The tree is up: from here on a death is an in-session crash rather than a
+  // failed startup, and the heartbeat keeps the tombstone's last-alive time
+  // honest for the next launch's report.
+  crashMonitor?.markReady()
   await clearResolvedFailures(home, profilePatchPath).catch((error: unknown) => {
     console.error(`${PRODUCT_NAME}: failed to clear resolved boot failures`, error)
   })
@@ -406,6 +540,8 @@ async function startDesktop(): Promise<void> {
     if (mainWindow === undefined || applicationUrl === undefined) return
     if (!desktopIpcSenderIsApplication(event.senderFrame?.url, new URL(applicationUrl).origin)) return
     Menu.buildFromTemplate(buildWindowMenu({
+      productName: PRODUCT_NAME,
+      about: showAbout,
       hide: () => { mainWindow?.hide() },
       restart: () => {
         quitArmed = true
@@ -480,6 +616,22 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   void app.whenReady().then(startDesktop).catch((error: unknown) => {
+    // A failure outside the Harness boot sequence (menu, tray, window
+    // creation, the application URL) still ends the process. Record it rather
+    // than leaving only a box on screen and no evidence on disk.
+    try {
+      const { message, stack } = failureMessage(error)
+      crashMonitor?.reportBootFailure({
+        message,
+        stack,
+        hang: false,
+        pluginIds: [],
+        safeMode: readSafeMode(resolveDshHome()),
+        notes: ['The failure surfaced outside the Harness boot sequence.'],
+      })
+    } catch (recordError) {
+      console.error(`${PRODUCT_NAME}: failed to record startup failure`, recordError)
+    }
     dialog.showErrorBox(`${PRODUCT_NAME} could not start`, error instanceof Error ? error.message : String(error))
     requestQuit(1)
   })

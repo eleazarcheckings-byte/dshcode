@@ -69,5 +69,5 @@ The application uses unpacked resources because the Harness profile fallback cre
 
 - Preview packages are deliberately unsigned. macOS Gatekeeper and Windows SmartScreen may warn about local builds until a future release configures platform signing and macOS notarization.
 - Automatic updates are not configured.
-- The embedded Web UI retains upstream identity, but desktop application and installer branding use the independent DSHCode icon; see the repository [license and branding notice](../../README.md).
+- The embedded Web UI carries the Saturn AI brand, and desktop application and installer branding use the same Saturn identity; see the repository [license and branding notice](../../README.md).
 - The recovery dialog, tray, and custom title bar need a manual pass on a native Windows build.
