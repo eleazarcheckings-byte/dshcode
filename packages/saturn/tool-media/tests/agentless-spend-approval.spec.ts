@@ -119,7 +119,9 @@ describe('the agentless spend-approval fallback (ctx.userQuestions, no Agent any
     await ctx.plugin(ToolMedia, { gemini: { apiKey: 'sk-test', baseURL: mock.url } })
 
     const request: MediaGenerateRequest = { kind: 'image', prompt: 'x', workspace: await workspace() }
-    await expect(ctx.media.generate(request)).rejects.toThrow(/refusing to spend without a Gate/)
+    // ctx.userQuestions IS composed here, just with no answerer — a distinct fail-closed shape from
+    // "no userQuestions service at all" (covered by the no-userQuestions-plugin case in tool-media.spec.ts).
+    await expect(ctx.media.generate(request)).rejects.toThrow('failed closed')
     expect(mock.requests).toHaveLength(0)
   })
 })

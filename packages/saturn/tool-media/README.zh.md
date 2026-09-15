@@ -1,5 +1,5 @@
 ---
-description: "ctx.media 与五个面向模型的媒体生成工具（图像/视频/音频/动作迁移），覆盖 gemini、openai、higgsfield 三个供应商——每一次计费调用都会先经过 ctx.approval 的批准,才会发出网络请求。"
+description: "ctx.media 与五个面向模型的媒体生成工具（图像/视频/音频/动作迁移），覆盖 gemini、openai、higgsfield 三个供应商——每一次计费调用都会先经过 ctx.approval(或 agentless 兜底路线 ctx.userQuestions）的批准,才会发出网络请求。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 摘要
 
-**为 Saturn AI harness 提供的 Higgsfield 级媒体生成能力。** `ctx.media` 是覆盖三个供应商后端的统一接口——**gemini**（图像走 `interactions` REST 端点,视频走 Veo 3.1 的 `predictLongRunning` 异步操作）、**openai**（图像,可选）、**higgsfield**（`docs.higgsfield.ai` 的异步任务 API,是唯一接入动作迁移/物体替换的供应商）——以 `media_generate_image`、`media_generate_video`、`media_generate_audio`、`media_motion_transfer`、`media_job_status` 五个模型可见工具的形式暴露。本包范围内的每个供应商都会产生真实费用;因此每次调用在发出计费网络请求之前,都会通过 `ctx.approval` 请求批准——批准理由中会写明预估的美元成本——无论权限预设如何,且在没有 agent 或没有可用的批准服务时会直接关闭失败(绝不会静默花钱)。生成的资产会写入 `<workspace>/.saturn/media/` 并以文件引用的形式返回,绝不会把字节内容直接交给模型。
+**为 Saturn AI harness 提供的 Higgsfield 级媒体生成能力。** `ctx.media` 是覆盖三个供应商后端的统一接口——**gemini**（图像走 `interactions` REST 端点,视频走 Veo 3.1 的 `predictLongRunning` 异步操作）、**openai**（图像,可选）、**higgsfield**（`docs.higgsfield.ai` 的异步任务 API,是唯一接入动作迁移/物体替换的供应商）——以 `media_generate_image`、`media_generate_video`、`media_generate_audio`、`media_motion_transfer`、`media_job_status` 五个模型可见工具的形式暴露。本包范围内的每个供应商都会产生真实费用;因此每次调用在发出计费网络请求之前都会先请求批准——无论权限预设如何——通过 `ctx.approval`(优先路线,当调用携带 `Agent` 时)或 `ctx.userQuestions`(agentless 兜底路线,面向像 SaturnBot 这样自身模型中完全没有 `Agent` 的调用方),两者都会写明预估的美元成本,且在两条路线都不可用时直接关闭失败(绝不会静默花钱)。生成的资产会写入 `<workspace>/.saturn/media/` 并以文件引用的形式返回,绝不会把字节内容直接交给模型。
 
 ## 目录
 
@@ -73,13 +73,13 @@ kind: "package-reference"
 <details>
 <summary>实现内部细节——点击展开</summary>
 
-**花费闸门(spend Gate)。** `MediaService.generate()` 先解析本次调用的成本——gemini 查已验证的价格表,openai 要求显式覆盖(本次会话未能获得已验证价格),higgsfield 则实时调用 `POST /estimate/{modelPath}` 获取报价——然后调用 `ctx.approval.request({ agent, toolName, callId, reason, signal })`,并在 `reason` 中写明成本(例如 `Generate image via gemini/gemini-3.1-flash-image — estimated cost $0.067 USD. Prompt: "…"`)。只有 `'allowed-once'` 会放行;`'rejected'`/`'cancelled'`/`'unavailable'` 各自抛出不同的错误信息,没有 agent 或没有已装配批准服务的调用会在触碰网络之前就抛出——由于本包没有任何免费供应商,不存在能绕过此闸门的权限预设。唯一需要说明的例外:Higgsfield 的 `/estimate` 调用本身免费且只读(`docs.higgsfield.ai/docs/concepts/billing-and-retention`),因此它会在批准之前运行,用于填充成本这一行;真正计费的 `POST /{modelPath}` 提交调用则绝不会。
+**花费闸门(spend Gate)。** `MediaService.generate()` 先解析本次调用的成本——gemini 查已验证的价格表,openai 要求显式覆盖(本次会话未能获得已验证价格),higgsfield 则实时调用 `POST /estimate/{modelPath}` 获取报价——然后在任何计费调用之前请求批准:调用携带 `Agent` 时走 `ctx.approval.request({ agent, toolName, callId, reason, signal })`(优先路线),否则走 `ctx.userQuestions.ask({ questions: [...], agent?, signal? })`(agentless 兜底路线,见下文);无论走哪条路线,成本都会写入提示文本中(例如 `Generate image via gemini/gemini-3.1-flash-image — estimated cost $0.067 USD. Prompt: "…"`)。只有明确的批准才会放行;拒绝、取消、无法获得应答,或两条路线都未装配,都会在触碰网络之前抛出——由于本包没有任何免费供应商,不存在能绕过此闸门的权限预设。唯一需要说明的例外:Higgsfield 的 `/estimate` 调用本身免费且只读(`docs.higgsfield.ai/docs/concepts/billing-and-retention`),因此它会在批准之前运行,用于填充成本这一行;真正计费的 `POST /{modelPath}` 提交调用则绝不会。
 
 **重定向策略。** 每一个携带凭据的请求都使用 `redirect: 'error'`(`fetchNoRedirect`),沿用 `tool-describe-image` 的约定——bearer/API key 永远不会被转发到部署未配置的主机。唯一有文档记录的例外是 Gemini 自身的 Veo 视频下载步骤:Google 的 `ai.google.dev/gemini-api/docs/veo` 快速上手示例在携带 `x-goog-api-key` 请求头的同时跟随了已签名 `video.uri` 的重定向,因此 `fetchAllowingRedirectTo` 只允许恰好一跳,且只能跳回配置的 `baseURL` 自身的主机——跳到任何其他主机都会抛出异常。
 
 **统一接缝下的多供应商**(`src/providers/{gemini,openai,higgsfield}.ts`),每个都针对本地 HTTP 测试夹具独立完成单元测试(测试中没有真实网络调用):`gemini.ts` 实现了 `interactions` 图像端点以及 Veo 的 `predictLongRunning` 提交→轮询→下载流程;`openai.ts` 实现了 `images/generations`;`higgsfield.ts` 实现了针对异步任务 API 的提交/状态/取消/估算/轮询。`MediaService`(`src/index.ts`)就是这层接缝:它为每次调用解析供应商、在批准闸门之后才发出网络调用、把结果字节写入 `<workspace>/.saturn/media/<uuid>.<ext>`,并按 id 缓存每一个终态任务,供 `media_job_status` 之后重新读取。
 
-**一处有文档记录的接口扩展,及其绑定方式。** SPEC §4 将 `ctx.media` 的 `generate(req): Promise<Job>` 固定为单一对象签名,其中没有位置容纳 `Agent`——但 `ctx.approval` 从根本上需要一个 agent 才能路由其提示。因此 `MediaService.generate()` 接受一个可选的第二参数 `exec`(`{ agent?, callId?, signal?, toolName? }`);仅按固定形状调用 `generate(req)` 的消费者依然能通过类型检查并正常运行,只是会收到"没有 agent 可用于路由批准提示"这一关闭失败的错误——这是正确的,因为本包中的每个供应商都会产生费用。`MediaService.withAgent(agent, defaults?)` 为持有单个 `Agent`(而不想在每个调用点都传递 `exec`)的消费者补上了这一缺口:它返回一个 `BoundMediaService`——`{ generate(req): Promise<Job>; status(id): Promise<Job> }`——与固定形状完全一致,且仍会经过真正的花费闸门。本绑定未能解决的那一个调用方,见"已知限制"。
+**花费闸门有两条路线,固定形状两者都需要。** SPEC §4 将 `ctx.media` 的 `generate(req): Promise<Job>` 固定为单一对象签名,其中没有位置容纳 `Agent`——仅按这一固定形状、不带第二个参数调用,依然能通过类型检查并正常运行。`ctx.approval`(优先路线,当调用携带 `Agent` 时启用——通过可选的第二参数 `exec`,或通过 `MediaService.withAgent(agent, defaults?)` 供手上已持有 `Agent` 的消费者使用)从根本上需要一个 `Agent` 才能路由其提示与审计轨迹。SaturnBot 真实的 `creative.generate` 调用点——固定形状唯一已知的消费者——自身的执行模型里根本没有 `Agent`,因此对这个调用方,闸门会改走 `ctx.userQuestions`:它接受未提供 agent 的调用,以不限定范围的方式发问,在问题的 `detail` 中携带与优先路线完全相同的预估成本行,并像优先路线一样把调用关闭失败——`userQuestions` 服务缺失、服务已装配但没有应答者(`NO_PROVIDER`)、发问被中止,或用户明确拒绝,都会在任何网络调用之前抛出。两条路线都完全实现在本包内部(`src/index.ts` 中的 `requireSpendApproval` / `requireSpendApprovalViaUserQuestions`);`MediaService.withAgent(agent, defaults?)` 仍然为手上确实持有 `Agent` 的消费者返回一个 `BoundMediaService`——`{ generate(req): Promise<Job>; status(id): Promise<Job> }`——与固定形状完全一致,并经由优先的 `ctx.approval` 路线。
 
 </details>
 
@@ -90,6 +90,7 @@ kind: "package-reference"
 
 - [工具目录](../../../docs/tool-catalog.zh.md)
 - [批准接缝](../../interaction/user-approval/README.zh.md)
+- [用户提问接缝(agentless 兜底路线)](../../interaction/user-questions/README.zh.md)
 - [凭据接缝](../../credentials/credentials/README.zh.md)
 - [`tool-describe-image`](../../vision/tool-describe-image/README.zh.md)——本包沿用的凭据接缝/拒绝重定向客户端模板
 - Gemini:[图像生成](https://ai.google.dev/gemini-api/docs/image-generation)、[Veo](https://ai.google.dev/gemini-api/docs/veo)、[定价](https://ai.google.dev/gemini-api/docs/pricing)——均于 2026-09-15 实时抓取
@@ -133,7 +134,7 @@ kind: "package-reference"
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **`ctx.get('media')` 唯一已知的消费者(SaturnBot 的 `creative.generate`,C7)直接调用固定的单参数形状,且完全无法提供 `Agent`**——本轮修复中通过阅读 `packages/saturn/saturnbot/src/adapters/integrations.ts`(`media.generate({ kind, prompt, workspace })`,没有第二个参数)与 `contracts.ts` 的 `BotMediaService`(即那个固定形状本身)已核实。`MediaService.withAgent(agent)`(见上文)解决的是一般情形——手上确实有一个真正 `dsh-agent` `Agent` 的消费者——但 SaturnBot 自身的工具执行模型里根本没有 `Agent` 对象:它的工具由自己的 `roles`/`effect` 中心化审批机制(`ActionRequiredError`,与 `ctx.approval` 不同)在调用前统一把关,而不是针对某个交互式会话逐次审批。要求一个没有会话形态身份的调用方,在 `media.generate` 内部再走一次*独立*的 `ctx.approval` 审批,是架构层面的不匹配,不是缺了一个绑定——本包无法仅凭自己的 IN 范围(`packages/saturn/tool-media/**`)单方面解决它。因此在这里如实记录为一项阻塞性的 `integration_needs`,并列出三个具体选项,交给 C7↔C8a 接线的负责人决定,而不是在此处猜测代劳。
+- **`ctx.get('media')` 唯一已知的消费者(SaturnBot 的 `creative.generate` 工具,调用 `packages/saturn/saturnbot/src/contracts.ts` 中的 `BotMediaService`)直接调用固定的单参数形状,且永远无法提供 `Agent`**——通过阅读 `packages/saturn/saturnbot/src/adapters/integrations.ts` 中的调用点(`media.generate({ kind, prompt, workspace })`,没有第二个参数)与 `BotMediaService` 接口本身(即那个固定形状本身)已核实。本轮已解决:没有 `exec.agent` 的调用现在会从优先的 `ctx.approval` 路线改走 `ctx.userQuestions`(见上文"花费闸门有两条路线"),它接受未提供 agent 的调用并以不限定范围的方式发问——恰好匹配 SaturnBot 自身完全没有 `Agent` 对象的执行模型。`MediaService.withAgent(agent)` 仍然是*另一类*消费者的答案——手上确实持有真正 `Agent` 的消费者——并仍经由优先的 `ctx.approval` 路线。
 - **Genjutsu(动作迁移/物体替换)没有已发布的 REST 路径**——`docs.higgsfield.ai` 公开的 `openapi.json`(2026-09-15 抓取,共 50 个端点,**本轮修复中重新抓取**,结果相同,仍无匹配)中没有任何动作迁移/物体替换/genjutsu 操作;直接尝试猜测文档页面(`docs/genjutsu`、`docs/motion-control`、`docs/models/genjutsu`)均返回 404 或被重定向到文档首页(一个客户端渲染的 SPA,没有静态站点地图,所以不带 JS 运行时的抓取器只能确认到这一步)。只有另一个已连接的 Higgsfield MCP 集成以内部模型 id(`hf_mult_motion_control`、`hf_mult_replace_object`)的形式暴露了它,那是与本包不同的接入面。`media_motion_transfer` 要求调用方提供确切的 `params.modelPath` 与 `params.body`,而不是猜测一个 URL;一旦 Higgsfield 发布该端点,补上一个真实默认值只是一个小的后续工作(只需修改 `generateWithHiggsfield` 中的这一处判断,而不用改动周边架构)。在 izzy 给出明确决定、要求改为发布一个猜测路径之前,这仍是诚实的选择。
 - **没有已验证的 OpenAI 单张图像价格**——公开定价页面对本次会话的抓取器只返回了重定向、没有静态内容;端点与当前模型 id(`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`、`gpt-image-2`)已针对 `developers.openai.com` 实时确认,但 `provider: 'openai'` 的 `media_generate_image` 需要显式的 `params.pricePerImageUsd`,拒绝猜测。后续会话应重新抓取 OpenAI 的定价页面(或其 API 自身的成本上报字段,如果存在的话),再移除这一要求。
 - **`generate()` 会阻塞到任务终态,而不是立即返回 `'queued'`**——包括在内部轮询 Higgsfield 的状态端点与 Veo 的长时间运行操作,以各供应商的 `pollTimeoutMs` 为界。因此 `media_job_status` 大多是重新读取已缓存的终态结果,而不是恢复一个真正仍在进行中的轮询;若需要真正的"提交后即忘、之后再轮询(甚至换一个进程轮询)",需要后续工作把被跟踪的任务表持久化到进程内存之外。这是本次会话的有意范围决策,而非疏漏——详见 `MediaService` 的类文档。
@@ -149,8 +150,10 @@ kind: "package-reference"
 
 于 2026-09-15 作为 SaturnAI 升级扇出的 SPEC §3 C7 构建。本包实现的每一个 REST 契约(Gemini 的 `interactions` + Veo 的 `predictLongRunning`,Higgsfield 完整的异步任务 API)都是本次会话用 `curl` 针对供应商自身当前文档实时抓取的,而非沿用训练时的记忆或第三方聚合器数据;`src/pricing.ts` 中的每一条价格都附带确切的来源 URL 与 `2026-09-15` 的 `verified` 日期。在文档未能清晰到足以诚实实现的地方(OpenAI 定价、Higgsfield 的 Genjutsu 端点、gemini/openai 音频),本包在代码与本文档中如实说明,而不是去猜测。
 
-**修复轮次(同日)。** 一次全新上下文的 Mars 评审要求了四处改动,均已应用:(1)新增 `MediaService.withAgent(agent)`(测试见 `tests/with-agent.spec.ts`,先提交 RED),使持有 `Agent` 的消费者无需在每个调用点传递 `exec` 即可使用 SPEC §4 固定的单参数形状;SaturnBot 的实际调用点经阅读确认其自身模型中根本没有 `Agent`,因此仍作为一项 `integration_needs` 记录在上文,而不是在本包 IN 范围之外凭空猜测一处代码改动。(2)`MEDIA_PROVIDER_IDS`/`MEDIA_KINDS` 从 `types.ts` 移入 `index.ts`(本仓库自身的包约定是 `src/types.ts` 仅存放类型)。(3)Genjutsu 缺失一事已重新实时核实(结果相同)。(4)此前有一次提交把本包的 `feat` 差异夹带进了另一个 cell 的提交中(共享 git 索引导致的问题,而非篡改——它唯一改动的测试文件那一处 hunk 只是替换了 mock 的响应形状,而非断言本身);由于提交历史本身无法事后改写,这里如实记录一笔;本轮修复自身的提交是干净的。
+**修复轮次 1(同日)。** 一次全新上下文的 Mars 评审要求了四处改动,均已应用:(1)新增 `MediaService.withAgent(agent)`(测试见 `tests/with-agent.spec.ts`,先提交 RED),使持有 `Agent` 的消费者无需在每个调用点传递 `exec` 即可使用 SPEC §4 固定的单参数形状;SaturnBot 的实际调用点经阅读确认其自身模型中根本没有 `Agent`,当时因此仍作为一项 `integration_needs` 记录,而不是在本包 IN 范围之外凭空猜测一处代码改动。(2)`MEDIA_PROVIDER_IDS`/`MEDIA_KINDS` 从 `types.ts` 移入 `index.ts`(本仓库自身的包约定是 `src/types.ts` 仅存放类型)。(3)Genjutsu 缺失一事已重新实时核实(结果相同)。(4)此前有一次提交 `78a06d26b1`("docs(saturn): re-record translation-pairing sidecars for hygiene-docs READMEs")把本包的 `feat` 差异夹带进了另一个 cell 的提交中(共享 git 索引导致的问题,而非篡改——它唯一改动的测试文件那一处 hunk 只是替换了 mock 的响应形状,而非断言本身);由于提交历史本身无法事后改写,这里如实记录一笔。
+
+**修复轮次 2(同日)。** 第二次全新上下文的 Mars 评审发现,上一轮记录的 `integration_needs` 本可避免:`ctx.userQuestions`(`packages/interaction/user-questions`)把 `agent` 参数声明为可选,在未提供时本就会以不限定范围的方式发问——完全在本包自身的 IN 范围之内就能实现。新增内容:`requireSpendApproval`/`requireSpendApprovalViaUserQuestions`(`src/index.ts`)中的 agentless 花费批准兜底路线——测试见 `tests/agentless-spend-approval.spec.ts`,先提交 RED——使没有 `exec.agent` 的调用(SaturnBot 的真实形状,分毫不差)现在会改走 `ctx.userQuestions` 发问,而不是直接失败,同样携带成本行、在应答之前零网络请求,并在拒绝、超时或没有应答者时保持同样的关闭失败保证。只要存在 `Agent`,`ctx.approval` 路线仍然优先。这解决了此前那项阻塞性的 `integration_needs`;类文档、本文件及其 `.zh.md` 姐妹文件均已相应重写,而不是继续保留已被取代的"架构不匹配"表述。
 
 </details>
 
-**运行时不变量:** 未发布配套包:`ctx.media` 是本包唯一的跨插件接口,由接入它的角色配置(按 SPEC §4,SaturnBot 的 `creative`/`growth` 角色)消费——关于超出固定 `generate(req): Promise<Job>` 签名之外那处有意扩展,见上文的 `ctx.media` 接口说明;关于为持有 `Agent` 的消费者精确满足该固定形状的绑定方式,见 `MediaService.withAgent`。
+**运行时不变量:** 未发布配套包:`ctx.media` 是本包唯一的跨插件接口,由接入它的角色配置(按 SPEC §4,SaturnBot 的 `creative`/`growth` 角色)消费——关于固定的 `generate(req): Promise<Job>` 签名如何同时满足持有 agent 的调用方(`ctx.approval`,优先路线,或 `MediaService.withAgent`)与 agentless 调用方(`ctx.userQuestions`,兜底路线),见上文"花费闸门有两条路线"。

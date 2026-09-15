@@ -1,10 +1,12 @@
 /**
  * `ctx.media`: model-facing generation (image, video, audio, motion-transfer) over three providers
  * behind one seam — gemini (image + Veo video), openai (image, optional), higgsfield (async job API;
- * the only provider wired for motion-transfer/object-swap). Every paid call requests approval
- * through `ctx.approval` — with the estimated USD cost line in the reason — before the billable
- * network call fires, regardless of any permission preset; a missing approval service or a
- * missing/rejecting agent fails the call closed rather than silently spending money.
+ * the only provider wired for motion-transfer/object-swap). Every paid call requests approval before
+ * the billable network call fires, regardless of any permission preset — through `ctx.approval` (the
+ * preferred route) when the call carries an `Agent` to route it through, falling back to
+ * `ctx.userQuestions` (which accepts no agent at all) when it does not — with the estimated USD cost
+ * line in either prompt; a missing approval route (neither service composed, or composed with no
+ * answerer) fails the call closed rather than silently spending money.
  *
  * Template followed throughout: `packages/vision/tool-describe-image` (credential seam, redirect-
  * refusing HTTP client, bounded reads, re-resolved-per-call settings) and `packages/web/web-fetch-http`
@@ -25,6 +27,7 @@ import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-user-approval'
+import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 
 import {
   DEFAULT_GEMINI_BASE_URL, DEFAULT_GEMINI_IMAGE_MODEL, DEFAULT_GEMINI_VIDEO_MODEL,
@@ -63,7 +66,12 @@ declare module '@deepseek-ai/cordis' {
 
 /** Cordis plugin name. */
 export const name = 'tool-media'
-/** Services this plugin composes against; `approval` is optional (its absence fails every paid call closed). */
+/**
+ * Services this plugin composes against; `approval` and `userQuestions` are both optional (soft
+ * `ctx.get(...)` lookups below) — the spend Gate prefers `approval` when the call has an `Agent`,
+ * falls back to `userQuestions` when it does not, and fails every paid call closed when neither route
+ * is available to ask through.
+ */
 export const inject = ['tools']
 
 const DEFAULT_GEMINI_API_KEY_ENV = 'GEMINI_API_KEY'
@@ -217,33 +225,89 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text
 }
 
+/** The two options `requireSpendApprovalViaUserQuestions` offers, matched by label (not position). */
+const SPEND_APPROVE_LABEL = 'Approve'
+const SPEND_DECLINE_LABEL = 'Decline'
+/** Stable id for the single question the agentless fallback asks — echoed back in the answer. */
+const SPEND_QUESTION_ID = 'media-spend-approval'
+
 /**
- * Ask `ctx.approval` before any billable network call. Unconditional: this package has no free
- * provider, so every `generate()` call reaches here, and there is no permission preset that skips it.
- * @throws when no approval service is composed, the call carries no agent, or the outcome is not `'allowed-once'`.
+ * Ask before any billable network call, preferring `ctx.approval` (needs an `Agent` to route its
+ * prompt through) and falling back to `ctx.userQuestions` (accepts none) when that route is not
+ * available for this call. Unconditional: this package has no free provider, so every `generate()`
+ * call reaches here, and there is no permission preset that skips it.
+ * @throws when neither route is available, or the chosen route's outcome is not an approval.
  */
 async function requireSpendApproval(ctx: Context, exec: MediaExecContext, request: MediaGenerateRequest, cost: MediaCost): Promise<void> {
-  const approval = ctx.get('approval')
-  if (approval === undefined) {
-    throw new Error('media: this generation costs money but no approval service is composed; refusing to spend without a Gate')
-  }
-  if (exec.agent === undefined) {
-    throw new Error('media: this generation costs money but the call has no agent to route the approval prompt through')
-  }
   const reason = `Generate ${request.kind} via ${cost.provider}/${cost.model} — estimated cost `
     + `$${cost.estimatedUsd.toFixed(3)} USD. Prompt: "${truncate(request.prompt, 200)}"`
-  const outcome = await approval.request({
-    agent: exec.agent,
-    toolName: exec.toolName ?? 'media',
-    ...exec.callId !== undefined ? { callId: exec.callId } : {},
-    reason,
-    ...exec.signal !== undefined ? { signal: exec.signal } : {},
-  })
-  switch (outcome) {
-    case 'allowed-once': return
-    case 'rejected': throw new Error(`media: the user declined this $${cost.estimatedUsd.toFixed(3)} generation`)
-    case 'cancelled': throw new Error('media: approval for this generation was cancelled')
-    case 'unavailable': throw new Error('media: this generation costs money but no approval channel answered')
+
+  const approval = ctx.get('approval')
+  if (approval !== undefined && exec.agent !== undefined) {
+    const outcome = await approval.request({
+      agent: exec.agent,
+      toolName: exec.toolName ?? 'media',
+      ...exec.callId !== undefined ? { callId: exec.callId } : {},
+      reason,
+      ...exec.signal !== undefined ? { signal: exec.signal } : {},
+    })
+    switch (outcome) {
+      case 'allowed-once': return
+      case 'rejected': throw new Error(`media: the user declined this $${cost.estimatedUsd.toFixed(3)} generation`)
+      case 'cancelled': throw new Error('media: approval for this generation was cancelled')
+      case 'unavailable': throw new Error('media: this generation costs money but no approval channel answered')
+    }
+    return
+  }
+
+  // The preferred ctx.approval-with-Agent route is unavailable — either no approval service is
+  // composed, or (SPEC §4's pinned single-argument `generate(req)` shape, SaturnBot's real
+  // `creative.generate` call site) this call carries no Agent to route its prompt through at all.
+  // Fall back to ctx.userQuestions, which asks unscoped when given no agent and still fails closed
+  // (a missing service, no answerer, an aborted ask, or a Decline all throw before any network call).
+  const unavailableReason = approval === undefined
+    ? 'no approval service is composed'
+    : 'the call has no agent to route the approval prompt through'
+  await requireSpendApprovalViaUserQuestions(ctx, exec, reason, cost, unavailableReason)
+}
+
+/**
+ * The agentless spend-approval fallback: asks one yes/no question through `ctx.userQuestions` —
+ * carrying the same estimated-cost line as the `ctx.approval` route — and fails closed on every
+ * outcome except an explicit {@link SPEND_APPROVE_LABEL}. Never fires a billable network call itself;
+ * the caller (`requireSpendApproval`) only proceeds to one after this resolves without throwing.
+ */
+async function requireSpendApprovalViaUserQuestions(
+  ctx: Context, exec: MediaExecContext, reason: string, cost: MediaCost, unavailableReason: string,
+): Promise<void> {
+  const userQuestions = ctx.get('userQuestions')
+  if (userQuestions === undefined) {
+    throw new Error(
+      `media: this generation costs money but ${unavailableReason}, and no user-questions answerer is `
+      + 'composed either; refusing to spend without a Gate',
+    )
+  }
+  let answer: AskUserQuestionAnswer
+  try {
+    answer = await userQuestions.ask({
+      questions: [{
+        id: SPEND_QUESTION_ID,
+        question: `Approve this ${cost.provider}/${cost.model} generation?`,
+        detail: reason,
+        options: [{ label: SPEND_APPROVE_LABEL }, { label: SPEND_DECLINE_LABEL }],
+      }],
+      ...exec.agent !== undefined ? { agent: exec.agent } : {},
+      ...exec.signal !== undefined ? { signal: exec.signal } : {},
+    })
+  } catch (error) {
+    throw new Error(
+      'media: this generation costs money but the user-questions approval failed closed '
+      + `(${error instanceof Error ? error.message : String(error)})`,
+    )
+  }
+  const item = answer.answers.find(entry => entry.id === SPEND_QUESTION_ID)
+  if (item === undefined || !item.selected.includes(SPEND_APPROVE_LABEL)) {
+    throw new Error(`media: the user declined this $${cost.estimatedUsd.toFixed(3)} generation`)
   }
 }
 
@@ -252,20 +316,23 @@ function assertAbsoluteWorkspace(workspace: string): void {
 }
 
 /**
- * `ctx.media`: resolves a provider per call, gates every billable request behind `ctx.approval`,
- * writes results under the caller's workspace, and tracks non-terminal jobs for `status()`.
+ * `ctx.media`: resolves a provider per call, gates every billable request behind the spend Gate
+ * (`ctx.approval` when the call has an `Agent`, `ctx.userQuestions` when it does not), writes results
+ * under the caller's workspace, and tracks non-terminal jobs for `status()`.
  *
  * `generate()` matches the `{ generate(req): Promise<Job>; status(id): Promise<Job> }` interface
- * SPEC §4 pins between this package and its consumers (C8a), with one deliberate extension: an
- * optional second `exec` parameter carries the calling agent/call id/signal that `ctx.approval`
- * fundamentally requires to route its prompt (the pinned single-object `req` shape has no room for
- * an `Agent`). A consumer that calls `generate(req)` with only the pinned shape still type-checks
- * and runs — it simply gets the fail-closed "no agent to route the approval prompt through" error
- * for any provider whose price is not $0, which every provider in this package's scope is. A
- * consumer that DOES hold an `Agent` up front should call {@link MediaService.withAgent} once and
- * hand the resulting {@link BoundMediaService} to code expecting the pinned shape instead — see the
- * README's Known Limitations for the full rationale, including where this still doesn't close the
- * gap (a caller with no `Agent`-shaped identity anywhere in its own execution model).
+ * SPEC §4 pins between this package and its consumers (C8a) exactly — a caller may call `generate(req)`
+ * with only the pinned single-object shape, no second argument, and it runs. What varies is which
+ * route the spend Gate takes: an optional second `exec` parameter (or {@link MediaService.withAgent}'s
+ * binding) carries an `Agent`, and when one is present `ctx.approval` is the preferred route (it
+ * fundamentally requires an `Agent` to attach its prompt/audit trail to). SaturnBot's real
+ * `creative.generate` call site — the pinned shape's only known consumer — has no `Agent` anywhere in
+ * its own execution model, so for a call with no `exec.agent` the Gate falls back to
+ * `ctx.userQuestions` instead, which accepts an undefined agent and asks unscoped; both routes carry
+ * the same estimated-cost line and both fail the call closed (never silently spend) when their
+ * respective service isn't composed, has no answerer, or the human declines. See
+ * {@link requireSpendApproval} for the exact preference order, and the README Known Limitations for
+ * the fuller rationale.
  */
 export class MediaService extends Service {
   static Config = Config
