@@ -9,6 +9,9 @@ Run from the target project's directory. Uses its installed playwright or @playw
 --storage-state reuses only the explicitly supplied Playwright session state in each viewport. Session state is never discovered automatically or copied into the report.
 Produces desktop, mobile, and reduced-motion viewport screenshots plus report.json and report.md in a new review-* subdirectory.
 Before capture, waits within --timeout for fonts and finite running entrance animations; infinite or paused animations keep their current state.
+Each view also reports "measure": the median rendered characters-per-line over the first 20 lines
+of the main prose container ({measure_ch, pass: <= 75}), or null when no sampleable prose is found.
+Pass this report.json to review-grade.mjs's --report to grade rendered line length there.
 Exit codes: 0 checks completed without findings; 1 findings or incomplete review; 2 unavailable browser/dependency or invalid arguments. Visual quality is not assessed.`
 const VIEWS = [
   { name: 'desktop', width: 1440, height: 1000, reducedMotion: 'no-preference' },
@@ -151,6 +154,59 @@ function inspectPage() {
   return { viewportWidth: innerWidth, documentWidth: document.documentElement.scrollWidth, horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1, mains, h1, counts, samples, scannedElements: scanLimit, omittedElements: Math.max(0, all.length - scanLimit), reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches }
 }
 
+// Runs in the page. jsdom (review-grade.mjs's static probe) has no layout engine and can never
+// see this: the real per-character line-wrap geometry a live browser renders. Segments the main
+// prose container's visible <p>/<li> text into wrapped lines by growing a single-character Range
+// per character and watching `getClientRects()[0].top` change, then reports the median characters
+// per line over the first MEASURE_LINE_TARGET lines sampled (not the first N elements — a short
+// paragraph contributes fewer lines, a long one more, up to the cap). Bounded by MEASURE_CHAR_CAP
+// so a very long page cannot make this scan unbounded. Returns null when no visible prose text is
+// found to sample, never a guessed value.
+function measureProse() {
+  const MEASURE_LINE_TARGET = 20
+  const MEASURE_CHAR_CAP = 4000
+  const container = document.querySelector('main') || document.body
+  const blocks = [...container.querySelectorAll('p, li')].filter((el) => {
+    const style = getComputedStyle(el)
+    const rect = el.getBoundingClientRect()
+    return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0 && (el.textContent || '').trim().length > 0
+  })
+  const lineLengths = []
+  let scanned = 0
+  for (const block of blocks) {
+    if (lineLengths.length >= MEASURE_LINE_TARGET) break
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+    let currentTop = null
+    let currentLength = 0
+    let node
+    while ((node = walker.nextNode())) {
+      const text = node.textContent || ''
+      for (let index = 0; index < text.length; index++) {
+        if (scanned >= MEASURE_CHAR_CAP || lineLengths.length >= MEASURE_LINE_TARGET) break
+        scanned++
+        const range = document.createRange()
+        range.setStart(node, index)
+        range.setEnd(node, index + 1)
+        const rects = range.getClientRects()
+        const top = rects.length ? Math.round(rects[0].top) : currentTop
+        if (currentTop === null) currentTop = top
+        if (top !== currentTop) {
+          lineLengths.push(currentLength)
+          currentTop = top
+          currentLength = 1
+        } else currentLength++
+      }
+      if (scanned >= MEASURE_CHAR_CAP || lineLengths.length >= MEASURE_LINE_TARGET) break
+    }
+    if (currentLength > 0 && lineLengths.length < MEASURE_LINE_TARGET) lineLengths.push(currentLength)
+  }
+  if (!lineLengths.length) return null
+  const sorted = [...lineLengths].sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
+  const median = sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+  return { measure_ch: Math.round(median * 10) / 10, pass: median <= 75, linesSampled: lineLengths.length }
+}
+
 // Runs in the page. Await actual completion without stopping ambient loops or changing motion preferences.
 async function settlePage(timeout) {
   const deadline = performance.now() + timeout
@@ -230,6 +286,7 @@ async function captureView(browser, options, view, directory) {
     }
     const screenshot = `${view.name}.png`
     let dom = null
+    let measure = null
     let settling = null
     try {
       settling = await page.evaluate(settlePage, options.timeout)
@@ -237,8 +294,12 @@ async function captureView(browser, options, view, directory) {
       if (settling.animationLimitReached) issue('settling-limit', 'More than 1000 finite animations were observed; capture stopped waiting and may show an unsettled state.')
       await page.screenshot({ path: resolve(directory, screenshot), fullPage: false, timeout: options.timeout })
       dom = await page.evaluate(inspectPage)
+      // Rendered character-measure: jsdom (review-grade.mjs) has no layout engine and cannot see
+      // this, so it is captured here instead, from real per-view geometry, and read back by
+      // review-grade.mjs's --report flag. null (no sampleable prose) is reported as-is, never guessed.
+      measure = await page.evaluate(measureProse)
     } catch (error) { issue('inspection-error', error.message) }
-    return { name: view.name, viewport: { width: view.width, height: view.height }, url: safeUrl(page.url()), navigationStatus, ready, settling, screenshot: dom ? screenshot : null, dom, issues, omittedIssues }
+    return { name: view.name, viewport: { width: view.width, height: view.height }, url: safeUrl(page.url()), navigationStatus, ready, settling, screenshot: dom ? screenshot : null, dom, measure, issues, omittedIssues }
   } finally { await context.close() }
 }
 
@@ -254,6 +315,7 @@ function markdown(report) {
     lines.push(`## ${view.name}`, '')
     if (view.screenshot) lines.push(`![${view.name}](${view.screenshot})`, '')
     if (view.dom) lines.push(`Horizontal overflow: ${view.dom.horizontalOverflow}. Failed images: ${view.dom.counts.failedImages}. Potential unlabeled controls: ${view.dom.counts.unlabeledControls}. Main landmarks: ${view.dom.mains}. Level-one headings: ${view.dom.h1}.`, '')
+    lines.push(view.measure ? `Rendered character measure: ${view.measure.measure_ch}ch median over ${view.measure.linesSampled} sampled line(s) (${view.measure.pass ? 'within' : 'over'} the 75ch budget).` : 'Rendered character measure: no sampleable prose found in the main container.', '')
     for (const issue of view.issues) lines.push(`- ${issue.kind}: ${issue.detail.replace(/[<>]/g, '')}`)
     if (view.omittedIssues) lines.push(`- ${view.omittedIssues} additional diagnostics omitted.`)
     lines.push('')

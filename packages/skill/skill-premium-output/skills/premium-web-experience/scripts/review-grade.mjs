@@ -47,12 +47,16 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-const HELP = `Usage: node review-grade.mjs --html ./page.html --out ./artifacts [--source label]
+const HELP = `Usage: node review-grade.mjs --html ./page.html --out ./artifacts [--source label] [--report ./review-web-report.json]
 Grades a saved, already-rendered HTML file against the Saturn AI premium-output
 rubric (see ../rubric.schema.json) using a static DOM (jsdom), never a live
 browser. Writes rubric.json (machine-readable) and rubric.md (human summary)
 into a new directory under --out.
 --source overrides the "source" field in rubric.json (default: --html path).
+--report reads a review-web.mjs report.json and grades rendered character
+measure (characters per line) from its "desktop" view, which jsdom cannot see
+itself; the rubric's "measure" field stays UNVERIFIED, never a guessed PASS,
+when --report is omitted or its desktop view carries no measurement.
 Exit codes: 0 overall PASS; 1 overall REVISE or REJECT; 2 invalid arguments,
 unreadable input, or jsdom unavailable (never a guessed clean result).`
 
@@ -86,14 +90,14 @@ export class GradeUnavailableError extends Error {}
 
 /** Parse a loopback-free CLI argument list without touching the filesystem.
  * @param {string[]} argv CLI arguments without the Node executable and script.
- * @returns {{help: boolean, html?: string, out?: string, source?: string}} Parsed options.
+ * @returns {{help: boolean, html?: string, out?: string, source?: string, report?: string}} Parsed options.
  */
 export function parseArgs(argv) {
-  if (argv.length > 8 || argv.some(value => value.length > 4096 || value.includes('\0'))) throw new Error('Arguments exceed supported limits.')
+  if (argv.length > 10 || argv.some(value => value.length > 4096 || value.includes('\0'))) throw new Error('Arguments exceed supported limits.')
   const values = new Map()
   for (let index = 0; index < argv.length; index++) {
     const flag = argv[index]
-    if (!['--help', '--html', '--out', '--source'].includes(flag)) throw new Error(`Unknown argument: ${flag.slice(0, 60)}`)
+    if (!['--help', '--html', '--out', '--source', '--report'].includes(flag)) throw new Error(`Unknown argument: ${flag.slice(0, 60)}`)
     if (values.has(flag)) throw new Error(`Repeated argument: ${flag}`)
     if (flag === '--help') { values.set(flag, true); continue }
     const value = argv[++index]
@@ -104,7 +108,7 @@ export function parseArgs(argv) {
   const html = values.get('--html')
   if (!html) throw new Error('--html is required.')
   if (!values.get('--out')) throw new Error('--out is required.')
-  return { help: false, html: resolve(html), out: resolve(values.get('--out')), source: values.get('--source') }
+  return { help: false, html: resolve(html), out: resolve(values.get('--out')), source: values.get('--source'), report: values.get('--report') ? resolve(values.get('--report')) : undefined }
 }
 
 /* ------------------------------------------------------------------ */
@@ -498,6 +502,29 @@ function gradeCtaRoutes(m) {
   return verdictItem('One primary CTA per section; real routes', 'PASS', `${m.deadLinks.total} link(s) checked, none dead; no section had 3+ competing CTAs.`)
 }
 
+/**
+ * Rendered character-measure (characters per line): `review-web.mjs` computes this from a real
+ * browser's line-wrap geometry (`Range.getClientRects()` over its "desktop" view) because jsdom has
+ * no layout engine and can never see it here. Reported as a top-level `measure` field alongside
+ * `items`, not inside the fixed 12-item array (`rubric.schema.json` pins that array's length and
+ * criterion enum to the SATURN-DESIGN-RULES.md checklist; "measure" is not one of those twelve
+ * named entries, and `additionalProperties: true` on the rubric object itself is exactly what
+ * permits this supplementary field). It intentionally does not gate `overallVerdict`, which stays
+ * scoped to the 12 schema criteria — this is browser-only supplementary evidence, off by default.
+ * @param {{measure_ch: number, pass: boolean}|null|undefined} measure Desktop-view measurement from
+ *   a review-web.mjs report, or undefined/null when none was supplied.
+ */
+function gradeMeasure(measure) {
+  if (!measure || typeof measure.measure_ch !== 'number') {
+    return { verdict: 'UNVERIFIED', measure_ch: null, evidence: 'jsdom has no layout engine and cannot measure rendered characters-per-line. Run review-web.mjs and pass its report.json via --report (with a "desktop" view carrying a measurement) to grade this.' }
+  }
+  return {
+    verdict: measure.pass ? 'PASS' : 'REVISE',
+    measure_ch: measure.measure_ch,
+    evidence: `Median rendered line length ${measure.measure_ch}ch, sampled by review-web.mjs from the desktop view's main prose container (budget ≤ 75ch).`,
+  }
+}
+
 function gradeReducedMotion(m) {
   const hasMotion = m.motion.distinctAnimationNames > 0 || m.canvas.count > 0 || m.fadeUp.matched > 0
   if (!hasMotion) return verdictItem('Reduced-motion state designed', 'PASS', 'No motion (CSS animation, canvas, or scroll-reveal marker) present; a reduced-motion accommodation does not apply.')
@@ -560,7 +587,7 @@ function assembleRubric(win, document, rawHtml) {
  * this package never installs it; when it cannot be resolved the grade is
  * unavailable, never a guessed PASS.
  * @param {string} html Rendered HTML markup (from a saved file or a captured page source).
- * @param {{source?: string}} [options]
+ * @param {{source?: string, measure?: {measure_ch: number, pass: boolean}}} [options]
  */
 export async function gradePage(html, options = {}) {
   let JSDOM
@@ -596,6 +623,7 @@ export async function gradePage(html, options = {}) {
       notes,
       items,
       findings,
+      measure: gradeMeasure(options.measure),
     }
   } finally {
     dom.window.close()
@@ -611,8 +639,32 @@ function markdown(rubric) {
     'This is the deterministic half of the review only (scripts/review-grade.mjs). It does not replace the fresh-context reviewer subagent\u2019s screenshot pass (policy.ts) — UNVERIFIED items below are exactly the checklist entries that pass depends on.', '',
   ]
   for (const item of rubric.items) lines.push(`- **${item.criterion}** — ${item.verdict}${item.score === null ? '' : ` (${item.score}/5)`}: ${item.evidence}`)
+  lines.push('', `**Rendered character measure** (supplementary, outside the 12-item checklist) — ${rubric.measure.verdict}${rubric.measure.measure_ch === null ? '' : ` (${rubric.measure.measure_ch}ch)`}: ${rubric.measure.evidence}`)
   if (rubric.notes.length) { lines.push('', '## Instrument limitations', ''); for (const note of rubric.notes) lines.push(`- ${note}`) }
   return `${lines.join('\n')}\n`
+}
+
+/** Read a review-web.mjs report.json and pull its "desktop" view's measurement, if any.
+ * @param {string} reportPath Absolute path to a review-web.mjs report.json.
+ * @returns {Promise<{measure_ch: number, pass: boolean}|undefined>}
+ */
+async function readDesktopMeasure(reportPath) {
+  let raw
+  try {
+    raw = await readFile(reportPath, 'utf8')
+  } catch (error) {
+    throw new Error(`--report could not be read: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`--report is not valid JSON: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  const views = Array.isArray(parsed?.views) ? parsed.views : []
+  const desktop = views.find(view => view && view.name === 'desktop')
+  const measure = desktop?.measure
+  return measure && typeof measure.measure_ch === 'number' && typeof measure.pass === 'boolean' ? { measure_ch: measure.measure_ch, pass: measure.pass } : undefined
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
@@ -621,7 +673,8 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
     if (options.help) process.stdout.write(`${HELP}\n`)
     else {
       const html = await readFile(options.html, 'utf8')
-      const rubric = await gradePage(html, { source: options.source ?? options.html })
+      const measure = options.report ? await readDesktopMeasure(options.report) : undefined
+      const rubric = await gradePage(html, { source: options.source ?? options.html, measure })
       await mkdir(options.out, { recursive: true })
       const rubricPath = resolve(options.out, 'rubric.json')
       const summaryPath = resolve(options.out, 'rubric.md')
