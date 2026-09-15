@@ -1,0 +1,58 @@
+# Agent Note: Self-hosted Saturn type system + the signature ring on the sidebar active row
+
+Status: implemented
+
+English | [中文](2026-09-15-saturn-type-system-and-signature-ring.zh.md)
+
+## Problem
+
+SPEC §2/§3 C3 (the 2026-09-15 fan-out): the app shipped with zero `@font-face` declarations anywhere in `packages/client` — body and display type were both the bare OS stack (`Segoe UI` on this machine), which the product's own design law names as a specific `ai-slop` tell ("do not use Inter, Roboto, or a system-default stack as the personality"). The favicon ring was already correctly tilted at -18deg, but it appeared on exactly two screens (hero, First Light backdrop); the sidebar — a surface every session lives in — carried none of the brand's one named mechanism.
+
+## Decision
+
+**Fonts.** Fetched Instrument Sans variable and Commit Mono from their official GitHub sources with `curl`, read every candidate license file before trusting the SPEC's assumption, and shipped only what the verification actually supported:
+
+- Instrument Sans: `Instrument/instrument-sans`, branch `master`. `fonts/webfonts/InstrumentSans[wdth,wght].woff2` is an official prebuilt variable woff2 (confirmed via `fontTools.ttLib`: `fvar` axes `wdth 75–100`, `wght 400–700`, exactly the SPEC's numbers). `OFL.txt` at the repo root — matches the SPEC.
+- Commit Mono: `eigilnikolajsen/commit-mono`, release `v1.143`. The release zip ships only `.otf`/`.ttf`, no `woff2`; converted the 400 and 700 regular weights with `fontTools` (`TTFont(src); f.flavor = 'woff2'; f.save(dst)` — outline and metrics untouched, only the container format changes). **License deviation:** the SPEC's mandate names `LICENSE-MIT.txt` for this file, but the repository's root `LICENSE` (MIT) covers its specimen site and build tooling only — the font binaries carry their own `LICENSE-FONT`, the SIL Open Font License, byte-identical in substance to the `license.txt` bundled inside the release zip beside the `.otf` files. Shipping an MIT label on an OFL-licensed binary would misrepresent its actual terms, so `apps/web/public/fonts/` carries `LICENSE-OFL-COMMITMONO.txt` instead. Both `LICENSE-OFL.txt` and `LICENSE-OFL-COMMITMONO.txt` were read in full before being copied in.
+
+**Reachability, proved rather than assumed.** `apps/web/vite.config.ts` sets no `publicDir` override, so Vite's default applies: everything under `apps/web/public/` copies verbatim into the built `dist` root. `packages/host/frontend-static/src/index.ts`'s `serveStatic` resolves any decoded request path directly against that dist root (`resolve(normalize(join(distRoot, pathname)))`) and reads it from disk; its MIME table has no `.woff2` entry, so an unlisted extension falls through to `application/octet-stream` rather than being rejected — exactly the same path the already-shipped `favicon.svg` and `manifest.webmanifest` public assets take. `packages/client/ui-skin-saturn/tests/font-served-path.spec.ts` pins this by reading the real production sources (no mock, no new package dependency — a relative `fs` read needs no module resolution) rather than merely asserting the font files exist.
+
+**Metrics-matched fallback, computed not guessed.** Each self-hosted `@font-face` pairs with a `*-Fallback` family (`size-adjust` plus `ascent-override`/`descent-override`/`line-gap-override`) so the `font-display: swap` transition never visibly reflows layout. The ratios came from reading each font's own `OS/2`/`head` tables with `fontTools` against its system fallback:
+
+```python
+from fontTools.ttLib import TTFont
+def metrics(path):
+    f = TTFont(path); os2 = f['OS/2']; upm = f['head'].unitsPerEm
+    return dict(upm=upm, xh=os2.sxHeight, typoAsc=os2.sTypoAscender, typoDesc=os2.sTypoDescender)
+# size-adjust = 100 * (target.xh/target.upm) / (fallback.xh/fallback.upm)
+# ascent/descent/line-gap-override = target's own typo metrics as % of its upm
+```
+
+Instrument Sans -> Arial: `size-adjust: 98.35%`, `ascent-override: 97%`, `descent-override: 25%`, `line-gap-override: 0%`. Commit Mono -> Consolas: `size-adjust: 110.15%`, `ascent-override: 90%`, `descent-override: 20%`, `line-gap-override: 0%`.
+
+**Tokens and the display move.** `ui-skin-saturn/src/client/index.ts` declares `--saturn-font-display`, `--saturn-font-body` (both the same Instrument Sans stack — SPEC §2: "one variable family carries UI and display"), and `--saturn-font-mono`, all under the file's existing `body[data-dsh-saturn][data-dsh-saturn]` doubled-specificity scope. It also re-points the two upstream variables nearly every component already reads for text — `--dsw-font-family` and `--ds-font-family-code` (both defined `:root`-wide in `ui-theme/src/styles/base.css`) — to the new Saturn tokens, so the whole app inherits the type system without a single consumer edit. **Deviation, and why it's not a bug:** the variable font's `wdth` axis is `min 75 / default 100 / max 100` — the default *is* the wide end; there is no wider-than-normal setting on this axis to swing to. `--saturn-font-display-variation: 'wdth' 100` therefore makes that value explicit (guarding against a future font swap silently changing the axis default) rather than encoding an actual move away from a narrower body default; the perceptual "move" for the hero headline is this explicit pin combined with the tight tracking (`letter-spacing: -0.045em`) `HeroShell.module.css` already carries. `apps/web/index.html` preloads the two files on the app's critical path (Instrument Sans variable, Commit Mono 400); Commit Mono 700 is not preloaded since it is a secondary/emphasis weight.
+
+**The ring on the sidebar active row.** The actual session-row markup (and its hashed CSS-module class names) belongs to `ui-workspace`'s `Rows.tsx` — the `sidebar.workspaces` slot registrant — outside this cell's write scope (`ui-sidebar/src/client/**/*.module.css` only). Rather than touch that package, `SidebarRoot.module.css` reaches through its own scoped `.regionArea` class to the two attributes every session/search row already sets regardless of which package renders it: `role="treeitem"` and `aria-selected`. CSS Modules rewrites only the leading class name in a compound selector — a bracket attribute selector is plain CSS and is not renamed — so `.regionArea [role='treeitem'][aria-selected='true']` reaches the real row with no coordination or private-API dependency on `ui-workspace`. The ring itself is a `::after` absolute overlay (never a flex participant, `pointer-events: none`), painted with `mask-image` + `background-color: var(--saturn-accent, currentColor)` rather than a baked-in hex so it inherits the accent token — same ellipse geometry as the favicon (`rx=27 ry=9.5`, `rotate(-18deg)`, 64×64 viewBox), the one tilt used everywhere per SPEC §2.
+
+## Alternatives considered
+
+**Inline the ring as generated `::before` content participating in flex flow.** Rejected: it would shift the row's existing content by its own width the moment a row becomes selected, a visible one-row layout jank the reduced-motion/no-op-when-idle bar this codebase holds elsewhere does not tolerate.
+
+**Format hint `format('woff2-variations')` on the Instrument Sans `src`.** Dropped after checking current Chromium/Electron support: the plain `format('woff2')` hint is sufficient — variable-font capability is read from the file's own `fvar` table, not the format string — so the extra hint added complexity without a compatibility gain.
+
+**Asking C2 (transcript-polish) or the orchestrator to add the two-line `wdth`/tracking change to `HeroShell.module.css`.** Not taken silently — logged as an explicit `integration_needs` entry instead, because that file is outside this cell's IN scope (SPEC §3 C3 lists only `ui-skin-saturn`, `apps/web/public/fonts`, `apps/web/index.html`, and `ui-sidebar/**/*.module.css`) and the hard rule against writing outside scope is unconditional.
+
+## Consequences
+
+`document.fonts.check('16px "Instrument Sans"')` resolves true in the served app (self-hosted, no network font request — asserted directly by `typeface-tokens.client.spec.ts`, which fails the suite if any `@font-face` ever references `fonts.googleapis.com`/`fonts.gstatic.com` or a bare `http(s)://` URL). Every existing screen — not just the hero — now renders in the Saturn type system, because the override sits at the two variables the whole component tree already consumes. The sidebar's active row is now visually distinguishable as *the* open session by the same mark that seals a PASS verdict and draws the favicon, extending the brand's one named mechanism past the two screens the 2026-09-15 UX audit found it confined to.
+
+**Known limitation, logged rather than silently accepted:** the ring's `::after` and the existing drag-marker `::after` (`.sessionRow.dropAfter::after` in `ui-workspace`'s `Rows.module.css`) both target the same pseudo-element slot on the same element; in the narrow case where a row is simultaneously the current session *and* the drop-target-after of an in-flight drag, only one visual wins per property by CSS specificity/source order. This is a rare, purely cosmetic overlap during a transient drag gesture, not a functional regression, and fixing it structurally would require a coordinated change to `ui-workspace` outside this cell's scope.
+
+## Verification
+
+- `packages/client/ui-skin-saturn/tests/typeface-tokens.client.spec.ts` — pins the exact injected `@font-face` rules (both self-hosted and fallback), the three tokens plus the `wdth` variation token, the `--dsw-font-family`/`--ds-font-family-code` re-point, the network-font-host guard, and a regression lock on the -18deg favicon tilt.
+- `packages/client/ui-skin-saturn/tests/font-served-path.spec.ts` — reads the real `apps/web/vite.config.ts`, `apps/web/index.html`, and `packages/host/frontend-static/src/index.ts` sources (no mock) to prove the `/fonts/*` reachability chain, plus verifies the shipped `woff2` magic bytes and the two license files' actual text.
+- `packages/client/ui-sidebar/tests/active-row-ring.client.spec.ts` — pins the ring's positioning context, its non-interactive absolute-overlay properties, the accent-token mask paint, and the exact -18deg/rx=27/ry=9.5 geometry shared with the favicon.
+- `node_modules/.bin/vitest run packages/client/ui-skin-saturn packages/client/ui-sidebar`: 10 test files, 48 tests, all green (one transient worker-process crash on a shared, heavily concurrent machine reproduced as a clean pass on immediate re-run).
+- `node_modules/.bin/tsc -p packages/client/ui-skin-saturn/tsconfig.json --noEmit` and the same for `ui-sidebar`: both clean.
+- `npx tsx scripts/run-gates.ts doc-quick`: `ui-skin-saturn`'s README now passes every check this cell's files can satisfy in scope; the sole remaining failure ("must contain one or more complete model-context entries") requires adding a `SENTENCE_MODEL_EXPERIENCE` allowlist entry in `scripts/verify-package-readme-model-experience.ts`, a shared repo-wide gate script outside this cell's write scope — logged in `integration_needs` with the exact fix, and the README's own sentence is already worded to match the required pattern (`None, as this package only changes browser presentation.`) so no further README edit is needed once the allowlist entry lands.
