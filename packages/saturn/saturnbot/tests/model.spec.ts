@@ -7,7 +7,7 @@ import SessionStore from '@deepseek-ai/dsh-session'
 import JsonlPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { LoggedBotModel, botModelPrompt } from '../src/model.ts'
 import { parseBotConfig } from '../src/config.ts'
 import { SaturnBotStore } from '../src/store.ts'
@@ -104,4 +104,44 @@ it('records cancellation and bounds model-visible input before a provider reques
   await rejected
   expect((await ctx.sessionPersistence.readRaw(adapter.requests[0]!.sessionId!))?.content).toContain('saturnbot/model-error')
   expect(() => botModelPrompt({ ...context, observedState: { huge: 'x'.repeat(context.config.maxInputBytes) } })).toThrow('maxInputBytes')
+})
+
+it('resolves the coordinator route through a connected model router instead of the configured provider', async () => {
+  const { ctx, context, model } = await setup()
+  const adapter = new MockAdapter([textResponse('{"summary":"idle","tasks":[]}')])
+  ctx.llm.registerAdapter(['fixture', 'routed'], adapter)
+  const resolve = vi.fn().mockReturnValue({ provider: 'routed', model: 'routed-model', reasoningEffort: 'high' })
+  const dispose = ctx.provide('modelRouter', { resolve })
+  try {
+    await model.plan(context)
+    expect(resolve).toHaveBeenCalledWith('coordinator')
+    expect(adapter.requests[0]).toMatchObject({ provider: 'routed', model: 'routed-model', reasoningEffort: 'high' })
+    const raw = await ctx.sessionPersistence.readRaw(adapter.requests[0]!.sessionId!)
+    expect(raw?.content).toContain('"routed-model"')
+  } finally { dispose() }
+})
+
+it('resolves the specialist tier for a role task', async () => {
+  const { ctx, context, model } = await setup()
+  const adapter = new MockAdapter([textResponse('{"summary":"ok","actions":[],"continue":false}')])
+  ctx.llm.registerAdapter(['fixture'], adapter)
+  const resolve = vi.fn().mockReturnValue({ provider: 'fixture', model: 'fixture' })
+  const dispose = ctx.provide('modelRouter', { resolve })
+  try {
+    await model.propose({ id: 'task' as BotId, role: 'growth', title: 'Draft outreach', instruction: 'Draft one message.' }, context)
+    expect(resolve).toHaveBeenCalledWith('specialist')
+  } finally { dispose() }
+})
+
+it('falls back to the configured provider and model when no router is connected, or when the router fails', async () => {
+  const { ctx, context, model } = await setup()
+  const adapter = new MockAdapter([textResponse('{"summary":"idle","tasks":[]}'), textResponse('{"summary":"idle","tasks":[]}')])
+  ctx.llm.registerAdapter(['fixture'], adapter)
+  await model.plan(context)
+  expect(adapter.requests[0]).toMatchObject({ provider: 'fixture', model: 'fixture' })
+  const dispose = ctx.provide('modelRouter', { resolve: () => { throw new Error('router unavailable') } })
+  try {
+    await model.plan(context)
+    expect(adapter.requests[1]).toMatchObject({ provider: 'fixture', model: 'fixture' })
+  } finally { dispose() }
 })
