@@ -135,9 +135,21 @@ export function packageResolvable(resolver: NodeJS.Require, specifier: string): 
  * that happens to resolve can never report "available" when the CLI
  * dependency bundled inside it failed to install. Two stages: first locate
  * the wrapper's own manifest from `resolver`'s module graph, then resolve
- * `cliPackage` from a `require` anchored at that manifest — the exact
- * resolution order Node itself would use to load the CLI from inside the
- * wrapper.
+ * `cliPackage` from a `require` anchored at that manifest.
+ *
+ * The second stage tries `cliPackage` as a bare specifier AND as its
+ * `/package.json` subpath, because the two shipped CLI dependencies need
+ * opposite forms and there is no single "the" resolution order that covers
+ * both: `@openai/codex` has no `main`/`exports` field (only `bin`), so the
+ * bare specifier throws `MODULE_NOT_FOUND` and only `/package.json`
+ * resolves; `@anthropic-ai/claude-agent-sdk` declares an `exports` map with
+ * a `.` entry but no `./package.json` entry, so `/package.json` throws
+ * `ERR_PACKAGE_PATH_NOT_EXPORTED` and only the bare specifier resolves.
+ * Trying both forms answers the question this function actually asks — is
+ * the CLI dependency present in the wrapper's module graph — without
+ * hard-coding a specifier shape per harness (Mars r2 F1-r2, confirmed
+ * against the real installed manifests in
+ * `packages/subagent/subagent-codex` and `packages/subagent/subagent-claude-code`).
  * @param resolver - a `createRequire`-produced resolver anchored at the caller's module; locates the wrapper.
  * @param subagentPackage - the wrapper package's specifier (e.g. `@deepseek-ai/dsh-subagent-codex`).
  * @param cliPackage - the platform CLI specifier the wrapper actually depends on (e.g. `@openai/codex`).
@@ -156,12 +168,8 @@ export function harnessCliResolvable(
   } catch {
     return false
   }
-  try {
-    createRequireFn(subagentManifest).resolve(cliPackage)
-    return true
-  } catch {
-    return false
-  }
+  const cliResolver = createRequireFn(subagentManifest)
+  return packageResolvable(cliResolver, cliPackage) || packageResolvable(cliResolver, `${cliPackage}/package.json`)
 }
 
 /**
