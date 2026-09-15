@@ -314,6 +314,13 @@
     - id: saturn-checkpoints
       name: '@saturnai/dsh-checkpoints'
 
+    # Saturn AI enforced workspace claims: the host plugin owns the durable
+    # TTL-leased claim ledger and the claim_scope / release_scope / claim_list /
+    # claim_check tools, so two agents cannot both take one file surface. A
+    # collision is DENIED rather than warned, which is what makes it a lock.
+    - id: saturn-claims
+      name: '@saturnai/dsh-claims'
+
     - id: ui-attachment
       name: '@deepseek-ai/dsh-client-ui-attachment'
 
