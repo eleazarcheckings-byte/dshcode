@@ -1,10 +1,10 @@
 /** SaturnBot model adapter over the existing LLM provider, with durable pre-dispatch records. */
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import { createUserMessage, LlmError } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import type { BotModel, BotModelContext } from './contracts.ts'
+import type { BotModel, BotModelContext, BotModelRoute, BotModelRouter } from './contracts.ts'
 import type { BotId, BotRole, BotTask } from './types.ts'
 import { botOutputQuality } from './output-quality.ts'
 
@@ -89,9 +89,28 @@ export class LoggedBotModel implements BotModel {
   /** Propose role-bound actions for one specialist task. */
   async propose(task: BotTask, context: BotModelContext): Promise<unknown> { return await this.generate(context, task) }
 
+  /**
+   * Resolve the provider/model/effort for one call through a connected model
+   * router when present, falling back to the configured provider/model. A
+   * router that is absent, throws, or returns an incomplete route never
+   * blocks a cycle — it only forgoes routing for that one call.
+   */
+  private resolveRoute(context: BotModelContext, task?: BotTask): BotModelRoute {
+    const fallback: BotModelRoute = { provider: context.config.provider, model: context.config.model }
+    const router = this.ctx.get('modelRouter') as BotModelRouter | undefined
+    if (router === undefined) return fallback
+    try {
+      const tier = task === undefined ? 'coordinator' : 'specialist'
+      const resolved = router.resolve(tier)
+      if (typeof resolved?.provider !== 'string' || typeof resolved.model !== 'string' || resolved.provider === '' || resolved.model === '') return fallback
+      return resolved
+    } catch { return fallback }
+  }
+
   private async generate(context: BotModelContext, task?: BotTask): Promise<unknown> {
     context.signal.throwIfAborted()
     const prompt = botModelPrompt(context, task)
+    const route = this.resolveRoute(context, task)
     const session = this.ctx.sessions.prepare(SessionId(`saturnbot-${randomUUID()}`), {
       meta: { cwd: context.config.workspace, origin: 'subagent' },
     })
@@ -100,7 +119,7 @@ export class LoggedBotModel implements BotModel {
       this.ctx.sessions.announce(session)
       session.append('saturnbot/model-request', {
         cycleId: context.cycleId, branchId: context.branchId, role: task?.role ?? 'orchestrator',
-        provider: context.config.provider, model: context.config.model, prompt, maxTokens: context.config.maxOutputTokens,
+        provider: route.provider, model: route.model, prompt, maxTokens: context.config.maxOutputTokens,
       })
       if (!await this.ctx.sessions.flush(session)) throw new Error('SaturnBot requires durable model request persistence')
       const messages = [createUserMessage({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin', plugin: 'saturnbot' } })]
@@ -108,7 +127,8 @@ export class LoggedBotModel implements BotModel {
       let usage: TokenUsage | null = null
       let finished = false
       for await (const chunk of this.ctx.llm.stream({
-        provider: context.config.provider, model: context.config.model,
+        provider: route.provider, model: route.model,
+        ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(route.reasoningEffort) }),
         messages, maxTokens: context.config.maxOutputTokens, signal: context.signal, sessionId: session.id,
       })) {
         context.signal.throwIfAborted()

@@ -73,3 +73,42 @@ export interface BotScheduler {
   start(): void
   dispose(): Promise<void>
 }
+
+/** One media generation or transform job, as the connected media provider reports it. */
+export interface BotMediaJob {
+  id: string
+  status: 'queued' | 'running' | 'done' | 'failed'
+  assets: Array<{ path: string; mimeType: string; url?: string }>
+  cost: { estimatedUsd: number; provider: string; model: string }
+}
+/**
+ * Duck-typed contract for the connected media capability (`ctx.get('media')`,
+ * provided by the `@saturnai/dsh-tool-media` package when mounted). SaturnBot
+ * depends only on this shape, never on that package directly, so the two can
+ * ship and version independently.
+ */
+export interface BotMediaService {
+  generate(request: {
+    kind: 'image' | 'video' | 'audio' | 'motion-transfer'
+    prompt: string
+    provider?: string
+    model?: string
+    params?: Record<string, unknown>
+    workspace: string
+  }): Promise<BotMediaJob>
+  status(id: string): Promise<BotMediaJob>
+}
+
+/** Model tiers a connected router chooses between for one resolution. */
+export type BotModelTier = 'coordinator' | 'specialist' | 'bulk' | 'vision'
+/** One resolved route: which provider/model (and optional reasoning effort) to call. */
+export interface BotModelRoute { provider: string; model: string; reasoningEffort?: string }
+/**
+ * Duck-typed contract for the connected model-router capability
+ * (`ctx.get('modelRouter')`, provided by `@saturnai/dsh-model-router` when
+ * mounted). Planner and specialist calls resolve `coordinator` and
+ * `specialist` respectively; a router that throws or omits a field is
+ * treated as absent for that call, falling back to the configured
+ * `provider`/`model`.
+ */
+export interface BotModelRouter { resolve(tier: BotModelTier): BotModelRoute }

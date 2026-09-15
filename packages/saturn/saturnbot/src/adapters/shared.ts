@@ -1,7 +1,7 @@
 /** Shared adapter admission, bounded output, and configured HTTP transport. */
 import { z, type ZodRawShape } from 'zod'
 import type { BotTool, BotToolContext, BotToolResult } from '../contracts.ts'
-import type { BotJson } from '../types.ts'
+import type { BotConfig, BotJson } from '../types.ts'
 import type { BotToolOptions } from '../tools.ts'
 
 /** Limit untrusted remote/file output before parsing or logging it. */
@@ -61,26 +61,51 @@ export function redact(value: string, options: BotToolOptions, context: BotToolC
 
 /** Resolve only a user-configured integration; credentials never appear in its returned URL.
  * @param options - Host environment snapshot.
- * @param context - Current validated configuration.
+ * @param config - Current validated configuration.
  * @param name - Stable integration key.
  * @param defaultEndpoint - Official service endpoint when the integration omits one.
  * @returns canonical HTTPS origin/base and a resolved bearer token.
  */
 export function integration(
-  options: BotToolOptions, context: BotToolContext, name: string, defaultEndpoint?: string,
+  options: BotToolOptions, config: BotConfig, name: string, defaultEndpoint?: string,
 ): { endpoint: string; token: string; resource: string | undefined } {
-  const config = context.config.integrations[name]
-  if (config === undefined) throw new ActionRequiredError(`Connect ${name} in SaturnBot settings.`)
-  const endpoint = config.endpoint ?? defaultEndpoint
+  const entry = config.integrations[name]
+  if (entry === undefined) throw new ActionRequiredError(`Connect ${name} in SaturnBot settings.`)
+  const endpoint = entry.endpoint ?? defaultEndpoint
   if (endpoint === undefined) throw new ActionRequiredError(`Configure the ${name} endpoint.`)
   let url: URL
   try { url = new URL(endpoint) } catch { throw new ActionRequiredError(`Configure a valid HTTPS endpoint for ${name}.`) }
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
     throw new ActionRequiredError(`${name} requires an HTTPS endpoint without embedded credentials, query, or fragment.`)
   }
-  const token = config.credentialEnv === undefined ? undefined : (options.environment ?? process.env)[config.credentialEnv]
+  const token = entry.credentialEnv === undefined ? undefined : (options.environment ?? process.env)[entry.credentialEnv]
   if (!token) throw new ActionRequiredError(`Set the credential environment variable configured for ${name}.`)
-  return { endpoint: url.href.replace(/\/$/u, ''), token, resource: config.resource }
+  return { endpoint: url.href.replace(/\/$/u, ''), token, resource: entry.resource }
+}
+
+/**
+ * Resolve a deploy-hook style integration whose credential is optional: a
+ * Vercel or Cloudflare Pages deploy hook URL is itself the secret (the
+ * platform authenticates the hook by its URL), so an operator may configure
+ * no `credentialEnv` at all. When one is configured it must still resolve.
+ * @param options - Host environment snapshot.
+ * @param config - Current validated configuration.
+ * @param name - Stable integration key (`vercel` or `cloudflare-pages`).
+ * @returns the exact configured HTTPS hook URL and an optional bearer token.
+ */
+export function deployHook(
+  options: BotToolOptions, config: BotConfig, name: string,
+): { endpoint: string; token: string | undefined } {
+  const entry = config.integrations[name]
+  if (entry?.endpoint === undefined) throw new ActionRequiredError(`Configure the ${name} deploy hook URL in SaturnBot settings.`)
+  let url: URL
+  try { url = new URL(entry.endpoint) } catch { throw new ActionRequiredError(`Configure a valid HTTPS ${name} deploy hook URL.`) }
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash) {
+    throw new ActionRequiredError(`${name} requires an HTTPS deploy hook URL without embedded credentials or a fragment.`)
+  }
+  const token = entry.credentialEnv === undefined ? undefined : (options.environment ?? process.env)[entry.credentialEnv]
+  if (entry.credentialEnv !== undefined && !token) throw new ActionRequiredError(`Set the credential environment variable configured for ${name}.`)
+  return { endpoint: url.href, token }
 }
 
 /** Read a bounded JSON response and reject malformed, redirected, or oversized provider output.
