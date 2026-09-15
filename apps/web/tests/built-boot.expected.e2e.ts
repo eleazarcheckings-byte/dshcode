@@ -68,10 +68,9 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   } else {
     expect(document.querySelector('svg[viewBox="0 0 64 64"]')).not.toBeNull()
     // The brand slot renders the Saturn wordmark as two weighted spans, so
-    // the product name is asserted per span; the glyph above carries the
-    // same mark identity at the sidebar seat.
-    expect(screen.getByText('Saturn', { exact: true })).not.toBeNull()
-    expect(screen.getByText('AI', { exact: true })).not.toBeNull()
+    // the product name is asserted through the wordmark node; the glyph
+    // above carries the same mark identity at the sidebar seat.
+    expect(document.querySelector('.saturn-brand-wordmark')?.textContent).toBe('SaturnAI')
   }
   // The compact layout dropped group session counts; the fixture workspace
   // group row renders immediately with its sessions beneath it.
