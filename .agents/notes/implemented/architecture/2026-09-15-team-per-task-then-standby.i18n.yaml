@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-15-team-per-task-then-standby.md
+2026-09-15-team-per-task-then-standby.md: 64c47f18a39bd8a1926a87a34c6705ab06f6adba
+2026-09-15-team-per-task-then-standby.zh.md: 5e0ae2c7eb9e30ebb85f5ca7d01853b5c5d34538

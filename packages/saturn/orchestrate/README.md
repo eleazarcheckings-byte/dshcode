@@ -25,7 +25,7 @@ The session multi-task setting is logged and defaults to ON. `/orchestrate [on|o
 
 Mount `@saturnai/dsh-orchestrate` on the host roster; the `/orchestrate` command attaches when a command registry is composed, and `@saturnai/dsh-client-ui-orchestrate` provides the composer toggle. Deployments may replace either body by supplying non-empty `on` and `off` strings.
 
-ON directs the coordinator to assign independent work with concrete deliverables, context, disjoint file scopes, and verification requirements, preferring named Team members for ongoing shared work and one-shot subagents for bounded independent work. It then states the rule that makes the arrangement trustworthy: the coordinator never grades its own team's work. When the pieces are in, the combined result goes to `review_definition_of_done`, which runs a fresh reviewer against the definition of done, and the contract is proven with that review's countersign or with the receipt of a run — never with the coordinator's own account of how it went.
+ON states the shape of the mode first: the coordinator is the composer, and every task the user hands it gets a team — never a single agent. A team is at least two specialists with disjoint write scopes plus the independent reviewer, sized to the task, the smallest coherent team being the right one. It then directs the coordinator to assign independent work with concrete deliverables, context, disjoint file scopes, and verification requirements, preferring named Team members for ongoing shared work and one-shot subagents for bounded independent work, and states the rule that makes the arrangement trustworthy: the coordinator never grades its own team's work. When the pieces are in, the combined result goes to `review_definition_of_done`, which runs a fresh reviewer against the definition of done, and the contract is proven with that review's countersign or with the receipt of a run — never with the coordinator's own account of how it went. Once the verified result is delivered the coordinator stands by: it reports and waits for the next prompt, which gets its own team, rather than rolling itself into the next task. The reads that lock context stay in its own hand; solving the task belongs to the team.
 
 OFF asks the agent to work in one thread unless the user requests delegation, and says outright that this session-level instruction overrides the standing always-orchestrate posture.
 
@@ -62,8 +62,10 @@ Exactly one of the two bodies above, chosen by the pending-or-logged setting, re
 ##### Verbatim text for this field, when needed
 
 ```markdown
-Multi-task mode is ON for this session. Coordinate substantial work across independent specialists
-while making useful progress yourself. When spawn_teammate is available, use named teammates
+Multi-task mode is ON for this session. You are the composer: for every task the user hands you,
+compose a team and give the task to it — never a single agent. A team is at least two specialists
+with disjoint write scopes plus the independent reviewer at the end; size it to the task, and the
+smallest coherent team is the right one. When spawn_teammate is available, use named teammates
 for work that needs shared tasks, peer messages, or follow-up. Use one-shot subagents for bounded
 work with no continuing coordination. Give each delegation a concrete deliverable, relevant
 context, disjoint write scopes, and verification requirements. Acquire file claims when available.
@@ -71,9 +73,10 @@ Check progress, unblock dependencies, and wait for required teammates before the
 You never grade your own team's work. When the pieces are in, hand the combined result to someone
 who did not build it: `review_definition_of_done` runs a fresh reviewer against the definition of done and
 returns a verdict with its reasons. Prove the contract with the countersign that review returns, or
-with the receipt of a run — never with your own account of how it went. Keep trivial reads, direct
-edits, and tightly dependent work in the main thread. Parallel work should reduce the time to a
-verified result.
+with the receipt of a run — never with your own account of how it went. Once the team's verified
+result is delivered, stand by: report it and wait for the next prompt. Do not start the next task
+on your own; the next prompt gets its own team. Keep the reads that lock context in your own hand;
+solving the task belongs to the team.
 ```
 
 #### Token effect
@@ -96,6 +99,6 @@ Prefix-stable while the setting is unchanged. Toggling replaces this section's t
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-The [decision record](../../../.agents/notes/implemented/architecture/2026-09-15-proof-gated-done.md) explains why the ON policy stopped telling the Lead to review the combined result itself.
+The [decision record](../../../.agents/notes/implemented/architecture/2026-09-15-proof-gated-done.md) explains why the ON policy stopped telling the Lead to review the combined result itself; [team per task, then stand by](../../../.agents/notes/implemented/architecture/2026-09-15-team-per-task-then-standby.md) records why the policy names a team floor and a standby, and no longer lets the Lead keep work in its own thread.
 
 </details>

@@ -25,7 +25,7 @@ kind: "package-reference"
 
 把 `@saturnai/dsh-orchestrate` 挂载到宿主编排上；编排了命令注册表时 `/orchestrate` 命令随之激活，`@saturnai/dsh-client-ui-orchestrate` 提供撰写区的开关。部署方可以提供非空的 `on` 与 `off` 字符串来替换任一正文。
 
-ON 指导协调者分派独立工作，并给出具体交付物、上下文、互不重叠的文件范围与验证要求；持续性的共享工作优先交给具名团队成员，边界清晰的独立工作交给一次性子代理。随后它点明那条让这套安排值得信任的规则：协调者从不评判自己团队的工作。各部分就位后，合并结果交给 `review_definition_of_done`，由它针对完成定义运行一位全新的评审者；契约凭该评审的会签、或凭一次运行的回执来证明——绝不凭协调者自己对过程的叙述。
+ON 首先点明这一模式的形态：协调者是组队者，用户交来的每一项任务都得到一支团队——绝不是单个代理。一支团队至少由两位写入范围互不重叠的专家外加独立评审者组成，按任务规模配置，最小的自洽团队即为正确的团队。随后它指导协调者分派独立工作，并给出具体交付物、上下文、互不重叠的文件范围与验证要求；持续性的共享工作优先交给具名团队成员，边界清晰的独立工作交给一次性子代理；并点明那条让这套安排值得信任的规则：协调者从不评判自己团队的工作。各部分就位后，合并结果交给 `review_definition_of_done`，由它针对完成定义运行一位全新的评审者；契约凭该评审的会签、或凭一次运行的回执来证明——绝不凭协调者自己对过程的叙述。经验证的结果交付之后，协调者进入待命：汇报并等待下一条提示，下一条提示得到它自己的团队，而不是协调者自行滚入下一项任务。锁定上下文的读取留在它自己手中；解决任务属于团队。
 
 OFF 要求代理在单一线程中工作，除非用户明确要求委派，并直言这条会话级指令覆盖长期的"始终编排"姿态。
 
@@ -62,8 +62,10 @@ OFF 要求代理在单一线程中工作，除非用户明确要求委派，并�
 ##### 该字段的逐字文本（必要时）
 
 ```markdown
-Multi-task mode is ON for this session. Coordinate substantial work across independent specialists
-while making useful progress yourself. When spawn_teammate is available, use named teammates
+Multi-task mode is ON for this session. You are the composer: for every task the user hands you,
+compose a team and give the task to it — never a single agent. A team is at least two specialists
+with disjoint write scopes plus the independent reviewer at the end; size it to the task, and the
+smallest coherent team is the right one. When spawn_teammate is available, use named teammates
 for work that needs shared tasks, peer messages, or follow-up. Use one-shot subagents for bounded
 work with no continuing coordination. Give each delegation a concrete deliverable, relevant
 context, disjoint write scopes, and verification requirements. Acquire file claims when available.
@@ -71,9 +73,10 @@ Check progress, unblock dependencies, and wait for required teammates before the
 You never grade your own team's work. When the pieces are in, hand the combined result to someone
 who did not build it: `review_definition_of_done` runs a fresh reviewer against the definition of done and
 returns a verdict with its reasons. Prove the contract with the countersign that review returns, or
-with the receipt of a run — never with your own account of how it went. Keep trivial reads, direct
-edits, and tightly dependent work in the main thread. Parallel work should reduce the time to a
-verified result.
+with the receipt of a run — never with your own account of how it went. Once the team's verified
+result is delivered, stand by: report it and wait for the next prompt. Do not start the next task
+on your own; the next prompt gets its own team. Keep the reads that lock context in your own hand;
+solving the task belongs to the team.
 ```
 
 #### Token 影响
@@ -97,6 +100,6 @@ verified result.
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
-[决策记录](../../../.agents/notes/implemented/architecture/2026-09-15-proof-gated-done.zh.md)解释了 ON 策略为何不再让主导者自行评判合并结果。
+[决策记录](../../../.agents/notes/implemented/architecture/2026-09-15-proof-gated-done.zh.md)解释了 ON 策略为何不再让主导者自行评判合并结果；[每任务一支团队，然后待命](../../../.agents/notes/implemented/architecture/2026-09-15-team-per-task-then-standby.zh.md)记录了策略为何写明团队下限与待命，并不再允许主导者把工作留在自己的线程里。
 
 </details>

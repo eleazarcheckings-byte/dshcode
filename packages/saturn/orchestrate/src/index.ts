@@ -3,6 +3,11 @@
  * the composer's multi-task toggle, and the ONE deployment-owned lever the
  * toggle actually moves.
  *
+ * The ON policy states the shape of the mode: the Lead composes a team for
+ * every task — never a single agent — delivers the team's verified result, then
+ * stands by for the next prompt, which gets its own team. Guidance, not
+ * enforcement: the proof gate is what makes the result trustworthy.
+ *
  * The `orchestrate` projection folds the session log, so resume and fork restore
  * the state: `init` is **active**, matching the standing posture of this harness
  * (`~/.dsh/SATURN-HARNESS-ADDENDUM.md` — always orchestrate), and only an
@@ -52,8 +57,10 @@ export interface OrchestrateModeConfig {
 const REVIEW_TOOL = 'review_definition_of_done'
 
 const DEFAULT_ON = [
-  'Multi-task mode is ON for this session. Coordinate substantial work across independent specialists',
-  'while making useful progress yourself. When spawn_teammate is available, use named teammates',
+  'Multi-task mode is ON for this session. You are the composer: for every task the user hands you,',
+  'compose a team and give the task to it — never a single agent. A team is at least two specialists',
+  'with disjoint write scopes plus the independent reviewer at the end; size it to the task, and the',
+  'smallest coherent team is the right one. When spawn_teammate is available, use named teammates',
   'for work that needs shared tasks, peer messages, or follow-up. Use one-shot subagents for bounded',
   'work with no continuing coordination. Give each delegation a concrete deliverable, relevant',
   'context, disjoint write scopes, and verification requirements. Acquire file claims when available.',
@@ -61,9 +68,10 @@ const DEFAULT_ON = [
   'You never grade your own team\'s work. When the pieces are in, hand the combined result to someone',
   `who did not build it: \`${REVIEW_TOOL}\` runs a fresh reviewer against the definition of done and`,
   'returns a verdict with its reasons. Prove the contract with the countersign that review returns, or',
-  'with the receipt of a run — never with your own account of how it went. Keep trivial reads, direct',
-  'edits, and tightly dependent work in the main thread. Parallel work should reduce the time to a',
-  'verified result.',
+  'with the receipt of a run — never with your own account of how it went. Once the team\'s verified',
+  'result is delivered, stand by: report it and wait for the next prompt. Do not start the next task',
+  'on your own; the next prompt gets its own team. Keep the reads that lock context in your own hand;',
+  'solving the task belongs to the team.',
 ].join('\n')
 
 const DEFAULT_OFF = [
