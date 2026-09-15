@@ -81,7 +81,7 @@ describe('the agentless spend-approval fallback (ctx.userQuestions, no Agent any
       { gemini: { apiKey: 'sk-test', baseURL: mock.url } },
       (request) => {
         requestsAtAskTime = mock.requests.length
-        return approveAnswer(request.questions[0].id)
+        return approveAnswer(request.questions[0]?.id ?? '')
       },
     )
 
