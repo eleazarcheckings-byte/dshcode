@@ -75,6 +75,16 @@ description: Inspect the bundled Preview workspace and its deterministic Session
 Read the workspace files, inspect the tool gallery, open both subagent histories, and load the earlier conversation page.
 `
 
+const SEEDED_SETTINGS = `# Preview fixture settings: the showcase exercises a finished setup. The
+# versioned First Light seal and the welcome acknowledgement both read as
+# done, so the worker boots straight to the composer — onboarding UX has its
+# own dedicated web e2e lanes against the real host.
+ui-first-light:
+  complete: 2026-09-14.1
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
+`
+
 interface EventDraft {
   readonly type: string
   readonly data: unknown
@@ -435,6 +445,7 @@ export function buildVfsExampleFiles(): ReadonlyMap<string, string> {
     ['workspace/src/preview.ts', PREVIEW_SOURCE],
     ['workspace/data/tasks.json', TASKS],
     ['workspace/.agents/skills/preview-tour/SKILL.md', SKILL],
+    ['home/settings.yaml', SEEDED_SETTINGS],
     ['home/storages/session_projcache.json', projectionCache],
     [sessionPath(VFS_EXAMPLE_SESSION_IDS.main), renderLog(
       header(VFS_EXAMPLE_SESSION_IDS.main, CREATED_AT),
