@@ -39,7 +39,7 @@ function Message({ message, t }: { message: BotMessage; t: BotTranslate }) {
 }
 
 /** The primary management surface follows the selected specialist while subviews remain nearby. */
-export function Dashboard({ state, workspaces, actions, t }: DashboardProps) {
+export function Dashboard({ state, workspaces, actions, pickDirectory, t }: DashboardProps) {
   const [role, setRole] = useState<BotRole>('orchestrator')
   const [surface, setSurface] = useState<Surface>('conversation')
   const [search, setSearch] = useState('')
@@ -143,7 +143,7 @@ export function Dashboard({ state, workspaces, actions, t }: DashboardProps) {
         {surface === 'settings' && <div className={css.pageStack}>
           <StatusStrip snapshot={snapshot} t={t} onFix={goToWizardStep} />
           {wizardActive
-            ? <FirstRunWizard key={wizardStep ?? 'resume'} snapshot={snapshot} workspaces={workspaces} save={save} busy={busy !== null} t={t} initialStep={wizardStep} onExit={() => { setWizardOverride(false); setWizardStep(undefined) }} />
+            ? <FirstRunWizard key={wizardStep ?? 'resume'} snapshot={snapshot} workspaces={workspaces} save={save} busy={busy !== null} pickDirectory={pickDirectory} t={t} initialStep={wizardStep} onExit={() => { setWizardOverride(false); setWizardStep(undefined) }} />
             : <>
               <Configuration snapshot={snapshot} workspaces={workspaces} save={save} busy={busy !== null} t={t} />
               <button type="button" className={css.linkButton} onClick={() => { setWizardOverride(true); setWizardStep(undefined) }}>{t('wizard.restart')}</button>

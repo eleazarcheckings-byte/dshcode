@@ -7,7 +7,7 @@ import css from './Entry.module.css'
 
 /** Mount one dashboard in its own window, or a top-right launcher in the main harness. */
 export function SaturnBotEntry({
-  useBot, useWorkspaces, standalone, openWindow, t,
+  useBot, useWorkspaces, standalone, openWindow, pickDirectory, t,
   refresh, configure, runNow, pause, cancel, approve, message, loadMoreEvents, loadRecords,
 }: SaturnBotEntryProps) {
   const state = useBot(value => value)
@@ -53,7 +53,7 @@ export function SaturnBotEntry({
     } finally { setOpening(false) }
   }
   if (standalone) return <div ref={root} className={css.window} tabIndex={-1}>
-    <Dashboard state={state} workspaces={workspaces} actions={actions} t={t} />
+    <Dashboard state={state} workspaces={workspaces} actions={actions} pickDirectory={pickDirectory} t={t} />
   </div>
   return <div ref={root} className={css.launcherSeat}><button type="button" className={css.launcher} aria-label={t('launch.label')} disabled={opening} aria-busy={opening} onClick={() => { void launch() }}><SaturnLogo size={18} /><span>{t('brand')}</span><svg viewBox="0 0 16 16" width="12" height="12" fill="none" aria-hidden="true"><path d="M6 3H3v10h10v-3M8 3h5v5M7 9l6-6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg></button>{launchFailure !== null && <p className={css.blocked} role="alert">{t(launchFailure === 'blocked' ? 'launch.blocked' : 'launch.unavailable')}</p>}</div>
 }

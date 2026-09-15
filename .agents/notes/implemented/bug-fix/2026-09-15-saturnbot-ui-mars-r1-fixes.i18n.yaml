@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-saturnbot-ui-mars-r1-fixes.md
+2026-09-15-saturnbot-ui-mars-r1-fixes.md: 80ab7870b419cadc0b4923fbb0ee2ed0dd4b5e3f
+2026-09-15-saturnbot-ui-mars-r1-fixes.zh.md: df0ff5cd6ebfa822a333c8b10fc4a13a25fea2b2

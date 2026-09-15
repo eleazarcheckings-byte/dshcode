@@ -40,9 +40,17 @@ export interface SaturnBotFirstRun {
 /** One BotConfig.integrations field key the runtime's fixed integration record admits. */
 export type SaturnBotIntegrationFieldKey = 'endpoint' | 'credentialEnv' | 'resource'
 
-/** One field of a generated connect form (SPEC §3 C8a item 7 / §3 C8b). */
+/**
+ * One field of a generated connect form (SPEC §3 C8a item 7 / §3 C8b). `key` is a
+ * plain `string`, not narrowed to `SaturnBotIntegrationFieldKey`: SPEC §4's C8a
+ * contract puts no constraint on `fields[].key`, so a future catalog entry may name a
+ * key the runtime's fixed `BotConfig.integrations` record does not yet admit (e.g. a
+ * `telegram` entry's `chatId`). `ConnectForms.tsx` renders only the admitted keys as
+ * editable and shows every other key as an unsupported, disabled field rather than a
+ * live input whose edits `safeParseIntegrations` would silently discard.
+ */
 export interface SaturnBotIntegrationField {
-  readonly key: SaturnBotIntegrationFieldKey
+  readonly key: string
   readonly label: string
   /** Secret fields never carry an editable value; only the required env var name is shown. */
   readonly secret: boolean
@@ -99,6 +107,12 @@ export interface SaturnBotInjected extends SaturnBotActions {
   hooks: { bot: HostObservable<SaturnBotViewState> }
   standalone: boolean
   openWindow(): Promise<boolean>
+  /**
+   * Open the Host-native directory picker (`ctx.uiWorkspace.pickDirectory()`) for the
+   * wizard's workspace step. Resolves `null` on cancellation; rejects when no chooser
+   * is available (e.g. a browser-only build) — callers keep the manual path in that case.
+   */
+  pickDirectory(): Promise<string | null>
 }
 
 /** Complete slot-derived entry props. */
@@ -109,6 +123,8 @@ export interface DashboardProps extends PropsLocale<typeof NS> {
   state: SaturnBotViewState
   workspaces: readonly WorkspaceView[]
   actions: SaturnBotActions
+  /** Threaded to the first-run wizard's workspace step; see `SaturnBotInjected.pickDirectory`. */
+  pickDirectory: () => Promise<string | null>
 }
 
 /** Stable dashboard navigation destinations. */

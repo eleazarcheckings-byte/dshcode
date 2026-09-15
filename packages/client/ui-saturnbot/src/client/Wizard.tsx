@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { BotConfig } from '@saturnai/dsh-saturnbot/client'
 import type { SaturnBotSnapshot } from './contracts.ts'
-import { IntegrationConnectForms, safeParseIntegrations } from './ConnectForms.tsx'
+import { IntegrationConnectForms, parseIntegrationsResult } from './ConnectForms.tsx'
 import { PanelHeading, type BotTranslate } from './ui.tsx'
 import css from './Dashboard.module.css'
 
@@ -35,11 +35,13 @@ export function resumeWizardStep(snapshot: SaturnBotSnapshot): SaturnBotWizardSt
  * C8b). Each step's Continue persists just that step so closing mid-setup keeps
  * progress; Skip and Back never lose an unsaved draft.
  */
-export function FirstRunWizard({ snapshot, workspaces, save, busy, t, onExit, initialStep }: {
+export function FirstRunWizard({ snapshot, workspaces, save, busy, pickDirectory, t, onExit, initialStep }: {
   snapshot: SaturnBotSnapshot
   workspaces: readonly WorkspaceView[]
   save: (patch: Partial<BotConfig>) => Promise<void>
   busy: boolean
+  /** Opens the Host-native directory picker for the workspace step's Browse button. */
+  pickDirectory: () => Promise<string | null>
   t: BotTranslate
   onExit: () => void
   initialStep?: SaturnBotWizardStep | undefined
@@ -53,10 +55,18 @@ export function FirstRunWizard({ snapshot, workspaces, save, busy, t, onExit, in
   const [scheduleEnabled, setScheduleEnabled] = useState(snapshot.config.enabled)
   const [intervalMinutes, setIntervalMinutes] = useState(snapshot.config.intervalMinutes)
   const [error, setError] = useState<string | null>(null)
+  const [browsing, setBrowsing] = useState(false)
 
   const index = STEPS.indexOf(step)
-  const parsedIntegrations = safeParseIntegrations(integrations)
+  const integrationsResult = parseIntegrationsResult(integrations)
+  const parsedIntegrations = integrationsResult.ok ? integrationsResult.value : {}
   const catalog = snapshot.integrationCatalog ?? []
+  const browse = (): void => {
+    setBrowsing(true)
+    void pickDirectory().then((picked) => { if (picked !== null) setWorkspace(picked) }).catch(() => {
+      /* No native chooser is available (e.g. a browser-only build); the manual path stays editable. */
+    }).finally(() => { setBrowsing(false) })
+  }
   const ready: Record<SaturnBotWizardStep, boolean> = {
     goal: goal.trim() !== '',
     workspace: workspace.trim() !== '',
@@ -101,7 +111,7 @@ export function FirstRunWizard({ snapshot, workspaces, save, busy, t, onExit, in
     </section>}
     {step === 'workspace' && <section className={css.panel}><PanelHeading title={t('wizard.step.workspace')} /><p className={css.muted}>{t('wizard.step.workspace.detail')}</p>
       <label className={css.field}>{t('settings.workspace')}<select value={workspaces.some(candidate => candidate.path === workspace) ? workspace : ''} onChange={(event) => { setWorkspace(event.target.value) }}><option value="">{t('settings.chooseWorkspace')}</option>{workspaces.map(candidate => <option key={candidate.workspaceId} value={candidate.path}>{candidate.title}</option>)}</select></label>
-      <label className={css.field}>{t('settings.workspacePath')}<input value={workspace} onChange={(event) => { setWorkspace(event.target.value) }} /></label>
+      <label className={css.field}>{t('settings.workspacePath')}<div className={css.fieldRow}><input value={workspace} onChange={(event) => { setWorkspace(event.target.value) }} /><button type="button" className={css.button} disabled={browsing} aria-label={t('settings.workspaceBrowseLabel')} onClick={browse}>{t('settings.workspaceBrowse')}</button></div></label>
     </section>}
     {step === 'model' && <section className={css.panel}><PanelHeading title={t('wizard.step.model')} /><p className={css.muted}>{t('wizard.step.model.detail')}</p>
       <div className={css.formGrid}>
@@ -112,11 +122,13 @@ export function FirstRunWizard({ snapshot, workspaces, save, busy, t, onExit, in
     </section>}
     {step === 'connections' && <section className={css.pageStack}>
       <div><PanelHeading title={t('wizard.step.connections')} /><p className={css.muted}>{t('wizard.step.connections.detail')}</p></div>
+      {!integrationsResult.ok && <p className={css.error} role="alert">{t('connect.fixJsonFirst')}</p>}
       <IntegrationConnectForms
         catalog={catalog}
         values={parsedIntegrations}
         onChange={(next) => { setIntegrations(JSON.stringify(next, null, 2)) }}
         envPath={snapshot.firstRun?.envPath}
+        disabled={!integrationsResult.ok}
         t={t}
       />
     </section>}

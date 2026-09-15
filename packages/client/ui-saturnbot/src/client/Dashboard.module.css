@@ -150,6 +150,9 @@
 .field input, .field textarea, .field select { box-sizing: border-box; width: 100%; min-height: 38px; padding: 10px 12px; border: 1px solid var(--saturn-stroke-strong); border-radius: 8px; background: var(--saturn-void); color: var(--saturn-ink); line-height: 18px; }
 .field textarea { resize: vertical; }
 .field small { color: var(--saturn-muted); font-size: 10px; line-height: 17px; }
+.fieldRow { display: flex; align-items: center; gap: 10px; }
+.fieldRow input { flex: 1; min-width: 0; }
+.fieldRow button { flex: none; }
 .formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .check { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0; font-size: 11px; line-height: 19px; }
 .check input, .toolChoice input { accent-color: var(--saturn-accent, var(--saturn-ink)); margin-top: 3px; }

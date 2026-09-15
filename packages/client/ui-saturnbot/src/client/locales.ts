@@ -261,6 +261,10 @@ export const en = {
   'connect.envHint': 'Set {env} in {path}, then restart SaturnBot. Never paste the value itself here.',
   'connect.envPathFallback': 'the SaturnBot data directory .env file',
   'connect.advancedJson': 'Advanced JSON',
+  'connect.fieldUnsupported': 'Not yet supported by the runtime configuration.',
+  'connect.fixJsonFirst': 'Fix the Advanced JSON above before editing these fields.',
+  'settings.workspaceBrowse': 'Browse…',
+  'settings.workspaceBrowseLabel': 'Choose a workspace folder',
 } as const
 
 /** Locale-owned product key union. */
@@ -310,4 +314,6 @@ export const zh: Record<SaturnBotKey, string> = {
   'wizard.missingHeading': 'SaturnBot 运行前需要', 'wizard.readyHeading': '设置已完成', 'wizard.ready': '所有必填项均已设置。SaturnBot 现在即可运行，或按计划运行。',
   'wizard.gap.workspace': '选择工作区', 'wizard.gap.goal': '描述运营目标', 'wizard.gap.model': '选择提供方和模型', 'wizard.gap.credential': '{name} 需要先设置 {env} 才能运行',
   'connect.empty': '目前没有可配置的集成。', 'connect.docs': '设置文档', 'connect.copyEnv': '复制变量名', 'connect.envHint': '在 {path} 中设置 {env}，然后重启 SaturnBot。切勿在此处粘贴实际值。', 'connect.envPathFallback': 'SaturnBot 数据目录下的 .env 文件', 'connect.advancedJson': '高级 JSON',
+  'connect.fieldUnsupported': '当前运行时配置尚不支持此字段。', 'connect.fixJsonFirst': '请先修复上方的高级 JSON，然后再编辑这些字段。',
+  'settings.workspaceBrowse': '浏览…', 'settings.workspaceBrowseLabel': '选择工作区文件夹',
 }

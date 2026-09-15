@@ -4,7 +4,7 @@ import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/cl
 import type { BotConfig, BotRole, BotSnapshot } from '@saturnai/dsh-saturnbot/client'
 import type { SaturnBotSnapshot } from './contracts.ts'
 import { Avatar } from './Avatar.tsx'
-import { IntegrationConnectForms, safeParseIntegrations } from './ConnectForms.tsx'
+import { IntegrationConnectForms, parseIntegrationsResult } from './ConnectForms.tsx'
 import { PanelHeading, Status, type BotTranslate } from './ui.tsx'
 import css from './Dashboard.module.css'
 
@@ -42,6 +42,7 @@ export function Configuration({ snapshot, workspaces, save, busy, t }: {
   const [integrations, setIntegrations] = useState(() => JSON.stringify(snapshot.config.integrations, null, 2))
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const integrationsResult = parseIntegrationsResult(integrations)
   const update = <K extends keyof BotConfig>(key: K, value: BotConfig[K]): void => {
     setDraft(current => ({ ...current, [key]: value })); setSaved(false)
   }
@@ -70,11 +71,13 @@ export function Configuration({ snapshot, workspaces, save, busy, t }: {
       {([['requireWriteApproval', 'settings.writeApproval'], ['requirePrApproval', 'settings.prApproval'], ['requireDeployApproval', 'settings.deployApproval'], ['autoDispatchEmail', 'settings.emailDispatch']] as const).map(([key, label]) => <label key={key} className={css.check}><input type="checkbox" checked={draft[key]} onChange={(event) => { update(key, event.target.checked) }} />{t(label)}</label>)}
     </section>
     <section className={css.panel}><PanelHeading title={t('nav.connections')} /><p className={css.muted}>{t('wizard.step.connections.detail')}</p>
+      {!integrationsResult.ok && <p className={css.error} role="alert">{t('connect.fixJsonFirst')}</p>}
       <IntegrationConnectForms
         catalog={snapshot.integrationCatalog ?? []}
-        values={safeParseIntegrations(integrations)}
+        values={integrationsResult.ok ? integrationsResult.value : {}}
         onChange={(next) => { setIntegrations(JSON.stringify(next, null, 2)); setSaved(false) }}
         envPath={snapshot.firstRun?.envPath}
+        disabled={!integrationsResult.ok}
         t={t}
       />
       <details className={css.disclosure}><summary>{t('connect.advancedJson')}</summary>
