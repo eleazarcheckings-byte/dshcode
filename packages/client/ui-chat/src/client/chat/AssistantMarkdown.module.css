@@ -49,7 +49,7 @@
   margin-bottom: -16px;
 }
 
-/* Interrupted-turn terminal marker: quiet inline tag, no animation. Fixed
+/* Halted-turn terminal marker: quiet inline tag, no animation. Fixed
    size like the small/code token variants — 11px is dense secondary text
    that would fall to an illegible 9px at the 12px floor. */
 .stopped {

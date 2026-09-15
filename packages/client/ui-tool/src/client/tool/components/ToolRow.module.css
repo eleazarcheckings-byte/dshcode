@@ -178,6 +178,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .duration {
+    animation: none;
+  }
+}
+
 /* Error row's collapsed summary: the failure's first line in the error color. */
 .errorSummary {
   color: var(--dsw-alias-state-error-primary);
@@ -320,6 +326,19 @@
 .searchBody,
 .webBody {
   margin: 4px 0 4px 4px;
+}
+
+/* The assistant prose measure (MarkdownText.module.css, 2026-09-15
+   transcript-polish) falls back to 70ch wherever `--dsh-chat-prose-measure`
+   is unset — which is everywhere outside ConversationRoot, including this
+   card: WebBlock's search-answer markdown (`WebBlock.tsx:156`) renders
+   through this exact wrapper class. A set custom property (even `none`)
+   short-circuits the var() fallback, so declaring it here — rather than
+   widening the pinned MarkdownText rule itself — keeps the tool card's
+   answer text at the card's own width instead of clipping to the transcript
+   measure (Mars fix-round, 2026-09-15). */
+.webBody {
+  --dsh-chat-prose-measure: none;
 }
 
 /* The recovery footer for a capped search: the result text (its `Full … stored

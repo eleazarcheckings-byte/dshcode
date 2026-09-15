@@ -38,6 +38,14 @@
   margin: 0;
 }
 
+/* Same reset as ToolRow.module.css's `.webBody`: the Details panel renders
+   the same WebBlock (`ToolDetails.tsx:57`), so its search-answer markdown
+   needs the same exemption from the assistant prose measure (Mars
+   fix-round, 2026-09-15). */
+.web {
+  --dsh-chat-prose-measure: none;
+}
+
 .empty {
   padding: 8px 0;
   font-size: 13px;
