@@ -912,6 +912,9 @@ importers:
       '@saturnai/dsh-design-brain':
         specifier: workspace:^
         version: link:../../packages/saturn/design-brain
+      '@saturnai/dsh-done':
+        specifier: workspace:^
+        version: link:../../packages/saturn/done
     devDependencies:
       electron:
         specifier: 43.4.0
