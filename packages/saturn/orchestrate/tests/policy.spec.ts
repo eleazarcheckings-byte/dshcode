@@ -57,3 +57,40 @@ describe('the multi-task policy', () => {
     expect(off).toContain('single straight thread')
   })
 })
+
+// izzy's law (2026-09-15): multi-task designates a team per task, then stands
+// by. The composer composes teams of agents — never one — and the next prompt
+// gets its own team. A policy that lets the Lead solve the task itself, or roll
+// straight into the next task, is a solo thread wearing the toggle's name.
+describe('team per task, then stand by', () => {
+  it('composes a team for every task, never a single agent', () => {
+    const { on } = resolveConfig()
+    expect(on).toMatch(/composes? a team/iu)
+    expect(on).toMatch(/never a single (?:agent|hand|specialist)/iu)
+    // The floor that makes "team" mean something: two builders plus the reviewer.
+    expect(on).toMatch(/at least two/iu)
+    // The line that let the Lead keep the work for itself.
+    expect(on).not.toContain('in the main thread')
+  })
+
+  it('stands by for the next prompt once the team\'s result is delivered', () => {
+    const { on } = resolveConfig()
+    expect(on).toMatch(/stands? by/iu)
+    expect(on).toMatch(/next prompt/iu)
+    expect(on).toMatch(/do not start the next task/iu)
+  })
+
+  it('carries the standby rule through the assembled prompt', async () => {
+    const { ctx, agent } = await setup()
+    const assembly = await ctx.systemPrompt.assemble({ agent })
+    const section = assembly.sections.find(entry => entry.name === ORCHESTRATE_SECTION)
+    expect(section?.text).toMatch(/stands? by/iu)
+    expect(section?.text).toMatch(/composes? a team/iu)
+  })
+
+  it('keeps the straight-thread override free of team composition', () => {
+    const { off } = resolveConfig()
+    expect(off).not.toMatch(/composes? a team/iu)
+    expect(off).not.toMatch(/stands? by/iu)
+  })
+})
