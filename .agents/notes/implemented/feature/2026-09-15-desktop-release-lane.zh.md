@@ -1,4 +1,4 @@
-# Agent Note：桌面发布通道，未签名、由标签触发
+# Agent Note：只保留一条桌面发布通道，重复的一条已下线
 
 Status: implemented
 
@@ -6,56 +6,57 @@ Status: implemented
 
 ## 问题
 
-`apps/desktop` 已经配置好了 electron-builder（`electron-builder.yml`），每个目标平台也都有对应的
-`dist:mac:*` / `dist:win:x64` 脚本。`.github/workflows/desktop.yml` 已经把 `desktop-v*` 标签和
-一整套冒烟测试关联到了 GitHub release，但那是唯一的这类通道，也没有任何文档说明代码签名要花多少钱、
-什么时候该启用。这次改动新增了第二条更轻量的发布通道（带校验和的产物、不含冒烟测试、使用独立的标签
-命名空间）以及缺失的成本/签名文档——不是因为此前完全没有机制把标签接到 release，而是因为修复轮的
-复查（Mars，2026-09-15）发现：如果和 `desktop.yml` 共用 `desktop-v*` 标签，两个 workflow 会在同一次
-推送上同时触发，并互相争抢同一个 `gh release create`，所以这条通道需要有自己的触发条件才能与
-现有通道共存。
+此前某个修复轮构建单元新增了 `.github/workflows/desktop-release.yml`，作为第二条
+由标签触发的发布 workflow，理由是认为复用 `.github/workflows/desktop.yml` 的
+`desktop-v*` 标签会导致两个 workflow 在同一次推送上同时触发，并互相争抢同一个
+`gh release create`。但 `desktop.yml` 本身已经在 `desktop-v*` 标签上完整构建了
+macOS（`macos-15` arm64、`macos-15-intel` x64）和 Windows（`windows-2025` x64）、
+运行了 Windows 目录选择器和 Electron 打包启动的冒烟测试、生成了 `SHA256SUMS.txt`
+并创建了 GitHub release——这正是第二条通道在不同标签命名空间
+（`desktop-release-v*`）下重复的同一份工作，而且覆盖面严格更少（没有冒烟测试）。
+应该存在且被记录的是一条发布通道，而不是两条做同一件事的通道。
 
 ## 决定
 
-新增 `.github/workflows/desktop-release.yml`：在推送 `desktop-release-v*` 标签时（与
-`desktop.yml` 的 `desktop-v*` 使用不同的命名空间，因此两个 workflow 不会在同一个标签上同时触发），
-一个三路矩阵（`macos-15` arm64、`macos-15-intel` x64、`windows-latest`）依次执行
-`pnpm/action-setup@v4`（读取根目录 `packageManager: pnpm@11.7.0` 的锁定版本，采用与
-`desktop.yml` 相同、已验证可行的方式，而不是裸的 `corepack enable`）、`pnpm install
---frozen-lockfile`、`pnpm run build`，再运行对应的 `pnpm --filter @dshcode/desktop run dist:*`
-脚本，把生成的 `.dmg`/`.zip`/`.exe` 上传为 workflow artifact；后续任务下载全部三份产物，生成
-`SHA256SUMS.txt`，再通过 `gh release create` 把它们一并附加到 GitHub release。在 workflow 级别
-设置了 `CSC_IDENTITY_AUTO_DISCOVERY=false`，避免任何 runner 上偶然存在的钥匙串状态产生签名不一致
-的构建；发布本身按设计是未签名的。`apps/desktop/RELEASE.md` 记录了确切的命令（推送到 `fork`
-远程，即 `eleazarcheckings-byte/dshcode`——而不是第三方远程 `origin`）、未签名构建的用户体验
-（Gatekeeper 与 SmartScreen 的警告）、为什么标签要和 `desktop.yml` 分开命名，以及下一步需要的
-Apple 开发者计划会员（约每年 99 美元）和 Windows 代码签名证书（约每年 70–400 美元）各自的
-花费——两者都标记为需要把关的支出（Gate），而不是这条发布通道自行开通的东西。仓库根目录下的
-`scripts/build-mac.sh`（比 `dshcode/` 高一级）在真实 Mac 上手动本地构建时复现了相同的步骤。
+下线重复的一条：`git rm .github/workflows/desktop-release.yml`。保留
+`desktop.yml` 作为唯一的发布路径——除了标签前缀不同之外，第二条通道并没有添加
+任何 `desktop.yml` 缺失的东西。重写 `apps/desktop/RELEASE.md`，直接围绕
+`desktop.yml` 编写文档：它精确的 runner 标签（`macos-15`、`macos-15-intel`、
+`windows-2025`）、`package`/`release` 两个 job 的划分、`desktop-v*` 标签触发条件、
+各类产物分别落在何处（workflow artifact 还是 GitHub Release）、未签名构建的用户
+体验（Gatekeeper/SmartScreen 警告）、Apple 开发者（每年 99 美元）和 Windows 代码
+签名（每年 70–400 美元）作为 Eleazar 需要把关的支出（Gate），以及日后要把哪些
+secret（`CSC_LINK`、`CSC_KEY_PASSWORD`、notarytool 凭证）接入 `desktop.yml`，
+还有本地 Mac 构建的交接方式 `scripts/build-mac.sh`（比 `dshcode/` 高一级）——
+该脚本未做改动，因为其构建命令已经和 `desktop.yml` 一致（`pnpm install
+--frozen-lockfile`、`pnpm run build`、`pnpm --filter @dshcode/desktop run
+dist:mac:$arch`），只更新了脚本头部注释，使其不再指向已删除的 workflow。
 
-在假设 CI 分钟数免费之前先核实了仓库可见性：`gh repo view eleazarcheckings-byte/dshcode`
-（`fork` 远程）返回 `visibility: PUBLIC`，因此该远程上这些 runner 分钟数不产生任何费用。
+在重申"CI 分钟数免费"这一结论之前，重新核实了仓库可见性：
+`gh repo view eleazarcheckings-byte/dshcode`（`fork` 远程）返回
+`visibility: PUBLIC`。
 
 ## 考虑过的替代方案
 
-**复用 `desktop.yml` 的 `desktop-v*` 标签。** 在修复轮复查证实了冲突之后被否决：两个 workflow
-会在同一次推送上同时触发，都对同一个标签执行 `gh release create`，后完成的那个会直接失败
-（或者 release 的标题/说明变成一场竞争）。使用独立的 `desktop-release-v*` 前缀就能彻底消除这个
-冲突，且不需要改动超出本次改动范围的 `desktop.yml`。
+**保留两条通道，之后再协调。** 已否决：此前的记录已经把这标记为待解决的问题，
+并写入了 `integration_needs`；但仔细检查后发现根本没有需要协调的地方——第二条
+通道没有增加任何 `desktop.yml` 缺失的覆盖，保留它纯粹是重复劳动和文档蔓延
+（两份 README、两个标签前缀、构建矩阵一变要改两处）。
 
-**直接下线或合并进 `desktop.yml`。** 未在此处完成：`desktop.yml` 是本构建单元文件范围之外、
-且仓库中其他并行工作也在涉及的既有 workflow。协调这两条通道（下线其中一个，或把目录选择器/
-启动冒烟测试移植到另一个）属于维护者层面的决策，已经记录在 `RELEASE.md` 的"待解决问题"部分
-和本次会话的 `integration_needs` 中，而非在此处擅自解决。
+**把 `desktop-release.yml` 的校验和步骤移植进 `desktop.yml`，其余部分丢弃。**
+没有必要：`desktop.yml` 的 `release` job 在调用 `gh release create` 之前已经
+执行了 `sha256sum * > SHA256SUMS.txt`——这个替代方案想"新增"的校验和步骤本来
+就已经存在。
 
-**现在就签名并公证。** 未采纳：目前没有配置 Apple 开发者账号或代码签名证书，而配置这些属于
-需要把关的支出（Gate）——无论技术上是否就绪，都超出本单元的范围。
+**现在就签名并公证。** 和此前一样被否决：目前没有配置 Apple 开发者账号或代码
+签名证书，配置任何一个都属于需要把关的支出（Gate）——无论技术上是否就绪，都
+超出本单元的范围。
 
 ## 后果
 
-维护者只需推送一个 `desktop-release-v*` 标签，就能发起一次带校验和的桌面发布；产物和
-`SHA256SUMS.txt` 会自动作为 GitHub release 落地，在公开的 `fork` 远程上不产生任何基础设施成本，
-也不会干扰既有的 `desktop.yml` 通道及其冒烟测试。任何打开该 release 的人都会看到未签名的构建，
-并且根据 RELEASE.md 会知道 Gatekeeper/SmartScreen 的警告是预期行为。两条发布通道
-（`desktop.yml` 与 `desktop-release.yml`）在用途上仍有重叠，尚未协调——RELEASE.md 的
-"待解决问题"部分会持续跟踪，直到有维护者下线或合并其中一个。
+`desktop.yml` 这一个 workflow 就是完整的桌面发布路径：向公开的 `fork` 远程
+（`eleazarcheckings-byte/dshcode`）推送一个 `desktop-v*` 标签，它就会构建、
+冒烟测试、生成校验和并发布 GitHub release，且不产生任何基础设施成本。
+`RELEASE.md` 完全按照 workflow 文件中实际写的内容记录了这条路径，外加本地
+Mac 构建的交接方式，以及启用代码签名将来需要的花费和配置。已经没有第二条
+通道需要协调了。

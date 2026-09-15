@@ -1,4 +1,4 @@
-# Agent Note: Desktop release lane builds unsigned, tag-triggered
+# Agent Note: One desktop release lane, duplicate retired
 
 Status: implemented
 
@@ -6,75 +6,67 @@ English | [中文](2026-09-15-desktop-release-lane.zh.md)
 
 ## Problem
 
-`apps/desktop` has electron-builder configured (`electron-builder.yml`) and a
-`dist:mac:*` / `dist:win:x64` script per target. `.github/workflows/desktop.yml`
-already wires a `desktop-v*` tag to a GitHub release with a full smoke-test
-suite, but it is the only such lane and there was no written guidance on
-what code-signing costs or when to turn it on. This change adds a second,
-leaner release lane (checksummed artifacts, no smoke tests, its own tag
-namespace) and the missing cost/signing documentation — not because nothing
-wired a tag to a release before, but because the fix-round review (Mars,
-2026-09-15) found that sharing `desktop.yml`'s `desktop-v*` tag would make
-both workflows fire on the same push and race each other's `gh release
-create`, so this lane needed its own trigger to coexist safely.
+A fix-round build cell had added `.github/workflows/desktop-release.yml`, a
+second tag-triggered release workflow, on the belief that reusing
+`.github/workflows/desktop.yml`'s `desktop-v*` tag would make both
+workflows fire on the same push and race each other's `gh release create`.
+But `desktop.yml` already builds macOS (`macos-15` arm64, `macos-15-intel`
+x64) and Windows (`windows-2025` x64), runs the Windows directory-picker and
+Electron packaged-startup smoke tests, generates `SHA256SUMS.txt`, and
+creates the GitHub release on a `desktop-v*` tag — the exact same job the
+second lane duplicated under a different tag namespace (`desktop-release-v*`)
+with strictly less coverage (no smoke tests). One release lane must exist
+and be documented, not two doing the same thing.
 
 ## Decision
 
-Add `.github/workflows/desktop-release.yml`: on push of a
-`desktop-release-v*` tag (a namespace distinct from `desktop.yml`'s
-`desktop-v*`, so the two workflows never both fire on one tag), a three-way
-matrix (`macos-15` arm64, `macos-15-intel` x64, `windows-latest`) runs
-`pnpm/action-setup@v4` (reading the root `packageManager: pnpm@11.7.0` pin,
-matching `desktop.yml`'s proven setup rather than a bare `corepack enable`),
-`pnpm install --frozen-lockfile`, `pnpm run build`, then the matching
-`pnpm --filter @dshcode/desktop run dist:*` script, uploads the resulting
-`.dmg`/`.zip`/`.exe` as workflow artifacts, and a follow-up job downloads all
-three, generates `SHA256SUMS.txt`, and attaches everything to a GitHub
-release via `gh release create`. `CSC_IDENTITY_AUTO_DISCOVERY=false` is set
-at the workflow level so no runner's incidental keychain state can produce a
-differently-signed build; the release is unsigned by design.
-`apps/desktop/RELEASE.md` documents the exact commands (pushing to the
-`fork` remote, `eleazarcheckings-byte/dshcode` — not `origin`, a third-party
-remote), the unsigned-build user experience (Gatekeeper and SmartScreen
-warnings), why the tag is namespaced apart from `desktop.yml`, and what
-Apple Developer Program membership (~US$99/yr) and a Windows code-signing
-certificate (~US$70-400/yr) cost when that becomes the next step — both
-flagged as spend Gates, not something this lane enables on its own.
-`scripts/build-mac.sh` (repo root, one level above `dshcode/`) mirrors the
-same steps for a manual local build on an actual Mac.
+Retire the duplicate: `git rm .github/workflows/desktop-release.yml`. Keep
+`desktop.yml` as the single release path — it was never missing anything
+the second lane added except a different tag prefix. Rewrite
+`apps/desktop/RELEASE.md` to document `desktop.yml` directly: its exact
+runner labels (`macos-15`, `macos-15-intel`, `windows-2025`), its
+`package`/`release` job split, the `desktop-v*` tag trigger, where each
+artifact type lands (workflow artifacts vs. the GitHub Release), the
+unsigned-build user experience (Gatekeeper/SmartScreen warnings), the
+Apple Developer ($99/yr) and Windows code-signing ($70-400/yr) costs as
+Eleazar's spend Gates with exactly what secrets (`CSC_LINK`,
+`CSC_KEY_PASSWORD`, notarytool credentials) would need to be wired into
+`desktop.yml` later, and the local Mac handoff via
+`scripts/build-mac.sh` (repo root, one level above `dshcode/`) — left
+untouched since its build commands already match `desktop.yml`'s
+(`pnpm install --frozen-lockfile`, `pnpm run build`,
+`pnpm --filter @dshcode/desktop run dist:mac:$arch`), only its header
+comment updated to stop naming the now-deleted workflow.
 
-Repo visibility was checked before assuming free CI minutes:
+Repo visibility was reconfirmed before restating the free-CI-minutes claim:
 `gh repo view eleazarcheckings-byte/dshcode` (the `fork` remote) reports
-`visibility: PUBLIC`, so these runner-minutes cost nothing on that remote.
+`visibility: PUBLIC`.
 
 ## Alternatives considered
 
-**Reuse `desktop.yml`'s `desktop-v*` tag.** Rejected after the fix-round
-review demonstrated the collision: both workflows would trigger on the same
-push, both run `gh release create` against the same tag, and the second to
-finish fails outright (or the release title/notes become a race). A distinct
-`desktop-release-v*` prefix removes the collision entirely without touching
-`desktop.yml`, which sits outside this change's scope.
+**Keep both lanes, reconcile later.** Rejected: the prior note already
+flagged this as an unresolved open question and logged it in
+`integration_needs`; on inspection there was nothing to reconcile — the
+second lane added no coverage `desktop.yml` lacked, so keeping it was pure
+duplication and doc-sprawl (two READMEs, two tag prefixes, two places to
+update if the build matrix changes).
 
-**Retire or merge into `desktop.yml` directly.** Not done here: `desktop.yml`
-is a pre-existing workflow outside this build cell's file scope, shared with
-other concurrent work on the repo. Reconciling the two lanes (retiring one,
-or porting its directory-picker/startup smoke tests into the other) is a
-maintainer decision, documented as an open question in `RELEASE.md` and in
-this session's `integration_needs`, not resolved unilaterally here.
+**Port `desktop-release.yml`'s checksum step into `desktop.yml`, drop the
+rest.** Unnecessary: `desktop.yml`'s `release` job already runs
+`sha256sum * > SHA256SUMS.txt` before calling `gh release create` — the
+checksum step this alternative would "add" already exists.
 
-**Sign and notarize now.** Rejected: no Apple Developer or code-signing
-certificate is provisioned, and provisioning one is a Gate (real money) —
-out of scope for this cell regardless of technical readiness.
+**Sign and notarize now.** Rejected, as before: no Apple Developer account
+or code-signing certificate is provisioned, and provisioning either is a
+Gate (real money) — out of scope for this cell regardless of technical
+readiness.
 
 ## Consequences
 
-A maintainer can cut a checksummed desktop release by pushing one
-`desktop-release-v*` tag; the artifacts and `SHA256SUMS.txt` land as a GitHub
-release automatically, at zero infrastructure cost on the public `fork`
-remote, without disturbing the pre-existing `desktop.yml` lane or its smoke
-tests. Anyone who opens the release sees an unsigned build and, per
-RELEASE.md, knows the Gatekeeper/SmartScreen warning is expected. The two
-release lanes (`desktop.yml` and `desktop-release.yml`) still overlap in
-purpose and are not yet reconciled — RELEASE.md's "Open question" section
-tracks that until a maintainer retires or merges one into the other.
+One workflow, `desktop.yml`, is the entire desktop release path: push a
+`desktop-v*` tag to the public `fork` remote
+(`eleazarcheckings-byte/dshcode`) and it builds, smoke-tests, checksums, and
+publishes the GitHub release at zero infrastructure cost. `RELEASE.md`
+documents that path exactly as written in the workflow file, plus the local
+Mac build handoff and what turning on code signing will cost and require.
+There is no second lane left to reconcile.
