@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-15-saturn-type-system-and-signature-ring.md
-2026-09-15-saturn-type-system-and-signature-ring.md: 00bc5235b5aa557185c823453039c2465b256d60
-2026-09-15-saturn-type-system-and-signature-ring.zh.md: b5344a6e3146dff749b974d9af2621551ffc03d1
+2026-09-15-saturn-type-system-and-signature-ring.md: 3ec1fe918708010b7421682a794aa97281f6b59a
+2026-09-15-saturn-type-system-and-signature-ring.zh.md: 4efec6e4cc668dbbbfcb6e0fcd4c3704daff05eb

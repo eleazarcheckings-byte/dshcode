@@ -40,8 +40,6 @@ Instrument Sans -> Arial：`size-adjust: 98.35%`，`ascent-override: 97%`，`des
 
 **在 Instrument Sans 的 `src` 上添加 `format('woff2-variations')` 格式提示。** 核查当前 Chromium/Electron 支持后已放弃：普通的 `format('woff2')` 提示已经足够——variable 字体能力是从文件自身的 `fvar` 表读取的，而非格式字符串——因此额外的提示只增加复杂度而没有带来兼容性收益。
 
-**请 C2（transcript-polish）或编排者把 `wdth`／字间距那两行改动加进 `HeroShell.module.css`。** 未做静默处理——而是记录为一条明确的 `integration_needs` 条目，因为该文件不在本 cell 的范围内（SPEC §3 C3 仅列出 `ui-skin-saturn`、`apps/web/public/fonts`、`apps/web/index.html` 与 `ui-sidebar/**/*.module.css`），而"不越界写入"这条硬性规则是无条件的。
-
 ## Consequences
 
 `document.fonts.check('16px "Instrument Sans"')` 在已发布的应用中解析为 true（自托管，没有任何网络字体请求——由 `typeface-tokens.client.spec.ts` 直接断言：只要任何 `@font-face` 引用了 `fonts.googleapis.com`／`fonts.gstatic.com` 或裸的 `http(s)://` URL，测试套件就会失败）。现在不只是 hero，每一个既有界面都以 Saturn 字体系统渲染，因为这次覆盖发生在整棵组件树本就消费的那两个变量上。侧边栏的当前行现在通过与 PASS 裁决印章、favicon 相同的标记而在视觉上可辨识为"这就是那个打开的会话"，把品牌唯一具名机制的覆盖范围，从 2026-09-15 UX 审计发现的那两个界面向外延伸。
@@ -56,3 +54,7 @@ Instrument Sans -> Arial：`size-adjust: 98.35%`，`ascent-override: 97%`，`des
 - `node_modules/.bin/vitest run packages/client/ui-skin-saturn packages/client/ui-sidebar`：10 个测试文件、48 个测试全部通过（在这台并发压力很大的共享机器上出现过一次瞬时 worker 进程崩溃，立即重跑后干净通过）。
 - `node_modules/.bin/tsc -p packages/client/ui-skin-saturn/tsconfig.json --noEmit` 及对 `ui-sidebar` 的同一命令：均无报错。
 - `npx tsx scripts/run-gates.ts doc-quick`：`ui-skin-saturn` 的 README 现已通过本 cell 范围内文件所能满足的每一项检查；唯一仍然失败的一项（"must contain one or more complete model-context entries"）需要在 `scripts/verify-package-readme-model-experience.ts`——一个跨 cell 共享的仓库级门禁脚本，不在本 cell 写入范围内——中新增一条 `SENTENCE_MODEL_EXPERIENCE` 白名单条目；已在 `integration_needs` 中记录确切的修复方式，且 README 自身的那句话已按所需模式措辞（`None, as this package only changes browser presentation.`），一旦该白名单条目落地即无需再改动 README。
+
+## Round 3 addendum — hero headline 的 `wdth` 改动已经落地，而非仍是缺口
+
+本笔记此前的"Alternatives considered"一节曾把 `HeroShell.module.css` 那两行改动记为一条未选之路，仅记录为一条 `integration_needs` 条目，理由是该文件不在本 cell 的范围内。Mars round 2 推翻了这一处理：它明确把这一处单文件改动指派给了本 cell，而不是留给 C2 或编排者去处理，round 3 随即直接应用了它。提交 `4e47e14b25`（"fix(saturn): round-3 doc-gate skeleton + hero headline display move"）在 `packages/client/ui-conversation/src/client/skeleton/HeroShell.module.css` 的 `.headline` 规则中恰好加入了 `font-family: var(--saturn-font-display, inherit);` 与 `font-variation-settings: var(--saturn-font-display-variation, 'wdth' 100);`——对那一个文件的两行改动，与本包 README 的 doc-gate 骨架修复在同一提交中一并落地。该改动由 `packages/client/ui-skin-saturn/tests/hero-headline-font-tokens.spec.ts` 固定：该测试在前一提交 `fb9a59f932`（"test(saturn): pin the hero headline's consumption of the Saturn display font tokens"）中先以 RED 状态针对修复前的规则提交，待 `4e47e14b25` 落地后转为 GREEN。因此 SPEC §3 C3 "wdth used as the display move for the hero headline" 这一交付项已经彻底完成，而不仅仅是记录为留给他人解决的缺口。
