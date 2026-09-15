@@ -11,7 +11,10 @@ function deferred<T>() {
   const promise = new Promise<T>((settle) => { resolve = settle })
   return { promise, resolve }
 }
-function remote(value = snapshot()) {
+// `snapshot()` returns the client's widened `SaturnBotSnapshot`; pin this back to the plain
+// host `BotSnapshot` the real `SaturnBotRemote` methods (and this file's own `RemoteResult<BotSnapshot>`
+// fixtures) traffic in — a `SaturnBotSnapshot` value is always a valid `BotSnapshot` too.
+function remote(value: BotSnapshot = snapshot()) {
   return {
     snapshot: vi.fn(async () => ok(value)), configure: vi.fn(async () => ok(value)),
     runNow: vi.fn(async () => ok(value)), pause: vi.fn(async () => ok(value)), cancel: vi.fn(async () => ok(value)),
