@@ -7,4 +7,14 @@
  * @module @saturnai/dsh-done/client
  */
 
-export type { DoneProjection, DoneState, DoneStatus, DoneUnitState } from './types.ts'
+export type {
+  CountersignRecord,
+  DoneProjection,
+  DoneProof,
+  DoneState,
+  DoneStatus,
+  DoneUnitState,
+  ReviewCriterion,
+  ReviewScore,
+  ReviewVerdict,
+} from './types.ts'

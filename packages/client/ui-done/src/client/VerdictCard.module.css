@@ -1,0 +1,183 @@
+/* VerdictCard: the independent review, inside the definition-of-done record
+   panel.
+
+   The card is a receipt, so it is drawn like one: hairline rules instead of
+   boxes, the rubric as a three-column ledger (criterion, score, evidence) that
+   collapses to two lines when the panel is narrow, and the score in the mono
+   face so a column of them reads as a column.
+
+   One motion, and it asserts something: on a PASS the signature ring draws
+   itself once as the card opens — the seal being applied, not a decoration
+   looping. REVISE and REJECT get no seal at all.
+
+   Colour carries the verdict and nothing else: the accent seals a PASS, the
+   warn and error tokens mark the two ways it can come back. Everything else
+   consumes the shared surface and label tokens. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 2px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The stamp: the verdict word, with the ring sealing it on a PASS. */
+.stamp {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 58px;
+  height: 22px;
+  padding: 0 8px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.stamp[data-verdict='PASS'] {
+  color: var(--saturn-accent, #dda43a);
+}
+
+.stamp[data-verdict='REVISE'] {
+  color: var(--dsw-alias-state-warn-primary, var(--dsw-alias-label-secondary));
+}
+
+.stamp[data-verdict='REJECT'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.stampWord {
+  font: var(--dsw-font-xxxs-strong-11);
+  font-family: var(--saturn-font-mono, var(--dsw-font-mono));
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* The signature mark, at the one tilt this product uses. */
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ringPath {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+  animation: draw-ring var(--saturn-dur-3, 320ms) var(--saturn-ease-out, cubic-bezier(0, 0, 0, 1)) both;
+}
+
+@keyframes draw-ring {
+  from {
+    stroke-dashoffset: 100;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.title {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+/* Who graded it: present, never shouting, and truncated before it wraps. */
+.reviewer {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.rubric {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The ledger row: criterion and score on the first line, evidence under them
+   where the panel is narrow, all three in one line where it is not. */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, auto) max-content;
+  gap: 2px 8px;
+  padding: 5px 0;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.criterion {
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.score {
+  justify-self: end;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
+  font-family: var(--saturn-font-mono, var(--dsw-font-mono));
+  font-variant-numeric: tabular-nums;
+}
+
+.evidence {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+/* A low score is the thing a reader came for: the row says so without colour
+   alone carrying it, by marking the score itself. */
+.row[data-score='1'] .score,
+.row[data-score='2'] .score {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.row[data-score='3'] .score {
+  color: var(--dsw-alias-state-warn-primary, var(--dsw-alias-label-primary));
+}
+
+/* The seal is an assertion, not an animation budget: when motion is reduced it
+   is simply already drawn. */
+@media (prefers-reduced-motion: reduce) {
+  .ringPath {
+    animation: none;
+  }
+}

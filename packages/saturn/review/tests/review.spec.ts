@@ -102,6 +102,9 @@ describe('review_definition_of_done', () => {
       toolCallResponse('c1', DONE_TOOL, { action: 'state', statement: STATEMENT }),
       toolCallResponse('rv-1', REVIEW_TOOL, { claim: 'The mint path is covered by four specs; run_tests showed 37 passed.' }),
       reviewerAnswer('PASS', 'The claim matches the transcript.'),
+      // The turn ends here: the token is read from the review's own result
+      // before the next turn cites it, exactly as a reader would.
+      textResponse('Reviewed — PASS.'),
       () => toolCallResponse('c2', DONE_TOOL, { action: 'prove', evidence: 'independent review: PASS', countersign: token }),
       textResponse('Proven, countersigned.'),
     ])

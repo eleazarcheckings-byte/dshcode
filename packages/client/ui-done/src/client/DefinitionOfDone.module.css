@@ -115,6 +115,37 @@
   }
 }
 
+/* Provenance: the short line saying what the proof actually is. Mono, because
+   it names a call id or a review rather than prose, and it never competes with
+   the statement for the row — below the narrow breakpoint it drops out with the
+   statement, leaving the ring and the status word. */
+.provenance {
+  flex: none;
+  max-width: 22ch;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  font-family: var(--saturn-font-mono, var(--dsw-font-mono));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provenance[data-proof='countersign'] {
+  color: var(--saturn-accent, #dda43a);
+}
+
+@media (max-width: 720px) {
+  .chip .provenance {
+    display: none;
+  }
+}
+
+/* In the panel the line is a full row, not a chip fragment. */
+.panel .provenance {
+  max-width: none;
+  white-space: normal;
+}
+
 /* The accented separator divides the statement from its supporting evidence. */
 .evidence {
   color: var(--dsw-alias-label-primary-dimmed);

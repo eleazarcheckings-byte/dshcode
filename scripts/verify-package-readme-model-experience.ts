@@ -188,6 +188,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/web/web-fetch-http': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-web.' },
   'packages/web/web-search-exa': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-web.' },
   'packages/workflow/workflow': { kind: 'indirect', reason: 'The service delegates parent and child model rendering to its consumer and engine.' },
+  'packages/saturn/model-router': { kind: 'none', reason: 'Resolves settings-driven tier routes and external-harness mount decisions for other Host plugins; it registers no prompt section, tool schema, or model-visible content of its own.' },
 }
 
 interface Failure {

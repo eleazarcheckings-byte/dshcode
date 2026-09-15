@@ -14,13 +14,105 @@
  * means proven. Tests pass, smoke passes, the thing actually runs — not
  * hoped. Missing evidence is NOT_ASSESSED and never counts as green." A
  * statement is `stated` from the moment it is written and becomes `proven`
- * only when it carries the evidence that met it.
+ * only when it carries both the evidence that met it and the
+ * {@link DoneProof proof} that evidence can be checked against.
  */
 export type DoneStatus = 'stated' | 'proven'
 
 /**
+ * A reviewer's overall judgement of one piece of work. Doctrine tokens, kept
+ * in this spelling everywhere they are shown so the word a reader sees is the
+ * word the reviewer wrote.
+ */
+export type ReviewVerdict = 'PASS' | 'REVISE' | 'REJECT'
+
+/**
+ * The closed set of criteria an independent review grades. A reviewer that may
+ * invent its own axes is not a gate, so the set is fixed here beside the
+ * durable payload that carries it.
+ */
+export type ReviewCriterion =
+  | 'factual_accuracy'
+  | 'completeness'
+  | 'format_compliance'
+  | 'internal_consistency'
+  | 'edge_case_handling'
+  | 'source_quality'
+
+/** One graded criterion: the score out of five and the evidence that earned it. */
+export interface ReviewScore {
+  /** Which criterion this line grades. */
+  readonly criterion: ReviewCriterion
+  /** 1–5, where 5 is "no flaw found under this criterion". */
+  readonly score: number
+  /** What the reviewer looked at to arrive at the score. */
+  readonly evidence: string
+}
+
+/**
+ * One durable review record: a reviewer's verdict on the contract it graded,
+ * plus the token that verdict can be cited by. Minted into the session log by
+ * the review tool and read back when a proof cites the token, so a proven
+ * contract's provenance survives resume and fork.
+ */
+export interface CountersignRecord {
+  /** Opaque single-session token the `prove` action cites. */
+  readonly token: string
+  /** The exact contract statement the reviewer graded. */
+  readonly statement: string
+  /** The reviewer's overall judgement. */
+  readonly verdict: ReviewVerdict
+  /** Who graded it: the reviewer persona and the backend that ran it. */
+  readonly reviewer: string
+  /** One line per criterion of the rubric. */
+  readonly scores: readonly ReviewScore[]
+  /** The reviewer's one-paragraph account of the verdict. */
+  readonly summary?: string
+  /** Epoch milliseconds of the review. */
+  readonly at: number
+}
+
+/**
+ * How a proven contract can be checked by someone who was not there.
+ *
+ * `receipt` names a tool call in this session whose result was not an error:
+ * the run the work actually made. `countersign` names a review an independent
+ * agent performed against the rubric and passed. `human` records the one
+ * attestation this harness cannot check and does not need to — the person
+ * whose work it is, saying so at the `/done prove` command.
+ */
+export type DoneProof =
+  | {
+    /** The proof is a tool call this session really made. */
+    readonly kind: 'receipt'
+    /** The call id cited, as it appears in the session log. */
+    readonly toolCallId: string
+    /** The tool that ran under that call id. */
+    readonly toolName: string
+  }
+  | {
+    /** The proof is an independent reviewer's PASS. */
+    readonly kind: 'countersign'
+    /** The token the reviewer minted. */
+    readonly token: string
+    /** Who graded it. */
+    readonly reviewer: string
+    /** Always `PASS`: no other verdict mints a usable token. */
+    readonly verdict: ReviewVerdict
+    /** The rubric the reviewer returned. */
+    readonly scores: readonly ReviewScore[]
+    /** The reviewer's account of the verdict. */
+    readonly summary?: string
+  }
+  | {
+    /** The person owning the work attested it at the command. */
+    readonly kind: 'human'
+  }
+
+/**
  * One durable definition of done: the short contract a piece of work is
- * striving against, plus the evidence that met it.
+ * striving against, plus the evidence that met it and the proof that evidence
+ * stands on.
  */
 export interface DoneState {
   /**
@@ -35,6 +127,11 @@ export interface DoneState {
    * it showed). Present exactly when `status` is `proven`.
    */
   readonly evidence?: string
+  /**
+   * What the evidence can be checked against. Present exactly when `status` is
+   * `proven`: a contract whose proof cannot be named is not proven.
+   */
+  readonly proof?: DoneProof
   /** Epoch milliseconds of the latest durable mutation. */
   readonly at: number
 }
@@ -60,6 +157,13 @@ declare module '@deepseek-ai/dsh-session/types' {
      * `null` — no definition of done has been stated yet.
      */
     'done/change': { readonly next: DoneState | null }
+    /**
+     * One independent review of this session's contract, minted by the review
+     * tool: log-only, non-surface, append-only. A `prove` citing the record's
+     * token reads it back from here, so the provenance of a proven contract is
+     * durable rather than held in memory.
+     */
+    'done/countersign': { readonly record: CountersignRecord }
   }
 }
 

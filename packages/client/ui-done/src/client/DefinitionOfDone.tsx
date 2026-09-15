@@ -38,8 +38,10 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 import type { CheckpointsProjection } from '@saturnai/dsh-checkpoints/client'
 import type { DoneDockInjected } from './index.ts'
 import { CheckpointRow } from './CheckpointRow.tsx'
+import { provenance, provenanceLabel } from './provenance.ts'
 import { turnReceipt } from './turn-receipt.ts'
 import { TurnReceipt } from './TurnReceipt.tsx'
+import { VerdictCard } from './VerdictCard.tsx'
 import css from './DefinitionOfDone.module.css'
 
 /** Full header-seat component props: runtime share (standard kit) & injected share & the locale seat. */
@@ -164,6 +166,11 @@ export function DefinitionOfDone({
   const statusLabel = proven ? t('status.proven') : t('status.stated')
   const statusTitle = proven ? t('status.proven.aria') : t('status.stated.aria')
   const receipt = contract === null ? null : turnReceipt({ timeline: timeline ?? NO_TIMELINE, done: contract })
+  // "Proven" alone is the old, weaker claim. The provenance line is what a
+  // reader can act on: which run, or whose review.
+  const proof = contract?.proof
+  const proofLine = provenance(proof, t)
+  const proofTitle = provenanceLabel(proof, t)
 
   // Escape closes the panel and returns focus to the chip. The editor owns
   // Escape while it is open: there it cancels the edit, and closing the whole
@@ -282,6 +289,7 @@ export function DefinitionOfDone({
         aria-label={t('statement.aria')}
         data-done-panel
         data-status={contract === null ? 'none' : contract.status}
+        data-proof={proof?.kind}
       >
         {contract !== null && (
           <>
@@ -299,6 +307,12 @@ export function DefinitionOfDone({
               {editor === null && actions}
             </div>
             {actionError !== null && <span className={css.error} role="alert">{actionError}</span>}
+            {proofLine !== null && (
+              <span className={css.provenance} data-proof={proof?.kind} title={proofTitle ?? undefined}>
+                {proofLine}
+              </span>
+            )}
+            <VerdictCard proof={proof} t={t} />
             {receipt !== null && <TurnReceipt receipt={receipt} t={t} />}
           </>
         )}
@@ -317,6 +331,7 @@ export function DefinitionOfDone({
         className={css.chip}
         data-done-bar
         data-status={contract === null ? 'none' : contract.status}
+        data-proof={proof?.kind}
         aria-expanded={open}
         title={contract === null
           ? t('checkpoint.title')
@@ -326,6 +341,11 @@ export function DefinitionOfDone({
         {contract !== null && statusMarker}
         {contract !== null && (
           <span className={css.label} data-status={contract.status}>{statusLabel}</span>
+        )}
+        {/* How it was proven, in the bar itself: the status word is a claim,
+            this is the thing that backs it. */}
+        {proofLine !== null && (
+          <span className={css.provenance} data-proof={proof?.kind}>{proofLine}</span>
         )}
         {/* One live region for the contract itself: the ring and the label are
             chrome around it, never part of the announcement. */}

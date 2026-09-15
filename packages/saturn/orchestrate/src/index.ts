@@ -43,15 +43,27 @@ export interface OrchestrateModeConfig {
   off?: string
 }
 
+/**
+ * The reviewer tool the ON policy sends a finished result to. Spelled here
+ * rather than imported: this package contributes prompt text only, and a
+ * dependency edge on the reviewer package to read one model-facing name would
+ * buy nothing. `@saturnai/dsh-review` owns the tool and its contract.
+ */
+const REVIEW_TOOL = 'review_definition_of_done'
+
 const DEFAULT_ON = [
   'Multi-task mode is ON for this session. Coordinate substantial work across independent specialists',
   'while making useful progress yourself. When spawn_teammate is available, use named teammates',
   'for work that needs shared tasks, peer messages, or follow-up. Use one-shot subagents for bounded',
   'work with no continuing coordination. Give each delegation a concrete deliverable, relevant',
   'context, disjoint write scopes, and verification requirements. Acquire file claims when available.',
-  'Check progress, unblock dependencies, review the combined result, and wait for required teammates',
-  'before the final response. Keep trivial reads, direct edits, and tightly dependent work in the',
-  'main thread. Parallel work should reduce the time to a verified result.',
+  'Check progress, unblock dependencies, and wait for required teammates before the final response.',
+  'You never grade your own team\'s work. When the pieces are in, hand the combined result to someone',
+  `who did not build it: \`${REVIEW_TOOL}\` runs a fresh reviewer against the definition of done and`,
+  'returns a verdict with its reasons. Prove the contract with the countersign that review returns, or',
+  'with the receipt of a run — never with your own account of how it went. Keep trivial reads, direct',
+  'edits, and tightly dependent work in the main thread. Parallel work should reduce the time to a',
+  'verified result.',
 ].join('\n')
 
 const DEFAULT_OFF = [

@@ -20,9 +20,20 @@
  * always resets it to `stated`, because a changed contract must be proven on
  * its own terms.
  *
+ * And `proven` is not a word the worker may simply write about itself. The
+ * `prove` action takes only evidence a third party can re-check: a RECEIPT —
+ * the id of a tool call in this session whose result was not an error, the run
+ * that actually happened — or a COUNTERSIGN — the token an independent
+ * reviewer minted after grading the work against the rubric and passing it.
+ * Prose alone is refused and the contract stays stated. The one exception is
+ * the human at the `/done` command: a person attesting their own work is the
+ * principal, not a worker grading itself, and their attestation is recorded as
+ * exactly that.
+ *
  * @module @saturnai/dsh-done
  */
 
+import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
@@ -34,15 +45,43 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import type { DoneProjection, DoneState, DoneUnitState } from './types.ts'
+import type { CountersignRecord, DoneProjection, DoneProof, DoneState, DoneUnitState } from './types.ts'
 
-export type { DoneProjection, DoneState, DoneStatus, DoneUnitState } from './types.ts'
+export type {
+  CountersignRecord, DoneProjection, DoneProof, DoneState, DoneStatus, DoneUnitState,
+  ReviewCriterion, ReviewScore, ReviewVerdict,
+} from './types.ts'
 
 /** Section name; also the anchor a deployment reads in a prompt dump. */
 export const DONE_SECTION = 'done:policy'
 
 /** Model tool name; the section names it, so both live here together. */
 export const DONE_TOOL = 'set_definition_of_done'
+
+/**
+ * The reviewer tool a countersign comes from. Named here because the guidance
+ * and the refusal must tell the model where to get a proof; the tool itself is
+ * owned by `@saturnai/dsh-review`, which mints tokens through
+ * {@link mintCountersign} and is composed independently.
+ */
+export const REVIEW_TOOL = 'review_definition_of_done'
+
+/** Prefix of every countersign token, so a cited token is recognizable on sight. */
+const COUNTERSIGN_PREFIX = 'saturn-countersign:'
+
+/**
+ * What the model is told when it claims a contract is met without naming
+ * anything that can be re-checked. Both paths are spelled out, because a
+ * refusal that does not say what would work is just an obstacle.
+ */
+export const PROOF_REFUSAL = [
+  'A definition of done is not proven by describing the proof.',
+  'Cite one of two things and try again:',
+  '`receipt`: the `tool_call_id` of a call you made in THIS session whose result was not an error — the test',
+  'run, the build, the smoke check you actually performed; or',
+  `\`countersign\`: the token \`${REVIEW_TOOL}\` returns after an independent reviewer grades the work PASS.`,
+  'If you have neither, the honest move is to leave the contract stated and say what remains unproven.',
+].join('\n')
 
 /** Longest statement the domain admits — a definition of done is 1–2 sentences, not a plan. */
 const MAX_STATEMENT = 400
@@ -71,9 +110,12 @@ export function statedGuidance(statement: string): string {
     'Definition of done (stated, not yet proven):',
     `"${statement}"`,
     'Strive against that contract. Prove it the way you would for a colleague: run the thing — the tests,',
-    'the smoke check, the command itself — and cite what you ran and what it showed. Only then set status',
-    `"proven" with a one-line \`evidence\` citation through \`${DONE_TOOL}\`. Missing evidence is NOT_ASSESSED`,
-    'and never counts as green: if you cannot prove it, say so plainly and leave it stated.',
+    'the smoke check, the command itself — and cite what you ran and what it showed. Then set status',
+    `"proven" through \`${DONE_TOOL}\` with a one-line \`evidence\` citation AND the proof it stands on:`,
+    '`receipt` — the `tool_call_id` of that run, a call in this session whose result was not an error — or',
+    `\`countersign\` — the token \`${REVIEW_TOOL}\` returns once an independent reviewer grades the work PASS.`,
+    'Your own account of the work is not a proof and is refused. Missing evidence is NOT_ASSESSED and never',
+    'counts as green: if you cannot prove it, say so plainly and leave it stated.',
   ].join('\n')
 }
 
@@ -82,22 +124,35 @@ export function statedGuidance(statement: string): string {
  * that settled work is not reopened, and that a changed contract loses its
  * proof.
  */
-export function provenGuidance(statement: string, evidence: string): string {
+export function provenGuidance(statement: string, evidence: string, proof?: DoneProof): string {
   return [
     'Definition of done (PROVEN):',
     `"${statement}"`,
     `Evidence: ${evidence}`,
+    ...proof === undefined ? [] : [`Proof: ${proofSentence(proof)}`],
     'The contract is met — do not reopen work that already satisfies it. If new work changes what "done"',
     `means, amend the definition first through \`${DONE_TOOL}\`; amending resets it to "stated", and the new`,
     'contract must be proven on its own terms.',
   ].join('\n')
 }
 
+/** One line naming what a proven contract stands on, for the prompt and the command. */
+export function proofSentence(proof: DoneProof): string {
+  switch (proof.kind) {
+    case 'receipt':
+      return `the \`${proof.toolName}\` call ${proof.toolCallId} in this session, which did not error`
+    case 'countersign':
+      return `${proof.reviewer} graded it ${proof.verdict} (countersign ${proof.token})`
+    case 'human':
+      return 'the person who owns the work attested it directly'
+  }
+}
+
 /** Render the section body for one session's current contract (or its absence). */
 export function guidance(current: DoneProjection): string {
   if (current === null) return ABSENT
   return current.status === 'proven'
-    ? provenGuidance(current.statement, current.evidence ?? '')
+    ? provenGuidance(current.statement, current.evidence ?? '', current.proof)
     : statedGuidance(current.statement)
 }
 
@@ -128,10 +183,63 @@ function resolveEvidence(value: string): string {
   return collapsed
 }
 
+/** Longest reviewer identity and per-criterion evidence line the durable record admits. */
+const MAX_REVIEWER = 200
+const MAX_SCORE_EVIDENCE = 400
+/** Longest reviewer summary the durable record admits — an account, not a report. */
+const MAX_SUMMARY = 1200
+
+const reviewVerdictSchema = zod.union([
+  zod.literal('PASS'),
+  zod.literal('REVISE'),
+  zod.literal('REJECT'),
+])
+
+const reviewScoreSchema = zod.object({
+  criterion: zod.union([
+    zod.literal('factual_accuracy'),
+    zod.literal('completeness'),
+    zod.literal('format_compliance'),
+    zod.literal('internal_consistency'),
+    zod.literal('edge_case_handling'),
+    zod.literal('source_quality'),
+  ]),
+  score: zod.number().int().min(1).max(5),
+  evidence: zod.string().min(1).max(MAX_SCORE_EVIDENCE),
+}).strict()
+
+const doneProofSchema = zod.union([
+  zod.object({
+    kind: zod.literal('receipt'),
+    toolCallId: zod.string().min(1).max(200),
+    toolName: zod.string().min(1).max(200),
+  }).strict(),
+  zod.object({
+    kind: zod.literal('countersign'),
+    token: zod.string().min(1).max(200),
+    reviewer: zod.string().min(1).max(MAX_REVIEWER),
+    verdict: reviewVerdictSchema,
+    scores: zod.array(reviewScoreSchema).min(1).max(12),
+    summary: zod.string().min(1).max(MAX_SUMMARY).optional(),
+  }).strict(),
+  zod.object({ kind: zod.literal('human') }).strict(),
+])
+
+const countersignRecordSchema = zod.object({
+  token: zod.string().min(1).max(200),
+  statement: zod.string().min(1).max(MAX_STATEMENT),
+  verdict: reviewVerdictSchema,
+  reviewer: zod.string().min(1).max(MAX_REVIEWER),
+  scores: zod.array(reviewScoreSchema).min(1).max(12),
+  summary: zod.string().min(1).max(MAX_SUMMARY).optional(),
+  at: zod.number().int().nonnegative(),
+}).strict()
+
 const doneStateSchema: ZodType<DoneState> = zod.object({
   statement: zod.string().min(1).max(MAX_STATEMENT),
   status: zod.union([zod.literal('stated'), zod.literal('proven')]),
   evidence: zod.string().min(1).max(MAX_EVIDENCE).optional(),
+  proof: doneProofSchema.optional(),
   at: zod.number().int().nonnegative(),
 }).strict().superRefine((state, context) => {
   if (state.status === 'proven' && state.evidence === undefined) {
@@ -139,6 +247,12 @@ const doneStateSchema: ZodType<DoneState> = zod.object({
   }
   if (state.status === 'stated' && state.evidence !== undefined) {
     context.addIssue({ code: 'custom', message: 'evidence is present exactly when the definition of done is proven' })
+  }
+  if (state.status === 'proven' && state.proof === undefined) {
+    context.addIssue({ code: 'custom', message: 'a proven definition of done must name the proof its evidence stands on' })
+  }
+  if (state.status === 'stated' && state.proof !== undefined) {
+    context.addIssue({ code: 'custom', message: 'a proof is present exactly when the definition of done is proven' })
   }
 }) as unknown as ZodType<DoneState>
 
@@ -157,6 +271,7 @@ function toolPayload(current: DoneProjection) {
       statement: current.statement,
       status: current.status,
       ...current.evidence === undefined ? {} : { evidence: current.evidence },
+      ...current.proof === undefined ? {} : { proof: proofSentence(current.proof) },
     },
   }
 }
@@ -168,7 +283,9 @@ function toolPayload(current: DoneProjection) {
  */
 export const doneProjectionDefinition = {
   key: 'done',
-  stateVersion: 1,
+  // v2: a proven contract carries the `proof` its evidence stands on. A v1
+  // snapshot recorded a proof-less `proven`, which this fold no longer admits.
+  stateVersion: 2,
   stateSchema: doneUnitStateSchema,
   init: () => ({ current: null }),
   apply: (state, event) => {
@@ -181,6 +298,132 @@ export const doneProjectionDefinition = {
   },
 } satisfies ProjectionDefinition<'done', DoneUnitState>
 
+/**
+ * Resolve one RECEIPT: the id of a tool call this session really made, whose
+ * result was not an error.
+ *
+ * The session log is the authority — not the caller's account of it — so the
+ * call is looked up by the id the model cited, and its own recorded result
+ * decides. Two cases are refused beyond "no such call": a call that ended in an
+ * error (a failed run proves nothing), and a call to one of the contract tools
+ * themselves (stating or reviewing a contract is not a run of the work).
+ * @param session - the session whose log is searched.
+ * @param toolCallId - the call id the model cited.
+ * @returns the resolved receipt provenance.
+ */
+export function resolveReceiptProof(session: Session, toolCallId: string): DoneProof {
+  const cited = toolCallId.trim()
+  if (cited === '') throw new TypeError('a receipt needs the `tool_call_id` of the call that proved it')
+  let name: string | undefined
+  for (const event of session.events) {
+    if (event.type === 'tool/call' && event.data.callId === cited) name = event.data.name
+  }
+  if (name === undefined) {
+    throw new TypeError(
+      `no tool call \`${cited}\` exists in this session, so it cannot prove anything. `
+      + `Cite the id of a call you actually made, or get a countersign through \`${REVIEW_TOOL}\`.`,
+    )
+  }
+  if (name === DONE_TOOL || name === REVIEW_TOOL) {
+    throw new TypeError(
+      `\`${name}\` records the contract; it does not run the work. `
+      + 'Cite the run itself — the tests, the build, the smoke check — or a countersign.',
+    )
+  }
+  const result = [...session.events].reverse().find(event =>
+    event.type === 'tool/result' && event.data.message.source.callId === cited)
+  if (result?.type !== 'tool/result') {
+    throw new TypeError(`the call \`${cited}\` has no recorded result yet, so it proves nothing.`)
+  }
+  if (result.data.message.content[0].isError === true) {
+    throw new TypeError(
+      `the call \`${cited}\` (\`${name}\`) ended in an error, so it proves nothing. `
+      + 'Fix the work, run it again, and cite the run that passed.',
+    )
+  }
+  return { kind: 'receipt', toolCallId: cited, toolName: name }
+}
+
+/**
+ * Resolve one COUNTERSIGN: a token an independent reviewer minted in this
+ * session, for this exact contract, on a PASS.
+ *
+ * The statement is part of the check, not decoration: a review grades one
+ * wording of the contract, so a token stops being a proof the moment the
+ * contract is amended.
+ * @param session - the session whose log is searched.
+ * @param token - the token the model cited.
+ * @param statement - the contract statement the token must have graded.
+ * @returns the resolved countersign provenance.
+ */
+export function resolveCountersignProof(session: Session, token: string, statement: string): DoneProof {
+  const cited = token.trim()
+  if (cited === '') throw new TypeError(`a countersign needs the token \`${REVIEW_TOOL}\` returned`)
+  let record: CountersignRecord | undefined
+  for (const event of session.events) {
+    if (event.type === 'done/countersign' && event.data.record.token === cited) record = event.data.record
+  }
+  if (record === undefined) {
+    throw new TypeError(
+      `no review in this session minted the countersign \`${cited}\`. `
+      + `Run \`${REVIEW_TOOL}\` and cite the token it returns.`,
+    )
+  }
+  if (record.verdict !== 'PASS') {
+    throw new TypeError(
+      `that review returned ${record.verdict}, not PASS, so it is not a proof. `
+      + 'Address what the reviewer raised and ask for a fresh review.',
+    )
+  }
+  if (record.statement !== statement) {
+    throw new TypeError(
+      'that countersign graded a different definition of done, so it does not cover this one. '
+      + `The reviewer read: "${record.statement}".`,
+    )
+  }
+  return {
+    kind: 'countersign',
+    token: record.token,
+    reviewer: record.reviewer,
+    verdict: record.verdict,
+    scores: record.scores,
+    ...record.summary === undefined ? {} : { summary: record.summary },
+  }
+}
+
+/** What a reviewer supplies when recording its verdict; the token and timestamp are minted here. */
+export type CountersignInput = Omit<CountersignRecord, 'token' | 'at'>
+
+/**
+ * Record one independent review in the session log and mint its token.
+ *
+ * Every verdict is recorded, not just the passing ones: a REVISE that left no
+ * trace would let a session quietly re-roll reviews until one passed. Only a
+ * PASS token resolves as a proof ({@link resolveCountersignProof}).
+ * @param session - the session the review belongs to.
+ * @param input - the reviewer identity, verdict, rubric and summary.
+ * @returns the durable record, including the minted token.
+ */
+export function mintCountersign(session: Session, input: CountersignInput): CountersignRecord {
+  const record: CountersignRecord = {
+    token: `${COUNTERSIGN_PREFIX}${randomUUID()}`,
+    statement: resolveStatement(input.statement),
+    verdict: input.verdict,
+    reviewer: input.reviewer.trim(),
+    scores: input.scores,
+    ...input.summary === undefined ? {} : { summary: input.summary },
+    at: Date.now(),
+  }
+  const checked = countersignRecordSchema.safeParse(record)
+  if (!checked.success) {
+    throw new TypeError(
+      `a countersign record must carry a reviewer, a verdict and its rubric: ${checked.error.message}`,
+    )
+  }
+  session.append('done/countersign', { record })
+  return record
+}
+
 /** Services this plugin needs; the command registry and the tool registry attach optionally below. */
 export const inject = ['sessionProjections', 'systemPrompt']
 
@@ -191,11 +434,13 @@ const USAGE = 'Usage: /done [<statement>|edit <statement>|prove <evidence>|clear
 function renderDone(title: string, current: DoneProjection): string {
   if (current === null) return title
   const evidence = current.status === 'proven' ? [`Evidence: ${current.evidence ?? ''}`] : []
+  const proof = current.proof === undefined ? [] : [`Proof: ${proofSentence(current.proof)}`]
   return [
     title,
     `Status: ${current.status}`,
     `Statement: ${current.statement}`,
     ...evidence,
+    ...proof,
     '',
     `Commands: ${current.status === 'proven'
       ? '/done <statement>, /done clear'
@@ -231,12 +476,18 @@ export function apply(ctx: Context): void {
     commit(session, { statement: resolveStatement(statement), status: 'stated', at: 0 })
 
   /** Prove the current contract with its evidence, or fail loudly if none is stated. */
-  const prove = (session: Session, evidence: string): DoneProjection => {
+  const prove = (session: Session, evidence: string, proof: DoneProof): DoneProjection => {
     const current = currentOf(session)
     if (current === null) {
       throw new TypeError('there is no definition of done to prove; state one first')
     }
-    return commit(session, { statement: current.statement, status: 'proven', evidence: resolveEvidence(evidence), at: 0 })
+    return commit(session, {
+      statement: current.statement,
+      status: 'proven',
+      evidence: resolveEvidence(evidence),
+      proof,
+      at: 0,
+    })
   }
 
   ctx.systemPrompt.section({
@@ -288,7 +539,15 @@ export function apply(ctx: Context): void {
             return { kind: 'error', text: `Proving needs the evidence that met it.\n${USAGE}` }
           }
           if (/^prove(?=\s)/iu.test(input)) {
-            return { kind: 'success', text: renderDone('Definition of done proven', prove(session, input.slice(5).trim())) }
+            // The person owning the work is the principal, not a worker grading
+            // itself: their attestation is admitted, and recorded as human.
+            return {
+              kind: 'success',
+              text: renderDone(
+                'Definition of done proven',
+                prove(session, input.slice(5).trim(), { kind: 'human' }),
+              ),
+            }
           }
           if (control === 'edit') {
             return { kind: 'error', text: `Amending needs a replacement statement.\n${USAGE}` }
@@ -312,9 +571,12 @@ export function apply(ctx: Context): void {
       name: DONE_TOOL,
       description: 'Record this session\'s definition of done: the one- or two-sentence contract for what is being '
         + 'built and how we will know it is finished. action "state" sets or amends the statement (amending always '
-        + 'returns it to unproven). action "prove" marks the current contract met and REQUIRES the one-line evidence '
-        + 'that met it — the command you ran and what it showed; if you have not actually run the thing, leave it '
-        + 'stated rather than claiming proof. action "clear" removes it. Keep the statement to a single confident '
+        + 'returns it to unproven). action "prove" marks the current contract met; it REQUIRES the one-line evidence '
+        + 'that met it AND a proof that evidence can be checked against — either `receipt`, the tool_call_id of a '
+        + 'call you made in this session whose result was not an error (the test run, the build, the smoke check), '
+        + `or \`countersign\`, the token \`${REVIEW_TOOL}\` returns once an independent reviewer grades the work `
+        + 'PASS. Your own account of the work is not accepted as proof: if you have not run it and it has not been '
+        + 'reviewed, leave the contract stated. action "clear" removes it. Keep the statement to a single confident '
         + 'thought, not a task list.',
       parameters: {
         action: {
@@ -330,6 +592,22 @@ export function apply(ctx: Context): void {
         evidence: {
           type: 'string',
           description: 'One line: what you ran and what it showed; required with action prove.',
+        },
+        receipt: {
+          type: 'object',
+          additionalProperties: false,
+          description: 'Proof by run: the call you made whose result proves the contract. Use with action prove.',
+          properties: {
+            tool_call_id: {
+              type: 'string',
+              required: true,
+              description: 'The id of that tool call in this session; its result must not be an error.',
+            },
+          },
+        },
+        countersign: {
+          type: 'string',
+          description: `Proof by review: the token \`${REVIEW_TOOL}\` returned on PASS. Use with action prove.`,
         },
       },
       output: {
@@ -347,7 +625,20 @@ export function apply(ctx: Context): void {
           if (args.evidence === undefined) {
             throw new TypeError('proving a definition of done requires the evidence that met it')
           }
-          return Promise.resolve(toolPayload(prove(session, args.evidence)))
+          const receipt = args.receipt?.tool_call_id
+          const countersign = args.countersign
+          if (receipt === undefined && countersign === undefined) throw new TypeError(PROOF_REFUSAL)
+          if (receipt !== undefined && countersign !== undefined) {
+            throw new TypeError('cite ONE proof: either the receipt of the run, or the reviewer\'s countersign.')
+          }
+          const current = currentOf(session)
+          if (current === null) {
+            throw new TypeError('there is no definition of done to prove; state one first')
+          }
+          const proof = receipt === undefined
+            ? resolveCountersignProof(session, countersign ?? '', current.statement)
+            : resolveReceiptProof(session, receipt)
+          return Promise.resolve(toolPayload(prove(session, args.evidence, proof)))
         }
         if (args.statement === undefined) {
           throw new TypeError('stating a definition of done requires the statement')
