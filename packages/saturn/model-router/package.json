@@ -44,6 +44,10 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:^"
   },
+  "optionalDependencies": {
+    "@deepseek-ai/dsh-subagent-claude-code": "workspace:^",
+    "@deepseek-ai/dsh-subagent-codex": "workspace:^"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/cordis-plugin-include": "workspace:^",
@@ -51,8 +55,6 @@
     "@deepseek-ai/dsh-agent-default-model": "workspace:^",
     "@deepseek-ai/dsh-settings": "workspace:^",
     "@deepseek-ai/dsh-settings-file": "workspace:^",
-    "@deepseek-ai/dsh-subagent-claude-code": "workspace:^",
-    "@deepseek-ai/dsh-subagent-codex": "workspace:^",
     "js-yaml": "^4.1.0"
   }
 }

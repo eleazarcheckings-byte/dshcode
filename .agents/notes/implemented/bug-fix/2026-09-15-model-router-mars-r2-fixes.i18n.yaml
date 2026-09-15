@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-model-router-mars-r2-fixes.md
+2026-09-15-model-router-mars-r2-fixes.md: 616c4659915bd9b3f0994aeefb5549173cfbb51f
+2026-09-15-model-router-mars-r2-fixes.zh.md: 396f161e0ff56a363a55e8b1e9d782781fb53509

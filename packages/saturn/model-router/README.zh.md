@@ -79,7 +79,7 @@ saturn-model-router:
 
 `ModelRouterService` 通过 `ctx.settings.register` 注册该命名空间,后者按顺序解析模式默认值、组合层的 `base`(此处没有——每个字段都有模式默认值)以及用户层;`resolve()` 在每次调用时读取当前注册状态,而不是缓存快照,因此编辑该命名空间会在下一次 `resolve` 时生效,无需重启。回退到 `agentDefaultModel` 是一次鸭子类型的 `ctx.get('agentDefaultModel')` 读取,而不是硬依赖,这与 SPEC §4 中的接口契约(`ctx.modelRouter`,C6 → C5/C8a)一致:从未挂载 `agent-default-model` 的组合仍会把每个 `'default'` 分级解析为随包附带的 DeepSeek V4 Flash 兜底值,而不是抛出异常。
 
-`harnessAvailable()` 是一次两阶段的 `require.resolve` 探测,而不是仅针对每个原生工具自身包装包的单次检查。仅探测包装包(`@deepseek-ai/dsh-subagent-codex`、`@deepseek-ai/dsh-subagent-claude-code`)会产生假阳性:只要该包装包在模块图中的任何地方被声明——例如某个消费者的 `devDependencies`——即使它实际依赖的平台 CLI 未能安装或在生产安装中被剪除,探测仍会成功。`harnessCliResolvable()` 转而分两步进行:(1) 用一个锚定在本包上的解析器解析包装包自身的 `package.json`;(2) 再用一个锚定在该清单上的 `require` 解析包装包真正依赖的 CLI(`codex` 对应 `@openai/codex`;`claude-code` 对应 `@anthropic-ai/claude-agent-sdk`)——这与 Node 自身从包装包内部加载该 CLI 时所用的解析顺序一致。只有两个阶段都成功,该工具才算可用。结果按进程缓存:某个包是否已安装在进程运行期间不会改变,而一次派生探测会带来禁用表达式求值器(一次同步的 `eval`)无法等待的延迟与副作用。
+`harnessAvailable()` 是一次两阶段的 `require.resolve` 探测,而不是仅针对每个原生工具自身包装包的单次检查。仅探测包装包(`@deepseek-ai/dsh-subagent-codex`、`@deepseek-ai/dsh-subagent-claude-code`)会产生假阳性:只要该包装包在模块图中的任何地方被声明——例如某个消费者的 `devDependencies`——即使它实际依赖的平台 CLI 未能安装或在生产安装中被剪除,探测仍会成功。`harnessCliResolvable()` 转而分两步进行:(1) 用一个锚定在本包上的解析器解析包装包自身的 `package.json`;(2) 再用一个锚定在该清单上的 `require` 解析包装包真正依赖的 CLI(`codex` 对应 `@openai/codex`;`claude-code` 对应 `@anthropic-ai/claude-agent-sdk`),并同时尝试该 CLI 说明符的裸形式与其 `/package.json` 子路径形式、两者任一成功即可——两个 CLI 包并不共享同一种可解析形式:`@openai/codex` 没有 `main`/`exports` 字段(只有 `bin`),因此只有 `/package.json` 能解析成功;`@anthropic-ai/claude-agent-sdk` 声明了包含 `.` 条目但不含 `./package.json` 条目的 `exports` 映射,因此只有裸说明符能解析成功。只有两个阶段都成功,该工具才算可用。结果按进程缓存:某个包是否已安装在进程运行期间不会改变,而一次派生探测会带来禁用表达式求值器(一次同步的 `eval`)无法等待的延迟与副作用。
 
 </details>
 
@@ -109,6 +109,7 @@ Independent:本包不持有任何按请求或按会话的状态,且不会直接�
 <a id="known-limitations-and-deferred-work"></a>
 
 - **本包不附带客户端卡片** ——该设置命名空间能够正确解析与校验,但将其渲染为可编辑的“Plugins”卡片属于本包未包含的 `packages/client/*` 贡献;在有人添加之前,该命名空间需直接在 `settings.yaml` 中编辑。
+- **第一阶段(包装包自身)锚定于本包自身的依赖声明** ——`@deepseek-ai/dsh-subagent-codex` 与 `@deepseek-ai/dsh-subagent-claude-code` 被声明为 `@saturnai/dsh-model-router` 的 `optionalDependencies`(此为恢复:Mars r2 发现上一轮曾移除这两项,导致第一阶段的解析在生产安装中含糊不清——此前它之所以能解析成功,只是因为在本检出中恰好位于会被 pnpm 从生产安装中剪除的 `devDependencies` 里)。本轮以只读方式检查了已打包的桌面应用的 `resources/app/node_modules`(`C:\Users\izzy\AppData\Local\Programs\@dshcodedesktop\resources\app\node_modules`):它是单一的扁平目录,而非 pnpm 的隔离式逐包存储,因此一旦本包随构建发布,该目录下的每个包都能被其他任意包的解析器访问到,无论各自声明了哪些依赖——`optionalDependencies` 仍是正确的声明(它记录了真实且有意的边界,并使本单体仓库中的 `pnpm install`、以及未来任何隔离式安装打包路径保持正确),只是在当前所用的扁平布局下,它并非阻止第一阶段出现假阴性的唯一因素。检查时该目录下并未出现这两个包装包(external-harnesses 功能尚未发布),因此打包应用场景仍未经端到端观测;扁平布局这一发现是关于解析机制的证据,而非关于打包开关已被实际验证过的断言。
 - **`harnessAvailable()` 会在进程生命周期内缓存** ——在进程启动之后安装某个工具包(不通过常规的 `pnpm install` + 重启流程)在下次重启之前不会被感知到。
 - **`resolve()` 不校验目标路由是否存在** ——显式的分级覆盖若指向一个未注册的提供方或未知的模型 id,只有在消费者自身的适配器拒绝该请求时才会被发现。
 - **不校验每个分级的推理强度是否与目标模型能力匹配** ——目标模型不支持的强度等级属于消费适配器自身的失败模式(参见 `dsh-llm-pi-ai` 的 `UNSUPPORTED_OPTION` / 推理能力处理)。
