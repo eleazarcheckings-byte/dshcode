@@ -298,9 +298,11 @@ describe('web e2e: settings modal and General preferences', () => {
     const systemCube = restoredDialog.getByRole('button', { name: '跟随系统' })
     await systemCube.click()
     await expect.poll(() => systemCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
+    // The Saturn skin holds the product dark against theme flips, so the
+    // resolved chrome never follows the emulated light OS scheme.
     await expect.poll(() => page.evaluate(() => document.body.hasAttribute('data-ds-dark-theme')), {
       timeout: 5_000,
-    }).toBe(false)
+    }).toBe(true)
     await page.keyboard.press('Escape')
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
@@ -314,7 +316,6 @@ describe('web e2e: settings modal and General preferences', () => {
       legacy: string | null
       themeColor: string | null
       themeColorCount: number
-      token: string
     }
     const readState = async (target: Page = page): Promise<ThemeState> => await target.evaluate(() => {
       const metas = document.head.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
@@ -325,7 +326,6 @@ describe('web e2e: settings modal and General preferences', () => {
         legacy: localStorage.getItem('dsh.theme'),
         themeColor: metas[0]?.content ?? null,
         themeColorCount: metas.length,
-        token: computed.getPropertyValue('--dsw-alias-bg-base').trim(),
       }
     })
     const expectThemeColorSynchronized = (state: ThemeState): void => {
@@ -333,8 +333,9 @@ describe('web e2e: settings modal and General preferences', () => {
       expect(state.background).not.toBe('rgba(0, 0, 0, 0)')
       expect(state.themeColor).toBe(state.background)
     }
-    // The shipped preference is dark regardless of the OS scheme, so the
-    // light flip below is unambiguously the gesture's doing.
+    // The Saturn skin holds the product dark against theme flips: the
+    // preference persists and the cubes track it, while the rendered chrome
+    // stays on the shipped dark palette regardless of the OS scheme.
     await page.emulateMedia({ colorScheme: 'dark' })
     const initial = await readState()
     expect(initial.attr).toBe(true)
@@ -346,13 +347,12 @@ describe('web e2e: settings modal and General preferences', () => {
     const lightCube = dialog.getByRole('button', { name: '浅色' })
     expect(await lightCube.getAttribute('aria-pressed')).toBe('false')
     await lightCube.click()
-    // The full cascade: pressed state, Host-backed preference, body attribute,
-    // alias token flip — all from one real user gesture.
+    // The full cascade: pressed state, Host-backed preference write — while
+    // the held chrome keeps the body attribute dark.
     await expect.poll(() => lightCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
     const light = await readState()
-    expect(light.attr).toBe(false)
+    expect(light.attr).toBe(true)
     expect(light.legacy).toBeNull()
-    expect(light.token).not.toBe(initial.token)
     expectThemeColorSynchronized(light)
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
       .toMatch(/ui-theme:\n\s+preference: light/)
@@ -364,14 +364,14 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     await page.emulateMedia({ colorScheme: 'dark' })
-    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(false)
+    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(true)
     const reloaded = await readState()
     expect(reloaded.legacy).toBeNull()
     expectThemeColorSynchronized(reloaded)
 
     // A second live Host binds another ephemeral port but shares the same
     // user-settings home. Its fresh origin has no theme localStorage and still
-    // converges to light before the settings dialog opens.
+    // converges to the held dark chrome before the settings dialog opens.
     const second = await launchWebScaffold({ harnessHome: scaffold.harnessHome })
     const secondPage = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     const secondTripwire = watchConsole(secondPage)
@@ -380,7 +380,7 @@ describe('web e2e: settings modal and General preferences', () => {
       await secondPage.emulateMedia({ colorScheme: 'dark' })
       await secondPage.goto(second.authenticatedUrl, { waitUntil: 'load' })
       await secondPage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-      await expect.poll(async () => (await readState(secondPage)).attr, { timeout: 5_000 }).toBe(false)
+      await expect.poll(async () => (await readState(secondPage)).attr, { timeout: 5_000 }).toBe(true)
       const secondState = await readState(secondPage)
       expect(secondState.legacy).toBeNull()
       expectThemeColorSynchronized(secondState)
@@ -391,21 +391,22 @@ describe('web e2e: settings modal and General preferences', () => {
       await second.close()
     }
 
-    // `system` follows the emulated OS scheme (light stays light, dark clears
-    // to dark).
+    // `system` writes the preference while the skin keeps the chrome dark
+    // under either emulated OS scheme.
     await page.getByRole('button', { name: '设置', exact: true }).click()
     const systemCube = page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '跟随系统' })
     await systemCube.click()
     await expect.poll(() => systemCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
-    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(false)
+    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(true)
     expectThemeColorSynchronized(await readState())
-    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.emulateMedia({ colorScheme: 'light' })
     await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(true)
     expectThemeColorSynchronized(await readState())
     // Restore for the specs that follow: the shipped dark preference, so the
     // shared page stays on the default the following sections assume.
     await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '深色' }).click()
-    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(true)
+    await expect.poll(() => page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '深色' })
+      .getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
     expectThemeColorSynchronized(await readState())
     await page.keyboard.press('Escape')
     expect(tripwire.pageErrors).toEqual([])
