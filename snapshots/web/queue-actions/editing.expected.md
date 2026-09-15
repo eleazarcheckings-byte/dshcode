@@ -1,52 +1,62 @@
-- banner:
+- main:
   - navigation "Session hierarchy":
     - button "Reply with a one-sentence description" [disabled]
   - img
-  - text: Standard mode
+  - text: Agent
+  - button "Agent Team":
+    - img
+    - text: Agent Team
   - button "Session log":
     - text: Session log
     - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- button "System prompt":
-  - img
-  - img
-  - text: System prompt
-- text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
-- button "Copy":
-  - img
-- button "Delete" [disabled]:
-  - img
-- text: Agent is running; stop the turn to delete
-- button "Context injection @deepseek-ai/dsh-system-prompt":
-  - img
-  - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- paragraph: partial
-- status: Deep diving...
-- button "2 queued messages" [disabled] [expanded]
-- list:
-  - listitem:
-    - text: Queue item to remove
-    - button "Edit queued message":
-      - img
-    - button "Remove queued message":
-      - img
-    - button "Steer queued message":
-      - img
-  - listitem:
-    - textbox "Edit queued message": Edited queue item
-    - button "Save queued message":
-      - img
-    - tooltip "Save queued message"
-    - button "Cancel editing":
-      - img
-- textbox "Cmd/Ctrl+Enter steers all queued messages"
-- button "Commands":
-  - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model, current DeepSeek-V4-Flash":
-  - text: DeepSeek-V4-Flash
-  - img
-- button "Stop generating"
+  - button "System prompt":
+    - img
+    - img
+    - text: System prompt
+  - text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
+  - button "Copy":
+    - img
+  - button "Delete" [disabled]:
+    - img
+  - text: Agent is running; stop the turn to delete
+  - button "Context injection @deepseek-ai/dsh-system-prompt":
+    - img
+    - img
+    - text: Context injection @deepseek-ai/dsh-system-prompt
+  - button "Context injection skill-catalog":
+    - img
+    - img
+    - text: Context injection skill-catalog
+  - paragraph: partial
+  - status: Deep diving...
+  - button "2 queued messages" [disabled] [expanded]
+  - list:
+    - listitem:
+      - text: Queue item to remove
+      - button "Edit queued message":
+        - img
+      - button "Remove queued message":
+        - img
+      - button "Steer queued message":
+        - img
+    - listitem:
+      - textbox "Edit queued message": Edited queue item
+      - button "Save queued message":
+        - img
+      - tooltip "Save queued message"
+      - button "Cancel editing":
+        - img
+  - textbox "Cmd/Ctrl+Enter steers all queued messages"
+  - button "Commands":
+    - img
+  - 'button "Access mode, current: Workspace Write"': Workspace Write
+  - button "Multi-task mode on, press to turn off" [pressed]: Multi-task
+  - img "Off-peak pricing (½ price) · peak at {{clock}} UTC": Off-peak
+  - button "Select model, current DeepSeek-V4-Flash":
+    - text: DeepSeek-V4-Flash
+    - img
+  - button "Stop generating"
+  - text: Fleet · no delegated workers

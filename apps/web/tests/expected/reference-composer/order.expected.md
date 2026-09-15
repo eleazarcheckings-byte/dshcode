@@ -1,27 +1,33 @@
-- banner:
+- main:
   - navigation "Session hierarchy":
     - button "Reference order target" [disabled]
+  - button "Agent Team":
+    - img
+    - text: Agent Team
   - button "Session log":
     - text: Session log
     - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Research notes what changed? Referenced session · Research notes {{clock}}
-- button "Copy":
-  - img
-- button "Delete":
-  - img
-- button "Edit":
-  - img
-- button "Session recall Research notes":
-  - img
-  - text: Session recall Research notes
-- textbox "Message the agent"
-- button "Commands":
-  - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model, current DeepSeek-V4-Flash":
-  - text: DeepSeek-V4-Flash
-  - img
-- button "Send message" [disabled]
+  - text: Research notes what changed? Referenced session · Research notes {{clock}}
+  - button "Copy":
+    - img
+  - button "Delete":
+    - img
+  - button "Edit":
+    - img
+  - button "Session recall Research notes":
+    - img
+    - text: Session recall Research notes
+  - textbox "Message the agent"
+  - button "Commands":
+    - img
+  - 'button "Access mode, current: Workspace Write"': Workspace Write
+  - button "Multi-task mode on, press to turn off" [pressed]: Multi-task
+  - img "Off-peak pricing (½ price) · peak at {{clock}} UTC": Off-peak
+  - button "Select model, current DeepSeek-V4-Flash":
+    - text: DeepSeek-V4-Flash
+    - img
+  - button "Send message" [disabled]
+  - text: Fleet · no delegated workers

@@ -10,9 +10,9 @@
     - button "Plugins":
       - img
       - text: Plugins
-    - button "Agent presets":
+    - button "Modes":
       - img
-      - text: Agent presets
+      - text: Modes
     - button "Archived sessions":
       - img
       - text: Archived sessions
@@ -32,10 +32,10 @@
   - button "Light":
     - img
     - text: Light
-  - button "Dark":
+  - button "Dark" [pressed]:
     - img
     - text: Dark
-  - button "System" [pressed]:
+  - button "System":
     - img
     - text: System
   - text: Font size Only affects conversation content 14

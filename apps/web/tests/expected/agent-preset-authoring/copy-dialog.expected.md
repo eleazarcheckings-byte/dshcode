@@ -1,8 +1,8 @@
-- dialog "复制预设 · 复制自 极简模式":
-  - heading "复制预设 · 复制自 极简模式" [level=2]
+- dialog "复制模式 · 复制自 Lite":
+  - heading "复制模式 · 复制自 Lite" [level=2]
   - button "关闭":
     - img
-  - paragraph: 整个预设会在本机复制一份。标识符将成为目录名，事后无法更改；其余内容之后直接在预设自己的文件里编辑。
+  - paragraph: 整个模式会在本机复制一份。标识符将成为目录名，事后无法更改；其余内容之后直接在模式自己的文件里编辑。
   - text: 标识符
   - textbox "标识符":
     - /placeholder: my-agent

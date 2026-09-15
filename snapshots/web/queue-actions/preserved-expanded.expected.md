@@ -1,73 +1,85 @@
-- banner:
+- main:
   - navigation "Session hierarchy":
     - button "Reply with a one-sentence description" [disabled]
   - img
-  - text: Standard mode
+  - text: Agent
+  - button "Agent Team":
+    - img
+    - text: Agent Team
   - button "Session log":
     - text: Session log
     - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- button "System prompt":
-  - img
-  - img
-  - text: System prompt
-- text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
-- button "Copy":
-  - img
-- button "Delete":
-  - img
-- button "Edit":
-  - img
-- button "Thought for a while" [expanded]:
-  - text: Thought for a while
-  - img
-- button "Context injection @deepseek-ai/dsh-system-prompt":
-  - img
-  - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- paragraph: partial
-- text: Stopped
-- button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
-  - img
-- button "Delete":
-  - img
-- button "Branch into a new conversation":
-  - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
-- button "2 queued messages" [expanded]
-- list:
-  - listitem:
-    - text: Edited queue item
-    - button "Edit queued message":
-      - img
-    - tooltip "Edit queued message"
-    - button "Remove queued message":
-      - img
-    - button "Steer queued message" [disabled]:
-      - img
-  - listitem:
-    - text: Queue item preserved after stop
-    - button "Edit queued message":
-      - img
-    - button "Remove queued message":
-      - img
-    - button "Steer queued message" [disabled]:
-      - img
-- textbox "Message the agent"
-- button "Commands":
-  - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model, current DeepSeek-V4-Flash":
-  - text: DeepSeek-V4-Flash
-  - img
-- button "Send message" [disabled]
-- text: 1 turns · 1 steps LLM {{duration}} TTFT avg {{duration}}
+  - button "System prompt":
+    - img
+    - img
+    - text: System prompt
+  - text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
+  - button "Copy":
+    - img
+  - button "Delete":
+    - img
+  - button "Edit":
+    - img
+  - button "Thought for a while" [expanded]:
+    - text: Thought for a while
+    - img
+  - button "Context injection @deepseek-ai/dsh-system-prompt":
+    - img
+    - img
+    - text: Context injection @deepseek-ai/dsh-system-prompt
+  - button "Context injection skill-catalog":
+    - img
+    - img
+    - text: Context injection skill-catalog
+  - paragraph: partial
+  - text: Stopped
+  - button "Continue":
+    - img
+    - text: Continue
+  - button "Copy":
+    - img
+  - button "Good response":
+    - img
+  - button "Bad response":
+    - img
+  - button "Delete":
+    - img
+  - button "Branch into a new conversation":
+    - img
+  - button "Ran for {{duration}}":
+    - img
+    - text: Ran for {{duration}}
+  - text: {{clock}}
+  - button "2 queued messages" [expanded]
+  - list:
+    - listitem:
+      - text: Edited queue item
+      - button "Edit queued message":
+        - img
+      - tooltip "Edit queued message"
+      - button "Remove queued message":
+        - img
+      - button "Steer queued message" [disabled]:
+        - img
+    - listitem:
+      - text: Queue item preserved after stop
+      - button "Edit queued message":
+        - img
+      - button "Remove queued message":
+        - img
+      - button "Steer queued message" [disabled]:
+        - img
+  - textbox "Message the agent"
+  - button "Commands":
+    - img
+  - 'button "Access mode, current: Workspace Write"': Workspace Write
+  - button "Multi-task mode on, press to turn off" [pressed]: Multi-task
+  - img "Off-peak pricing (½ price) · peak at {{clock}} UTC": Off-peak
+  - button "Select model, current DeepSeek-V4-Flash":
+    - text: DeepSeek-V4-Flash
+    - img
+  - button "Send message" [disabled]
+  - text: 1 turns · 1 steps LLM {{duration}} TTFT avg {{duration}} Fleet · no delegated workers

@@ -6,5 +6,5 @@
       - img
   - option "reference.txt"
   - text: Sessions
-  - option "reference-order-target-session {{cwd}} · {{age}}"
-  - option "reference-source-session {{cwd}} · {{age}}"
+  - option "reference-order-target-session C:\\Users\\izzy\\AppData\\Local\\Temp\\{{workspace}} · {{age}}"
+  - option "reference-source-session C:\\Users\\izzy\\AppData\\Local\\Temp\\{{workspace}} · {{age}}"

@@ -1,40 +1,50 @@
-- banner:
+- main:
   - navigation "Session hierarchy":
     - button "Stream one TypeScript fence for" [disabled]
   - img
-  - text: Standard mode
+  - text: Agent
+  - button "Agent Team":
+    - img
+    - text: Agent Team
   - button "Session log":
     - text: Session log
     - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- button "System prompt":
-  - img
-  - img
-  - text: System prompt
-- text: Stream one TypeScript fence for the highlighting snapshot. {{clock}}
-- button "Copy":
-  - img
-- button "Delete" [disabled]:
-  - img
-- text: Agent is running; stop the turn to delete
-- button "Context injection @deepseek-ai/dsh-system-prompt":
-  - img
-  - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- text: ts
-- button "Copy"
-- code: "const first: number = 1 const second = \"two\" let tail"
-- status: Deep diving...
-- textbox "Message the agent"
-- button "Commands":
-  - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model, current streaming-fence-highlight-test/streaming-fence":
-  - text: streaming-fence-highlight-test/streaming-fence
-  - img
-- button "Stop generating"
+  - button "System prompt":
+    - img
+    - img
+    - text: System prompt
+  - text: Stream one TypeScript fence for the highlighting snapshot. {{clock}}
+  - button "Copy":
+    - img
+  - button "Delete" [disabled]:
+    - img
+  - text: Agent is running; stop the turn to delete
+  - button "Context injection @deepseek-ai/dsh-system-prompt":
+    - img
+    - img
+    - text: Context injection @deepseek-ai/dsh-system-prompt
+  - button "Context injection skill-catalog":
+    - img
+    - img
+    - text: Context injection skill-catalog
+  - text: ts
+  - button "Copy"
+  - code: "const first: number = 1 const second = \"two\" let tail"
+  - status: Deep diving...
+  - textbox "Message the agent"
+  - button "Commands":
+    - img
+  - 'button "Access mode, current: Workspace Write"': Workspace Write
+  - button "Multi-task mode on, press to turn off" [pressed]: Multi-task
+  - img "Off-peak pricing (½ price) · peak at {{clock}} UTC": Off-peak
+  - button "Select model, current streaming-fence-highlight-test/streaming-fence":
+    - text: streaming-fence-highlight-test/streaming-fence
+    - img
+  - button "Stop generating"
+  - text: Fleet · no delegated workers
 
 ---
 

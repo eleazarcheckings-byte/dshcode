@@ -9,53 +9,62 @@
 
 ---
 
-- banner:
+- main:
   - navigation "Session hierarchy":
     - button "Review deepseek-harness/deepseek-harness#314" [disabled]
   - img
-  - text: Standard mode
+  - text: Agent
+  - button "Agent Team":
+    - img
+    - text: Agent Team
   - button "Session log":
     - text: Session log
     - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- button "System prompt":
-  - img
-  - img
-  - text: System prompt
-- button "Thought for a while" [expanded]:
-  - text: Thought for a while
-  - img
-- button "Context injection webhook github webhook handled by review-pr-when-ready":
-  - img
-  - img
-  - text: Context injection webhook github webhook handled by review-pr-when-ready
-- button "Context injection @deepseek-ai/dsh-system-prompt":
-  - img
-  - img
-  - text: Context injection @deepseek-ai/dsh-system-prompt
-- paragraph: "Review complete: no actionable findings."
-- button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
-  - img
-- button "Delete":
-  - img
-- button "Branch into a new conversation":
-  - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
-- textbox "Message the agent"
-- button "Commands":
-  - img
-- 'button "Access mode, current: Read Only"': Read Only
-- button "Select model, current github-webhook-review-test/reply":
-  - text: github-webhook-review-test/reply
-  - img
-- button "Send message" [disabled]
-- text: 1 turns · 1 steps LLM {{duration}}
+  - button "System prompt":
+    - img
+    - img
+    - text: System prompt
+  - button "Thought for a while" [expanded]:
+    - text: Thought for a while
+    - img
+  - button "Context injection webhook github webhook handled by review-pr-when-ready":
+    - img
+    - img
+    - text: Context injection webhook github webhook handled by review-pr-when-ready
+  - button "Context injection @deepseek-ai/dsh-system-prompt":
+    - img
+    - img
+    - text: Context injection @deepseek-ai/dsh-system-prompt
+  - button "Context injection skill-catalog":
+    - img
+    - img
+    - text: Context injection skill-catalog
+  - paragraph: "Review complete: no actionable findings."
+  - button "Copy":
+    - img
+  - button "Good response":
+    - img
+  - button "Bad response":
+    - img
+  - button "Delete":
+    - img
+  - button "Branch into a new conversation":
+    - img
+  - button "Ran for {{duration}}":
+    - img
+    - text: Ran for {{duration}}
+  - text: {{clock}}
+  - textbox "Message the agent"
+  - button "Commands":
+    - img
+  - 'button "Access mode, current: Read Only"': Read Only
+  - button "Multi-task mode on, press to turn off" [pressed]: Multi-task
+  - img "Off-peak pricing (½ price) · peak at {{clock}} UTC": Off-peak
+  - button "Select model, current github-webhook-review-test/reply":
+    - text: github-webhook-review-test/reply
+    - img
+  - button "Send message" [disabled]
+  - text: 1 turns · 1 steps LLM {{duration}} Fleet · no delegated workers

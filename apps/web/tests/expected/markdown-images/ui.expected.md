@@ -1,44 +1,49 @@
-- banner:
+- main:
   - navigation "Session hierarchy":
     - button "Markdown image policy" [disabled]
+  - button "Agent Team":
+    - img
+    - text: Agent Team
   - button "Session log":
     - text: Session log
     - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Show the Markdown image policy. {{clock}}
-- button "Copy":
-  - img
-- button "Delete":
-  - img
-- button "Edit":
-  - img
-- heading "Markdown images" [level=2]
-- paragraph:
-  - img "Remote test image"
-- paragraph: Local test image
-- paragraph: REMOTE_IMAGE_DONE
-- button "Copy":
-  - img
-- button "Good response":
-  - img
-- button "Bad response":
-  - img
-- button "Delete":
-  - img
-- button "Branch into a new conversation":
-  - img
-- button "Ran for {{duration}}":
-  - img
-  - text: Ran for {{duration}}
-- text: {{clock}}
-- textbox "Message the agent"
-- button "Commands":
-  - img
-- 'button "Access mode, current: Workspace Write"': Workspace Write
-- button "Select model, current DeepSeek-V4-Flash":
-  - text: DeepSeek-V4-Flash
-  - img
-- button "Send message" [disabled]
-- text: 1 turns · 1 steps LLM {{duration}}
+  - text: Show the Markdown image policy. {{clock}}
+  - button "Copy":
+    - img
+  - button "Delete":
+    - img
+  - button "Edit":
+    - img
+  - heading "Markdown images" [level=2]
+  - paragraph:
+    - img "Remote test image"
+  - paragraph: Local test image
+  - paragraph: REMOTE_IMAGE_DONE
+  - button "Copy":
+    - img
+  - button "Good response":
+    - img
+  - button "Bad response":
+    - img
+  - button "Delete":
+    - img
+  - button "Branch into a new conversation":
+    - img
+  - button "Ran for {{duration}}":
+    - img
+    - text: Ran for {{duration}}
+  - text: {{clock}}
+  - textbox "Message the agent"
+  - button "Commands":
+    - img
+  - 'button "Access mode, current: Workspace Write"': Workspace Write
+  - button "Multi-task mode on, press to turn off" [pressed]: Multi-task
+  - img "Off-peak pricing (½ price) · peak at {{clock}} UTC": Off-peak
+  - button "Select model, current DeepSeek-V4-Flash":
+    - text: DeepSeek-V4-Flash
+    - img
+  - button "Send message" [disabled]
+  - text: 1 turns · 1 steps LLM {{duration}} Fleet · no delegated workers

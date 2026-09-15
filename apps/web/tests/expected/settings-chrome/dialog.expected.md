@@ -10,9 +10,9 @@
     - button "插件":
       - img
       - text: 插件
-    - button "Agent 预设":
+    - button "模式":
       - img
-      - text: Agent 预设
+      - text: 模式
     - button "归档会话":
       - img
       - text: 归档会话
@@ -32,10 +32,10 @@
   - button "浅色":
     - img
     - text: 浅色
-  - button "深色":
+  - button "深色" [pressed]:
     - img
     - text: 深色
-  - button "跟随系统" [pressed]:
+  - button "跟随系统":
     - img
     - text: 跟随系统
   - text: 字号大小 仅影响会话内容的字号 14

@@ -2,7 +2,7 @@
   - img
   - text: workspace
   - img
-- button "Standard mode":
+- button "Agent":
   - img
-  - text: Standard mode
+  - text: Agent
   - img

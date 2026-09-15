@@ -10,9 +10,9 @@
     - button "插件":
       - img
       - text: 插件
-    - button "Agent 预设":
+    - button "模式":
       - img
-      - text: Agent 预设
+      - text: 模式
     - button "归档会话":
       - img
       - text: 归档会话
