@@ -47,6 +47,25 @@ describe('strict deployment configuration', () => {
     expect(() => parseBotYaml('version: 1\ngoal: &a hi\nworkspace: *a')).toThrow()
     expect(parseBotYaml('version: 1\nintegrations:\n  email:\n    credentialEnv: GRAPH_TOKEN').integrations.email).toEqual({ credentialEnv: 'GRAPH_TOKEN' })
   })
+
+  it('refuses a literal vercel/cloudflare-pages deploy-hook endpoint; only endpointEnv may resolve the hook URL', () => {
+    expect(() => parseBotConfig({ integrations: { vercel: { endpoint: 'https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y' } } })).toThrow('endpointEnv')
+    expect(() => parseBotConfig({ integrations: { 'cloudflare-pages': { endpoint: 'https://api.cloudflare.com/hook' } } })).toThrow('endpointEnv')
+    expect(parseBotConfig({ integrations: { vercel: { endpointEnv: 'SATURN_VERCEL_DEPLOY_HOOK_URL' } } }).integrations.vercel).toEqual({ endpointEnv: 'SATURN_VERCEL_DEPLOY_HOOK_URL' })
+  })
+})
+
+describe('deploy-hook secrets never reach the journal', () => {
+  it('rejects configuring a literal hook URL before any journal write, and never journals the resolved secret', async () => {
+    const { engine, store } = await setup()
+    await expect(engine.configure({ integrations: { vercel: { endpoint: 'https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y' } } })).rejects.toThrow('endpointEnv')
+    const rejected = await store.events(0)
+    expect(JSON.stringify(rejected.events)).not.toContain('hook_y')
+    await engine.configure({ integrations: { vercel: { endpointEnv: 'SATURN_VERCEL_DEPLOY_HOOK_URL' } } })
+    const accepted = await store.events(0)
+    expect(JSON.stringify(accepted.events)).not.toContain('hook_y')
+    expect(JSON.stringify(accepted.events)).toContain('SATURN_VERCEL_DEPLOY_HOOK_URL')
+  })
 })
 
 describe('durable cycles', () => {
@@ -307,5 +326,48 @@ describe('durable cycles', () => {
     const state = await restarted.snapshot()
     expect(state.approvals[0]?.status).toBe('interrupted')
     expect(state.cycles[0]?.status).toBe('interrupted')
+  })
+})
+
+describe('report channel delivery', () => {
+  it('invokes a registered non-inbox delivery on cycle settlement, and only alerts when the channel has no delivery', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'saturnbot-report-'))
+    roots.push(root)
+    const store = new SaturnBotStore(root)
+    const delivered: { title: string; markdown: string }[] = []
+    const engine = new SaturnBotEngine({
+      store, model: defaultModel, tools: [],
+      reportDeliveries: { telegram: async (_config, report) => { delivered.push(report) } },
+    })
+    engines.push(engine)
+    await engine.initialize()
+    await engine.configure({ workspace: root, goal: 'Improve support', reportChannel: 'telegram' })
+    await run(engine)
+    expect(delivered).toHaveLength(1)
+    const settled = await engine.snapshot()
+    expect(settled.alerts.some(alert => alert.message.includes('is not configured'))).toBe(false)
+
+    await engine.configure({ reportChannel: 'unregistered-channel' })
+    await run(engine)
+    const after = await engine.snapshot()
+    expect(after.alerts.some(alert => alert.message.includes('"unregistered-channel" is not configured by this runtime'))).toBe(true)
+    expect(delivered).toHaveLength(1)
+  })
+
+  it('keeps the inbox report when a configured delivery throws, and alerts with a bounded message', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'saturnbot-report-fail-'))
+    roots.push(root)
+    const store = new SaturnBotStore(root)
+    const engine = new SaturnBotEngine({
+      store, model: defaultModel, tools: [],
+      reportDeliveries: { telegram: async () => { throw new Error('Telegram report delivery returned HTTP 500.') } },
+    })
+    engines.push(engine)
+    await engine.initialize()
+    await engine.configure({ workspace: root, goal: 'Improve support', reportChannel: 'telegram' })
+    await run(engine)
+    const settled = await engine.snapshot()
+    expect(settled.reports.length).toBeGreaterThan(0)
+    expect(settled.alerts.some(alert => alert.message.includes('delivery failed'))).toBe(true)
   })
 })

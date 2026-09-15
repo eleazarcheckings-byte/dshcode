@@ -133,6 +133,21 @@ it('resolves the specialist tier for a role task', async () => {
   } finally { dispose() }
 })
 
+it('drops a router-resolved reasoning effort the target model does not declare instead of failing the call', async () => {
+  const { ctx, context, model } = await setup()
+  // The 'routed' adapter declares no reasoning capability at all, so the runtime's own
+  // capability check must reject 'high' before dispatch; the call must still succeed.
+  const adapter = new MockAdapter([textResponse('{"summary":"idle","tasks":[]}')])
+  ctx.llm.registerAdapter(['fixture', 'routed'], adapter)
+  const resolve = vi.fn().mockReturnValue({ provider: 'routed', model: 'routed-model', reasoningEffort: 'high' })
+  const dispose = ctx.provide('modelRouter', { resolve })
+  try {
+    await model.plan(context)
+    expect(adapter.requests[0]).toMatchObject({ provider: 'routed', model: 'routed-model' })
+    expect(adapter.requests[0]!.reasoningEffort).toBeUndefined()
+  } finally { dispose() }
+})
+
 it('falls back to the configured provider and model when no router is connected, or when the router fails', async () => {
   const { ctx, context, model } = await setup()
   const adapter = new MockAdapter([textResponse('{"summary":"idle","tasks":[]}'), textResponse('{"summary":"idle","tasks":[]}')])

@@ -93,6 +93,8 @@ it('boots the shipped host services, persists the request before dispatch, execu
     expect(raw.content).not.toContain('PRIVATE_FIXTURE_REASONING')
   }
   const state = await ctx.saturnbot.snapshot()
+  expect(state.firstRun).toEqual({ goal: 'Improve onboarding support.', workspace: directory, provider: 'fixture', credentials: [] })
+  expect(state.integrationCatalog.map(entry => entry.name)).toEqual(expect.arrayContaining(['telegram', 'shopify', 'vercel', 'cloudflare-pages']))
   expect(state.reports).toHaveLength(2)
   expect(state.messages.some(message => message.role === 'operations' && message.sender === 'agent')).toBe(true)
   const report = state.reports[0]!

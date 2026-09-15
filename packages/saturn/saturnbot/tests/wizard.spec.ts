@@ -37,4 +37,15 @@ describe('botIntegrationCatalog', () => {
     const github = catalog.find(entry => entry.name === 'github')!
     expect(github.fields.find(field => field.secret)?.env).toBe('SATURN_GITHUB_TOKEN')
   })
+
+  it('marks the vercel and cloudflare-pages deploy hook URL itself as secret, resolved only through an env var', () => {
+    const catalog = botIntegrationCatalog()
+    for (const name of ['vercel', 'cloudflare-pages']) {
+      const entry = catalog.find(item => item.name === name)!
+      const endpointField = entry.fields.find(field => field.key === 'endpointEnv')
+      expect(endpointField).toMatchObject({ secret: true })
+      expect(endpointField?.env?.length ?? 0).toBeGreaterThan(0)
+      expect(entry.fields.some(field => field.key === 'endpoint')).toBe(false)
+    }
+  })
 })

@@ -11,7 +11,7 @@ import type { BotId } from '../src/types.ts'
 import { createBotTools, type BotToolOptions } from '../src/tools.ts'
 import { git, runProcess, verifyStage } from '../src/adapters/local.ts'
 import { BotDataStore, WebhookConflictError } from '../src/adapters/memory.ts'
-import { describeBotConnections } from '../src/adapters/integrations.ts'
+import { createReportDeliveries, describeBotConnections } from '../src/adapters/integrations.ts'
 import { MAX_ADAPTER_BYTES } from '../src/adapters/shared.ts'
 
 const cleanups: (() => Promise<void>)[] = []
@@ -342,10 +342,22 @@ describe('shopify adapter', () => {
     f.options.fetch = fetch
     const orders = await f.execute('shopify.orders_list', {})
     expect(orders.data).toMatchObject({ items: [expect.objectContaining({ name: '#1001' })] })
-    expect(fetch.mock.calls[0]![0]).toBe('https://test-shop.myshopify.com/admin/api/2025-01/orders.json?limit=20&status=open')
+    expect(fetch.mock.calls[0]![0]).toBe('https://test-shop.myshopify.com/admin/api/2026-07/orders.json?limit=20&status=open')
     expect(fetch.mock.calls[0]![1]).toMatchObject({ headers: { 'X-Shopify-Access-Token': 'shpat-secret-value' } })
     const products = await f.execute('shopify.products_list', {})
     expect(products.data).toMatchObject({ items: [expect.objectContaining({ title: 'Widget' })] })
+  })
+
+  it('rejects a malformed or hostile store domain before ever dispatching a request', async () => {
+    const f = await fixture()
+    f.options.environment = { SHOPIFY_TOKEN: 'shpat-secret-value' }
+    const fetch = vi.fn<typeof globalThis.fetch>()
+    f.options.fetch = fetch
+    for (const resource of ['test-shop.myshopify.com.evil.example', 'https://test-shop.myshopify.com/', 'test-shop.myshopify.com#frag', '-leading-hyphen.myshopify.com']) {
+      f.context.config.integrations.shopify = { credentialEnv: 'SHOPIFY_TOKEN', resource }
+      await expect(f.execute('shopify.orders_list', {})).rejects.toMatchObject({ code: 'action-required' })
+    }
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('sets inventory only through the admitted tool and reports the provider-confirmed quantity', async () => {
@@ -372,12 +384,12 @@ describe('shopify adapter', () => {
 })
 
 describe('cloud.deploy first-class targets', () => {
-  it('deploys through a configured Vercel deploy hook without requiring a credential', async () => {
+  it('deploys through a Vercel deploy hook resolved from its environment variable, never a literal config endpoint, without requiring a credential', async () => {
     const f = await repository()
     f.context.stage = (await f.execute('workspace.stage')).stage!
     f.context.config.integrations.github = { credentialEnv: 'GH_TOKEN', resource: 'owner/repository' }
-    f.context.config.integrations.vercel = { endpoint: 'https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y' }
-    f.options.environment = { ...process.env, GH_TOKEN: 'github-test-token' }
+    f.context.config.integrations.vercel = { endpointEnv: 'SATURN_VERCEL_DEPLOY_HOOK_URL' }
+    f.options.environment = { ...process.env, GH_TOKEN: 'github-test-token', SATURN_VERCEL_DEPLOY_HOOK_URL: 'https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y' }
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(Response.json({ sha: f.context.stage.revision }))
       .mockResolvedValueOnce(Response.json({ job: { id: 'job-1', state: 'PENDING' } }))
@@ -386,14 +398,17 @@ describe('cloud.deploy first-class targets', () => {
     expect(result.data).toMatchObject({ target: 'vercel', revision: f.context.stage.revision, response: { job: { id: 'job-1' } } })
     expect(fetch.mock.calls[1]![0]).toBe('https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y')
     expect((fetch.mock.calls[1]![1]!.headers as Record<string, string>)['Authorization']).toBeUndefined()
+    // A literal endpoint in config is refused before any secret can be resolved or dispatched.
+    f.context.config.integrations.vercel = { endpoint: 'https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y' }
+    await expect(f.execute('cloud.deploy', { environment: 'production', target: 'vercel' })).rejects.toMatchObject({ code: 'action-required' })
   }, 20_000)
 
   it('deploys through a configured Cloudflare Pages deploy hook and rejects a hook URL carrying embedded credentials', async () => {
     const f = await repository()
     f.context.stage = (await f.execute('workspace.stage')).stage!
     f.context.config.integrations.github = { credentialEnv: 'GH_TOKEN', resource: 'owner/repository' }
-    f.context.config.integrations['cloudflare-pages'] = { endpoint: 'https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/hook-id' }
-    f.options.environment = { ...process.env, GH_TOKEN: 'github-test-token' }
+    f.context.config.integrations['cloudflare-pages'] = { endpointEnv: 'SATURN_CLOUDFLARE_PAGES_DEPLOY_HOOK_URL' }
+    f.options.environment = { ...process.env, GH_TOKEN: 'github-test-token', SATURN_CLOUDFLARE_PAGES_DEPLOY_HOOK_URL: 'https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/hook-id' }
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(Response.json({ sha: f.context.stage.revision }))
       .mockResolvedValueOnce(Response.json({ success: true, result: { id: 'deployment-1' } }))
@@ -401,9 +416,52 @@ describe('cloud.deploy first-class targets', () => {
     f.options.fetch = fetch
     const result = await f.execute('cloud.deploy', { environment: 'production', target: 'cloudflare-pages' })
     expect(result.data).toMatchObject({ target: 'cloudflare-pages', response: { success: true } })
-    f.context.config.integrations['cloudflare-pages'] = { endpoint: 'https://user:pass@api.cloudflare.com/hook' }
+    f.options.environment = { ...f.options.environment, SATURN_CLOUDFLARE_PAGES_DEPLOY_HOOK_URL: 'https://user:pass@api.cloudflare.com/hook' }
     await expect(f.execute('cloud.deploy', { environment: 'production', target: 'cloudflare-pages' })).rejects.toMatchObject({ code: 'action-required' })
   }, 20_000)
+
+  it('redacts a deploy-hook URL that a provider echoes back in its own response', async () => {
+    const f = await repository()
+    f.context.stage = (await f.execute('workspace.stage')).stage!
+    f.context.config.integrations.github = { credentialEnv: 'GH_TOKEN', resource: 'owner/repository' }
+    f.context.config.integrations.vercel = { endpointEnv: 'SATURN_VERCEL_DEPLOY_HOOK_URL' }
+    f.options.environment = { ...process.env, GH_TOKEN: 'github-test-token', SATURN_VERCEL_DEPLOY_HOOK_URL: 'https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y' }
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json({ sha: f.context.stage.revision }))
+      .mockResolvedValueOnce(Response.json({ job: { id: 'job-1', webhookUrl: 'https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y' } }))
+    f.options.fetch = fetch
+    const result = await f.execute('cloud.deploy', { environment: 'production', target: 'vercel' })
+    expect(JSON.stringify(result)).not.toContain('hook_y')
+  }, 20_000)
+})
+
+describe('report deliveries', () => {
+  it('sends the daily digest through telegram and never leaks the token in a delivery failure', async () => {
+    const f = await fixture()
+    f.context.config.integrations.telegram = { credentialEnv: 'TG_TOKEN', resource: '123456' }
+    f.options.environment = { TG_TOKEN: 'secret-bot-token' }
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(Response.json({ ok: true, result: { message_id: 7 } }))
+    f.options.fetch = fetch
+    const deliveries = createReportDeliveries(f.options)
+    await deliveries.telegram!(f.context.config, { title: 'Daily digest · 2026-09-15', markdown: 'Cycle summary body.' })
+    expect(fetch.mock.calls[0]![0]).toBe('https://api.telegram.org/botsecret-bot-token/sendMessage')
+    expect(parsedBody(fetch.mock.calls[0]![1]!.body)).toMatchObject({ chat_id: '123456' })
+
+    const failing = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('nope', { status: 500 }))
+    f.options.fetch = failing
+    const failingDeliveries = createReportDeliveries(f.options)
+    const error = await failureFrom(failingDeliveries.telegram!(f.context.config, { title: 'Daily digest', markdown: 'Body' }))
+    expect(String(error)).not.toContain('secret-bot-token')
+  })
+
+  it('requires a configured chat id before sending a report delivery', async () => {
+    const f = await fixture()
+    f.context.config.integrations.telegram = { credentialEnv: 'TG_TOKEN' }
+    f.options.environment = { TG_TOKEN: 'secret-bot-token' }
+    const deliveries = createReportDeliveries(f.options)
+    const error = await failureFrom(deliveries.telegram!(f.context.config, { title: 'Daily digest', markdown: 'Body' }))
+    expect(error).toMatchObject({ code: 'action-required' })
+  })
 })
 
 describe('creative.generate media routing', () => {
