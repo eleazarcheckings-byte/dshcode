@@ -1,0 +1,64 @@
+# Agent Note: Upstream reconciliation with deepseek-ai/deepseek-harness
+
+Status: proposed
+
+English | [中文](2026-09-15-upstream-reconciliation.zh.md)
+
+## Problem
+
+`dshcode` (`origin` = `whitelonng/dshcode`, `HEAD` = `5dd99fb`) is a fork of DeepSeek's `deepseek-harness`. Sixteen `@saturnai/*` packages and a repository-wide rebrand sit on top of it (947 files changed, +40,148/-5,648 versus `origin/master`). The fork has not taken an upstream release since `dsh-v0.1.2-alpha.4` (2026-09-01). Nine upstream releases have shipped since then, the newest `dsh-v0.1.6-alpha.1` (2026-09-15), totalling **8,570 files changed, +999,931/-111,317** — including an MCP SDK v2 upgrade, a subagent/Team-mode rewrite (`spawn_teammate` replacing `subagent`/`subagent_fork`, teammate cap 8 → 16), a DeepSeek-adapter protocol switch (Messages replaces the old completions default), and a `PTC`/`workflow` package rename family. Deciding whether and how to take these releases — before divergence compounds further — needs a real conflict estimate, not a guess.
+
+## Proposal
+
+**Conflict measurement is not a standard `git merge-tree` job here — that is itself the first finding.** `origin/master` and `upstream-dsh/master` (`https://github.com/deepseek-ai/deepseek-harness.git`, added as remote `upstream-dsh` and fetched — 17 tags, `master` at `0d1f500`) share **no common ancestor**: `git merge-base origin/master upstream-dsh/master` exits 1, and `git merge-base --is-ancestor dsh-v0.1.2-alpha.4 HEAD` also exits 1, even though the fork's own `REBRAND.md`/recon record it as descending from that version. `whitelonng/dshcode` was built as a **content snapshot** of upstream at some point, not a preserved fork — so `git merge-tree --write-tree HEAD <upstream-tag>` fails outright (`fatal: refusing to merge unrelated histories`), and `git merge-tree --write-tree --allow-unrelated-histories HEAD dsh-v0.1.6-alpha.1` does not return within an 8-minute budget on this ~460k-object monorepo (killed after ~10 minutes; a full unrelated-histories 3-way merge attempt is too expensive to run opportunistically and would need its own dedicated, unattended pass). `git merge-tree HEAD origin/master` (a real ancestor relationship) *does* resolve cleanly in-process — confirming the tool and repository work normally when history is actually shared.
+
+**Substitute measure — file-level overlap, the tractable proxy for "would conflict":**
+
+1. `git diff --name-only origin/master..HEAD` → **947 files** is Saturn's total change surface (packages, rebrand, docs, config) over the fork's own base.
+2. Of those, **630 files** sit outside the 16 Saturn-owned package directories (i.e., shared/framework files Saturn's own work edited).
+3. `git diff --name-only dsh-v0.1.2-alpha.4..dsh-v0.1.6-alpha.1` → **8,570 files** upstream has touched since the fork's baseline.
+4. The intersection of (2) and (3) — files **both** Saturn's own diff and upstream's four-release span touched — is **431 files**, the conflict-candidate set. (No Saturn-owned package directory appears in this set, by construction: Saturn packages are new paths with no upstream counterpart, so they carry zero merge risk on their own; all risk is in the shared substrate both sides edited.)
+
+Breakdown of the 431: `packages/` 148 (spanning 42 distinct shared packages), `snapshots/` (session/web/sdk fixture goldens) 184, `apps/` 61, `docs/` 21, `scripts/` 10, root/other 7.
+
+The 42 shared packages, ranked by how directly they intersect *this session's own* build mandates (i.e., where a real vendor-bump would refight work this fan-out just did):
+
+- **Direct, high-confidence collisions** (sampled and diffed, not inferred): `packages/client/ui-tool/src/client/tool/components/ToolRow.tsx` — upstream 0.1.3-alpha.1 added `image`/`renderSlot`/`loadImage` props for inline `read_image` rendering in the exact file the C2 cell edits for verb-first tool-row titles; `packages/client/ui-sidebar` (`SidebarRoot.tsx`/`.module.css`) — C3's ring-on-active-row work; `packages/client/ui-conversation` (`ConversationRoot.tsx/.module.css`, `locales.ts`, `InputBar.tsx`) — C2's prose-measure and orbital-canvas work; `packages/client/ui-settings-models` (`ProviderEditor.tsx`, `locales.ts`, 4 test files) — C6's model-router Settings-card work, colliding with upstream's own model-catalog and pi-ai changes; `packages/bundle/base/cordis.patch.yml` and `packages/bundle/web-app/cordis.patch.yml` — every cell that reports a bundle-row integration need (C4, C6, C7, C8a) writes into files upstream also restructures; `packages/preset/agent-presets/presets/cordis/agent.cordis.yml` — C6's IN-scope file, directly touched upstream; `packages/mcp/mcp-client` (`connection.ts`, `index.ts` + 2 tests) — upstream's MCP SDK v2 upgrade (protocol negotiation, tool pagination) lands in the exact package any Saturn MCP-facing work depends on; `packages/subagent/subagent-codex/src/wire.ts` — adjacent to C5's `child-agent.ts` cwd work and C6's Codex-provider mounting.
+- **Moderate**: `packages/client/ui-chat`, `packages/client/ui-theme` (`design-platform.css`, sibling to C2's `base.css` motion-token work), `packages/core/system-prompt`, `packages/sandbox/sandbox-policy` (adjacent to C5's bash-aware claims guard), `packages/experimental/agent-team-profile` / `agent-team-web-profile` (Team-mode rewrite territory — `spawn_teammate` — directly relevant to C5's worktree-isolation work on `packages/saturn/agent-team`, which sits beside but does not literally overlap these paths).
+- **Low/mechanical**: README/i18n triplets, `packages/skill/README*`, `packages/experimental/README*` — rebrand-only text, not logic.
+- **184 snapshot goldens** (`snapshots/session/*`, `snapshots/web/*`, `snapshots/sdk/*`, many `subagent-*` fixtures) is the largest single bucket and the least visible in a file-count summary: a real vendor-bump regenerates or hand-reconciles most of these, which SPEC §5 already defers ("new web e2e golden scenarios … are a follow-up") — this note extends that same caution to the *session/sdk* snapshot family, which SPEC did not separately call out.
+
+**Upstream features since `dsh-v0.1.2-alpha.4`** (GitHub Releases API, `deepseek-ai/deepseek-harness`, English release-note bodies; dates are `published_at`):
+
+| Release | Date | Notable for Saturn |
+|---|---|---|
+| `0.1.2-alpha.5` | 2026-09-02 | Bug-fix only (upgrade-path session-title regression). |
+| `0.1.2-rc.1` | 2026-09-03 | 71-item release. Subagent model selection (provider/model/reasoning-effort/max-output per call, plus Claude Code/Codex model config) — **directly overlaps C6's model-router mandate**; `send_message` replaces one-way `report` for parent↔child agents — overlaps C5's agent-team work; public `WebFetch` enabled by default with SSRF protection; `Session.events` replaced by `seq`/`eventAt()`/`snapshotEvents()`; Remote gateway replaces legacy APIProxy; Rename Code Mode → PTC mode. |
+| `0.1.3-alpha.1` | 2026-09-04 | Arbitrary-file-type Web uploads; **breaking**: Session persistence now owned by lifecycle-scoped `SessionHandle`s, `agentLoop.create()` becomes async, one-process-per-session lock; Session format v2 migration. Known perf regression flagged by upstream itself, unresolved in this release. |
+| `0.1.3-alpha.2` | 2026-09-07 | pi-ai upgraded to 0.85.1 (new models); continuable-subagent message queue/edit/delete/steer/stop. |
+| `0.1.5-alpha.1` | 2026-09-08 | Dynamic system-prompt edits without breaking KV cache; experimental right Sidebar (multi-tab/split/fullscreen); bundled Codex 0.153.4 / Claude Code 2.1.263 runtimes for the optional subagent-provider plugins — **directly relevant to C6's `dsh-subagent-claude-code`/`dsh-subagent-codex` rows**. |
+| `0.1.5-alpha.2` | 2026-09-09 | Sidebar document preview (Markdown/code/HTML/PDF/image); models can explicitly deliver files into the sidebar. |
+| `0.1.5-rc.1` | 2026-09-10 | `DeepSeek-V41-Flash` model default for new sessions. |
+| `0.1.5-rc.2` | 2026-09-10 | UX polish only (feedback dialog, delivered-file card layout). |
+| `0.1.6-alpha.1` | 2026-09-15 | Web-sidebar terminals; archived-session list; **MCP resource discovery + URI templates + official SDK v2** (protocol negotiation, tool pagination); Headless stdin tasks + `--session-id` resume + `--json` event stream; SSH-remote-workspace file/command/PTC tools; **experimental Browser Use** (Playwright MCP / Chrome DevTools MCP / Stagehand) and **experimental Computer Use** (Cua Driver MCP / native driver) — both pre-empt ground SPEC §3's C7 (`tool-media`) and any future Saturn browser-automation work claims as novel; experimental Auto-review mode. **Breaking/chores**: DeepSeek adapter defaults to the Messages protocol (old completions root URL must be removed or repointed to `/anthropic`); Ralph disabled by default; built-in E2B backend removed; PTC package/service family renamed to `ptc-runtime` (no legacy aliases); workflow executor renamed to `workflow-ptc` (Python PTC unsupported); `agent/session-start` replaced by async `agent/created`; **Team mode: `spawn_teammate` becomes the only path, `subagent`/`subagent_fork` disabled, default teammate cap raised 8 → 16** — this is the same surface C5 is modifying this session (`packages/saturn/agent-team`, `packages/saturn/tool-agent-team`) and needs to be read before, not after, a future vendor-bump attempt. |
+
+## Alternatives considered
+
+- **Run `git merge-tree --allow-unrelated-histories` to completion regardless of time.** Rejected for this session: it did not finish in 8 minutes on a monorepo this size with no shared history, the mandate caps commands at 8 minutes, and a half-finished background job proves nothing actionable. A dedicated, unattended pass (own budget, run overnight) is the right way to get an exact conflict count if izzy wants one before deciding.
+- **Treat "947 files diverge from origin/master" itself as the conflict count.** Rejected: that count includes Saturn's own new packages and rebrand-only text with zero upstream counterpart, wildly overstating risk; the 431-file intersection isolates the actual shared substrate.
+- **Skip the release-note read and infer features from commit subjects only.** Rejected: DeepSeek's release notes are the only accurate feature-to-date mapping (commit graphs are unrelated-history noise here), and several entries (Team-mode rewrite, MCP SDK v2, Browser/Computer Use) are exactly the kind of "do we already have this" question SPEC's intake explicitly asked C11 to answer.
+- **Recommend an immediate vendor-bump.** Rejected: the underlying histories are unrelated, upstream shipped a one-million-line diff with multiple explicit breaking changes (Session persistence, PTC renames, Team-mode) across the same span Saturn's 16 packages were built against, and one of upstream's own releases (`0.1.3-alpha.1`) shipped with a self-reported unresolved performance regression. A vendor-bump attempted now would be a full manual reconciliation, not a merge.
+
+## Acceptance criteria
+
+- `git remote -v` in `R` lists `upstream-dsh` → `https://github.com/deepseek-ai/deepseek-harness.git` (added and fetched this session; harmless to leave, fetches no LFS/credentials).
+- `git merge-tree --write-tree HEAD origin/master` (control case, common ancestor exists) resolves clean — recorded above as the tool-sanity check.
+- The 431-file, 42-package intersection list and the nine-release feature table above are reproducible via the two `git diff --name-only` commands and one GitHub Releases API call named in this note.
+- Nothing in `R` was merged, rebased, or reset; `HEAD` is unchanged at `5dd99fb`.
+
+## Risks
+
+- **The 431-file proxy undercounts true risk.** File-level overlap says two sides touched the same file, not that their hunks collide; some of the 431 (e.g., README-only files) will merge trivially, while a single-line change to `packages/mcp/mcp-client/src/connection.ts` could still break every Saturn feature depending on the pre-v2 MCP client contract. Treat this note's count as a **lower bound on effort**, not an exact conflict tally.
+- **Nine releases in fourteen days is a fast-moving target.** Any vendor-bump plan drafted from this note stales quickly; re-run the two `git diff --name-only` commands and the Releases API call immediately before actually attempting a bump.
+- **The unattended `--allow-unrelated-histories` merge-tree run was never completed.** If izzy wants an exact upstream 3-way conflict count (not the file-overlap proxy), that specific command needs a dedicated multi-hour budget outside this session's per-command cap — flagged here rather than run to an uncertain outcome.
+- **Decision stays with izzy per SPEC §3 C11**: this note recommends surfacing the collision list and feature table for his call, not choosing vendor-bump vs. deliberate divergence unilaterally.
