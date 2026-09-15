@@ -9,15 +9,25 @@ import { BotBusyError, SaturnBotStore } from './store.ts'
 import type { BotModel, BotModelContext, BotTool, BotToolResult } from './contracts.ts'
 import type { BotApproval, BotBranch, BotConfig, BotCycle, BotEventPage, BotId, BotJson, BotRole, BotSnapshot, BotTask, ToolProposal } from './types.ts'
 
+/** One report-channel delivery: send an already-composed digest, or throw with a safe message. */
+export type BotReportDelivery = (config: BotConfig, report: { title: string; markdown: string }) => Promise<void>
 /** Required adapters; no network or shell implementation is hidden in the engine. */
-export interface BotEngineOptions { store: SaturnBotStore; model: BotModel; tools: readonly BotTool[] }
+export interface BotEngineOptions {
+  store: SaturnBotStore
+  model: BotModel
+  tools: readonly BotTool[]
+  /** Environment secrets are redacted from; defaults to `process.env`. */
+  environment?: Readonly<NodeJS.ProcessEnv>
+  /** Non-inbox `reportChannel` deliveries, keyed by channel name. */
+  reportDeliveries?: Readonly<Record<string, BotReportDelivery>>
+}
 const freshId = (): BotId => randomUUID() as BotId
 const timestamp = (): string => new Date().toISOString()
 
 /** Remove credential fields, configured environment values, and bearer tokens from observable facts. */
-function redacted(value: unknown, config: BotConfig): BotJson {
+function redacted(value: unknown, config: BotConfig, environment: Readonly<NodeJS.ProcessEnv>): BotJson {
   const secrets = Object.values(config.integrations)
-    .map(item => item.credentialEnv === undefined ? undefined : process.env[item.credentialEnv])
+    .map(item => item.credentialEnv === undefined ? undefined : environment[item.credentialEnv])
     .filter((item): item is string => item !== undefined && item.length > 3)
   const clean = (item: unknown, depth: number): BotJson => {
     if (depth > 20) return '[depth limit]'
@@ -60,9 +70,11 @@ export class SaturnBotEngine {
   private disposed = false
   private nextRunAt: string | null = null
   private readonly store: SaturnBotStore
+  private readonly environment: Readonly<NodeJS.ProcessEnv>
 
   constructor(private readonly options: BotEngineOptions) {
     this.store = options.store
+    this.environment = options.environment ?? process.env
     this.planner = new SaturnBotOrchestrator(options.model)
     for (const tool of options.tools) {
       if (this.tools.has(tool.name)) throw new Error(`Duplicate SaturnBot tool ${tool.name}`)
@@ -247,7 +259,7 @@ export class SaturnBotEngine {
         const result = await this.dispatch(
           tool, { tool: tool.name, input: tool.evaluationInput }, config, cycle.id, null, 'orchestrator', null, -1, signal,
         )
-        observedState[tool.name] = redacted(result, config)
+        observedState[tool.name] = redacted(result, config, this.environment)
       } catch (error) {
         observedState[tool.name] = { error: this.errorText(error, config) }
         await this.alert(cycle.id, null, `State feed ${tool.name}: ${this.errorText(error, config)}`)
@@ -311,7 +323,7 @@ export class SaturnBotEngine {
       Object.assign(branch, candidate)
       await this.store.append({ type: 'cycle', cycle })
       await this.store.append({ type: 'message', message: { id: freshId(), role: branch.task.role, sender: 'agent', content: proposal.summary || 'Task proposal ready.', at: timestamp(), cycleId: cycle.id } })
-      await this.store.append({ type: 'trace', trace: { cycleId: cycle.id, branchId: branch.id, kind: 'proposal', summary: proposal.summary, data: redacted(proposal, config) } })
+      await this.store.append({ type: 'trace', trace: { cycleId: cycle.id, branchId: branch.id, kind: 'proposal', summary: proposal.summary, data: redacted(proposal, config, this.environment) } })
     }
   }
 
@@ -366,7 +378,7 @@ export class SaturnBotEngine {
     for (let attempt = 1; attempt <= attempts; attempt++) {
       signal.throwIfAborted()
       await this.store.requireHeadroom(4_194_304)
-      await this.store.append({ type: 'trace', trace: { cycleId, branchId, kind: 'tool-start', tool: tool.name, attempt, summary: `Dispatch ${tool.name}`, data: redacted(input, config) } })
+      await this.store.append({ type: 'trace', trace: { cycleId, branchId, kind: 'tool-start', tool: tool.name, attempt, summary: `Dispatch ${tool.name}`, data: redacted(input, config, this.environment) } })
       try {
         const result = await bounded(signal, config.toolTimeoutMs, async toolSignal => tool.execute(input, {
           config, cycleId, branchId: branchId ?? `${cycleId}:evaluation` as BotId, role, stage, signal: toolSignal,
@@ -376,7 +388,7 @@ export class SaturnBotEngine {
         const parsed = botToolResultSchema.parse(result)
         await this.store.append({ type: 'trace', trace: {
           cycleId, branchId, kind: 'tool-result', tool: tool.name, attempt,
-          summary: this.redactedText(parsed.summary, config), data: redacted(parsed.data ?? null, config),
+          summary: this.redactedText(parsed.summary, config), data: redacted(parsed.data ?? null, config, this.environment),
         } })
         return {
           summary: parsed.summary, ...(parsed.data === undefined ? {} : { data: parsed.data }),
@@ -429,7 +441,7 @@ export class SaturnBotEngine {
     } finally { if (!transferred) await release() }
   }
 
-  private redactedText(value: string, config: BotConfig): string { return redacted(value, config) as string }
+  private redactedText(value: string, config: BotConfig): string { return redacted(value, config, this.environment) as string }
   private errorText(error: unknown, config: BotConfig): string {
     const message = error instanceof Error ? error.stack ?? error.message : typeof error === 'string' ? error : 'Unknown SaturnBot failure'
     return this.redactedText(message, config)
@@ -457,7 +469,16 @@ export class SaturnBotEngine {
     await this.store.append({ type: 'report', report: { id: `${date}:digest` as BotId, cycleId: cycle.id, date, title: `Daily digest · ${date}`, markdown: `# Daily digest · ${date}\n\n${daily}`, channel: 'inbox' } })
     await writeFileAtomic(join(this.store.root, 'reports', `${date}.md`), `# Daily digest · ${date}\n\n${fullDigest}\n`, { mode: 0o600, dirMode: 0o700 })
     await this.store.append({ type: 'message', message: { id: freshId(), role: 'orchestrator', sender: 'agent', content: markdown.slice(0, 16_000) || 'Cycle finished.', at: timestamp(), cycleId: cycle.id } })
-    if (config.reportChannel !== 'inbox') await this.alert(cycle.id, null, `Report saved to the durable inbox. External report channel "${config.reportChannel}" is not configured by this runtime.`)
+    if (config.reportChannel !== 'inbox') {
+      const deliver = this.options.reportDeliveries?.[config.reportChannel]
+      if (deliver === undefined) {
+        await this.alert(cycle.id, null, `Report saved to the durable inbox. External report channel "${config.reportChannel}" is not configured by this runtime.`)
+      } else {
+        try { await deliver(config, { title: `Daily digest · ${date}`, markdown: daily }) } catch (error) {
+          await this.alert(cycle.id, null, `Report channel "${config.reportChannel}" delivery failed: ${this.errorText(error, config)}`)
+        }
+      }
+    }
   }
 
   /** Abort current work and wait until adapters and the journal reach quiescence.
