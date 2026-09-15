@@ -45,11 +45,18 @@ describe('web e2e: startup auto-selection', () => {
     // Saturn accent the mark's own token resolves to (the ambient canvas owns
     // the hero's motion, so the mark itself is a still).
     const mark = page.locator('[data-saturn-anchor] + div svg')
-    const [markColor, markAccent] = await mark.evaluate((node) => {
+    const [markColor, accentColor] = await mark.evaluate((node) => {
       const style = getComputedStyle(node)
-      return [style.color, style.getPropertyValue('--saturn-accent')]
+      // Computed color serializes as rgb(); resolve the token the same way
+      // through a probe so both sides compare in one spelling.
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--saturn-accent)'
+      document.body.appendChild(probe)
+      const accent = getComputedStyle(probe).color
+      probe.remove()
+      return [style.color, accent]
     })
-    expect(markColor).toBe(markAccent)
+    expect(markColor).toBe(accentColor)
     await page.evaluate(() => {
       const refs = {
         root: document.querySelector('div[data-phase="hero"]'),
