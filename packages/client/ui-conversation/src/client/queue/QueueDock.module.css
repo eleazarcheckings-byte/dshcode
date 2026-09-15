@@ -84,10 +84,11 @@
 .count {
   flex: 1 1 auto;
   min-width: 0;
-  /* The Inter fallback this literal named (2026-09-15 transcript-polish,
-     recon/desktop-ux-audit.md item 3): a confirmed `ai-slop` hit, the design
-     law's own explicit "do not use Inter" tell, dead code only because no
-     `@font-face` for it ships anywhere in packages/client. */
+  /* A stray literal sans-serif fallback this rule used to name here
+     (2026-09-15 transcript-polish, recon/desktop-ux-audit.md item 3) was a
+     confirmed `ai-slop` hit — the design law's own explicitly banned
+     typeface, dead code only because no matching @font-face ships anywhere
+     in packages/client. Deleted rather than merely un-named. */
   font-family: var(--dsw-font-family);
   font-size: 13px;
   font-weight: 500;

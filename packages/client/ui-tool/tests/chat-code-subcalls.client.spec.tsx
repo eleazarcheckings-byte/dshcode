@@ -155,7 +155,8 @@ describe('run_code sub-calls through the real chat machinery', () => {
     const nest = view.container.querySelector('[data-subcalls]')
     expect(nest).not.toBeNull()
     expect(nest!.querySelector('[data-sample="bash"]')).not.toBeNull()
-    expect(view.getByText('Bash')).toBeTruthy()
+    // Settled title is past-tense (2026-09-15 transcript-polish): 'Ran'.
+    expect(view.getByText('Ran')).toBeTruthy()
     expect(view.getByText('List notes')).toBeTruthy()
     expect(view.getByText('Tool call')).toBeTruthy()
   })
@@ -173,9 +174,12 @@ describe('run_code sub-calls through the real chat machinery', () => {
 
     // Each run-control verb names its act and shows the package id; without the
     // owned titles all three would read "Tool call · cordis_run · dyn-2".
+    // A per-row duration (2026-09-15 transcript-polish) now sits between the
+    // title and the summary for every settled row, including these; each
+    // sub-call here settles at 0s elapsed (its seq-derived time === callTime).
     expect(nest.querySelector('[data-tool="cordis_runtime_inspect"]')?.textContent).toContain('Inspect')
-    expect(nest.querySelector('[data-tool="cordis_run"]')?.textContent).toContain('Run Cordis Plugindyn-2')
-    expect(nest.querySelector('[data-tool="cordis_undefine"]')?.textContent).toContain('Remove Cordis Plugindyn-2')
+    expect(nest.querySelector('[data-tool="cordis_run"]')?.textContent).toContain('Run Cordis Plugin0sdyn-2')
+    expect(nest.querySelector('[data-tool="cordis_undefine"]')?.textContent).toContain('Remove Cordis Plugin0sdyn-2')
     // None of them is a code row: the program belongs to cordis_define, whose
     // own keyed card renders it (the next case covers the code row itself).
     expect(nest.querySelector('[data-variant="code"]')).toBeNull()

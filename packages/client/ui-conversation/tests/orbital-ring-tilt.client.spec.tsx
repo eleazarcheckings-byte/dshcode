@@ -63,9 +63,7 @@ describe('OrbitalCanvas SVG fallback ring tilt', () => {
       width: 720, height: 250, x: 0, y: 0, top: 0, left: 0, right: 720, bottom: 250,
       toJSON: () => ({}),
     })
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-      setTransform: vi.fn(),
-    } as unknown as CanvasRenderingContext2D)
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(makeCtxStub().ctx)
   })
 
   afterEach(() => {

@@ -97,7 +97,8 @@ describe('keyed toolview hole through the real machinery', () => {
     // bash: the sample plugin's keyed registration took the row (root
     // session → global arm, decided inside the component off useSessions).
     expect(view.container.querySelector('[data-sample="bash"]')).not.toBeNull()
-    expect(view.getByText('Bash')).toBeTruthy()
+    // Settled title is past-tense (2026-09-15 transcript-polish): 'Ran'.
+    expect(view.getByText('Ran')).toBeTruthy()
     expect(view.getByText('Build')).toBeTruthy()
     // mystery: no registration under that key → render-site fallback.
     expect(view.getByText('Tool call')).toBeTruthy()
@@ -116,11 +117,14 @@ describe('keyed toolview hole through the real machinery', () => {
     // Every one of these rows is user-visible on each model define/run, so each
     // names its act and carries the package id rather than falling back to the
     // generic "Tool call · <name> · <id>" row.
+    // A per-row duration (2026-09-15 transcript-polish) now sits between the
+    // title and the summary for every settled row, including these; each
+    // fixture settles 500ms after its call, rounding to 1s.
     const rowText = (name: string) => view.container.querySelector(`[data-tool="${name}"]`)?.textContent
     expect(rowText('cordis_runtime_inspect')).toContain('Inspect')
-    expect(rowText('cordis_run')).toContain('Run Cordis Plugindyn-2')
-    expect(rowText('cordis_stop')).toContain('Stop Cordis Plugindyn-2')
-    expect(rowText('cordis_undefine')).toContain('Remove Cordis Plugindyn-2')
+    expect(rowText('cordis_run')).toContain('Run Cordis Plugin1sdyn-2')
+    expect(rowText('cordis_stop')).toContain('Stop Cordis Plugin1sdyn-2')
+    expect(rowText('cordis_undefine')).toContain('Remove Cordis Plugin1sdyn-2')
     // No run-control verb is a code row; the program is cordis_define's, and its
     // own keyed card owns that rendering.
     expect(view.container.querySelector('[data-variant="code"]')).toBeNull()
