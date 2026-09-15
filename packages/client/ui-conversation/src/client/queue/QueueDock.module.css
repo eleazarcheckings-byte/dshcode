@@ -84,7 +84,11 @@
 .count {
   flex: 1 1 auto;
   min-width: 0;
-  font-family: Inter, var(--dsw-font-family);
+  /* The Inter fallback this literal named (2026-09-15 transcript-polish,
+     recon/desktop-ux-audit.md item 3): a confirmed `ai-slop` hit, the design
+     law's own explicit "do not use Inter" tell, dead code only because no
+     `@font-face` for it ships anywhere in packages/client. */
+  font-family: var(--dsw-font-family);
   font-size: 13px;
   font-weight: 500;
   line-height: 24px;
@@ -142,7 +146,7 @@
   flex: 1 1 auto;
   min-width: 0;
   font: var(--dsw-font-xs-13);
-  font-family: Inter, var(--dsw-font-family);
+  font-family: var(--dsw-font-family);
 }
 
 .preview {
@@ -162,6 +166,7 @@
   outline: none;
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
+  transition: border-color var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
 }
 
 .editor:focus {
@@ -188,6 +193,9 @@
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
+  transition:
+    background-color var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease),
+    opacity var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
 }
 
 .action:hover:not(:disabled) {

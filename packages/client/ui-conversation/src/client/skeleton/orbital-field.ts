@@ -1,6 +1,16 @@
 /** Deterministic canvas painting for the conversation's decorative Saturn field. */
 import { paintStellarField, type StellarPointer } from './stellar-field.ts'
 
+/**
+ * The signature ring tilt (SPEC §2: "one tilt value everywhere"), in radians
+ * for `ctx.rotate`. 2026-09-15 transcript-polish: this canvas previously used
+ * -0.25 rad (≈-14.3°) while the favicon/mark (`ui-skin-saturn`) and this
+ * file's own SVG fallback used -18° — two render paths drawing two angles
+ * for the same mark (recon/desktop-ux-audit.md item 2). -18° is the value the
+ * design law's precedent text and the favicon already committed to.
+ */
+const RING_TILT_RADIANS = -18 * (Math.PI / 180)
+
 /** The composer state echoed by the decorative field; no agent activity is inferred. */
 export type OrbitalState = 'idle' | 'focused' | 'drafting'
 
@@ -34,7 +44,7 @@ export function paintOrbitalField(
   const scale = Math.min(anchor.width / 720, anchor.height / 250, 1)
   ctx.translate(anchor.x + anchor.width / 2, anchor.y + anchor.height * 0.52)
   ctx.scale(scale, scale)
-  const angle = -0.25 + Math.sin(time * 0.35) * 0.085
+  const angle = RING_TILT_RADIANS + Math.sin(time * 0.35) * 0.085
   const depth = 0.26 + Math.sin(time * 0.25) * 0.022
   const light = 0.94 + Math.sin(time * 0.3) * 0.06 + (state === 'idle' ? 0 : 0.05)
 

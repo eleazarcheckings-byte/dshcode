@@ -9,10 +9,9 @@ import { CONVERSATION_NS as NS } from '../../locale.ts'
 
 type SearchRowProps = ToolCallViewProps & PropsLocale<'conversation'>
 
-const SEARCH_TITLE_KEYS = {
-  grep: 'tool.title.grep',
-  glob: 'tool.title.glob',
-} as const
+// Grep is verb-first present/past (2026-09-15 transcript-polish, the audit's
+// own named example); glob keeps its existing static label, unchanged.
+const GREP_TITLE_KEYS = { running: 'tool.title.grep.running', done: 'tool.title.grep' } as const
 
 /** Lets users expand grep or glob results and recover capped searches. */
 export function SearchRow({ toolName, block, inspect, t }: SearchRowProps) {
@@ -25,8 +24,8 @@ export function SearchRow({ toolName, block, inspect, t }: SearchRowProps) {
       toolName={toolName}
       icon={<IconSearchOutline16 size={14} />}
       title={t(toolName === 'grep'
-        ? SEARCH_TITLE_KEYS.grep
-        : toolName === 'glob' ? SEARCH_TITLE_KEYS.glob : model.titleKey)}
+        ? (model.state === 'running' ? GREP_TITLE_KEYS.running : GREP_TITLE_KEYS.done)
+        : toolName === 'glob' ? 'tool.title.glob' : model.titleKey)}
       summary={model.summary}
       // ToolRow ignores output when a structured card is present; otherwise it
       // preserves the generic fallback for errors and legacy results.
@@ -34,6 +33,7 @@ export function SearchRow({ toolName, block, inspect, t }: SearchRowProps) {
       errorSummary={model.errorSummary}
       search={search}
       state={model.state}
+      duration={model.durationMs}
       inspect={inspect}
     />
   )

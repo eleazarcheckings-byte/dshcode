@@ -12,4 +12,19 @@
   --ds-transition-duration: 0.2s;
   --ds-transition-duration-fast: 0.1s;
   --ds-transition-duration-slow: 0.3s;
+
+  /* Saturn motion system (2026-09-15 transcript-polish, SPEC §2): a named
+   * three-step duration scale plus standard/out/exit eases, declared here so
+   * every package (not only the ui-skin-saturn palette scope, which owns the
+   * separate single-value --saturn-duration/--saturn-ease pair) can adopt one
+   * system instead of ad hoc per-component ms values — the recon audit found
+   * 14 distinct durations and only 9 uses of the one prior token project-wide.
+   * Budget: 2-3 intentional motions per surface, each stating something about
+   * the product (a receipt arriving, a view settling) — never decoration. */
+  --saturn-dur-1: 120ms;
+  --saturn-dur-2: 200ms;
+  --saturn-dur-3: 320ms;
+  --saturn-ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --saturn-ease-out: cubic-bezier(0, 0, 0, 1);
+  --saturn-ease-exit: cubic-bezier(.4, 0, 1, 1);
 }

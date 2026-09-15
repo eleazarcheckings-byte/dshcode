@@ -149,7 +149,7 @@
 .iconIdle {
   display: inline-flex;
   opacity: 1;
-  transition: opacity 100ms ease;
+  transition: opacity var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
 }
 
 .chevronHover {
@@ -157,7 +157,7 @@
   inset: 0;
   margin: auto;
   opacity: 0;
-  transition: opacity 100ms ease;
+  transition: opacity var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
 }
 
 .root:hover .iconIdle {
@@ -182,6 +182,29 @@
   border-radius: 1px;
   margin: 0 8px;
   background: var(--dsw-alias-label-caption);
+}
+
+/* Settled-call receipt, same treatment as ToolRow's .duration (this row
+   duplicates ToolRow's chrome rather than sharing it — see the TODO on
+   .leading above). */
+.duration {
+  flex: none;
+  margin-left: 8px;
+  font-family: var(--ds-font-family-code);
+  font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 2px);
+  color: var(--dsw-alias-label-caption);
+  animation: dsh-tool-duration-in var(--saturn-dur-2, 200ms) var(--saturn-ease-out, ease-out);
+}
+
+@keyframes dsh-tool-duration-in {
+  from {
+    opacity: 0;
+    transform: translateY(1px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .summary {
@@ -226,7 +249,7 @@
   line-height: 16px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 100ms ease;
+  transition: opacity var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
 }
 
 .card:hover .inspectButton,

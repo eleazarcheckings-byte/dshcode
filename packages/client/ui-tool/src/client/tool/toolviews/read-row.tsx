@@ -27,6 +27,7 @@ export function ReadRow({ toolName, block, cwd, home, openFile, inspect, t }: Re
       errorSummary={model.errorSummary}
       read={read}
       state={model.state}
+      duration={model.durationMs}
       filePath={model.filePath}
       onOpenFile={openFile}
       inspect={inspect}

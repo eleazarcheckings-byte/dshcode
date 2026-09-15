@@ -60,6 +60,7 @@ export function GenericToolCard({ toolName, block, cwd, home, openFile, inspect,
       search={search}
       web={web}
       state={state}
+      duration={model.durationMs}
       filePath={model.filePath}
       onOpenFile={singleFile ? openFile : undefined}
       inspect={inspect}

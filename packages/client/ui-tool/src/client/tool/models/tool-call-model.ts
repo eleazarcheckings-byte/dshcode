@@ -9,7 +9,7 @@
 // contract only forwards it (type-definition authority stays with the layer
 // that produces the values).
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-chat/client'
-import type { LocaleKeysOf } from '@deepseek-ai/dsh-client-ui-slots'
+import type { LocaleKeysOf, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
 
 export type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-chat/client'
@@ -22,12 +22,27 @@ export type ToolRowState = 'running' | 'ok' | 'error' | 'stopped'
 
 type ToolTitleKey = Extract<LocaleKeysOf<'conversation'>, `tool.title.${string}`>
 
-/** Locale key per generic row variant. */
+/**
+ * A verb-first present/past title pair: `running` names the act in progress,
+ * `done` names what happened. A variant with no distinct present tense (its
+ * copy was not part of the 2026-09-15 audit's three named examples) repeats
+ * the same key for both states, so its rendered title is unchanged.
+ */
+interface TitleKeyPair {
+  readonly running: ToolTitleKey
+  readonly done: ToolTitleKey
+}
+
+/** Locale key pair per generic row variant, selected by {@link toolRowModel} off the row's state. */
 export const VARIANT_TITLE_KEYS = {
-  search: 'tool.title.search', read: 'tool.title.read', bash: 'tool.title.bash',
-  write: 'tool.title.write', edit: 'tool.title.edit', code: 'tool.title.code',
-  others: 'tool.title.generic',
-} as const satisfies Record<ToolRowVariant, ToolTitleKey>
+  search: { running: 'tool.title.search', done: 'tool.title.search' },
+  read: { running: 'tool.title.read.running', done: 'tool.title.read' },
+  bash: { running: 'tool.title.bash.running', done: 'tool.title.bash' },
+  write: { running: 'tool.title.write', done: 'tool.title.write' },
+  edit: { running: 'tool.title.edit', done: 'tool.title.edit' },
+  code: { running: 'tool.title.code', done: 'tool.title.code' },
+  others: { running: 'tool.title.generic', done: 'tool.title.generic' },
+} as const satisfies Record<ToolRowVariant, TitleKeyPair>
 
 /**
  * Known tool name -> variant.
@@ -99,6 +114,13 @@ export interface ToolRowModel {
   /** First line of the result text on an error row; null for every other state. */
   errorSummary: string | null
   state: ToolRowState
+  /**
+   * Elapsed wall time from call to settlement, in ms; null while running (no
+   * live ticking clock: a settled duration is a receipt, not a stopwatch) and
+   * null when the call's start fell outside the loaded window (`callTime`
+   * absent on the result node).
+   */
+  durationMs: number | null
 }
 
 /**
@@ -216,6 +238,25 @@ export function formatToolBody(variant: ToolRowVariant, argsRaw: string): string
 }
 
 /**
+ * Format a settled row's elapsed time (`ToolRowModel.durationMs`) the same
+ * way the message footer's "Ran for Xs" pattern does: whole seconds under a
+ * minute, minutes+seconds beyond. Callers gate on `durationMs !== null`
+ * themselves — this formatter takes a plain number so it never hides a
+ * caller's own null-check.
+ * @param ms - Elapsed duration in milliseconds (negatives clamp to zero).
+ * @param t - Translate seat supplying `duration.seconds` / `duration.minutes`.
+ * @returns Display string, e.g. `12s` or `1m 05s`.
+ */
+export function formatToolDuration(ms: number, t: TranslateNS<'conversation'>): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return minutes > 0
+    ? t('duration.minutes', { minutes, seconds: String(seconds).padStart(2, '0') })
+    : t('duration.seconds', { seconds })
+}
+
+/**
  * Derive the full row model from a frozen call slice.
  * @param toolName - wire tool name (dispatch-supplied; survives windowless results).
  * @param block - RunningToolCall or ToolResultNode off the snapshot caches.
@@ -245,14 +286,26 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   const output = done ? (resultText(block) || null) : null
   const errorSummary = state === 'error' && output !== null ? firstLine(output) : null
   const bodyRaw = argsRaw === '' ? null : argsRaw
+  // A tool-owned title (cordis verbs, pwsh) keeps one label regardless of
+  // state; a generic row's title flips between the variant's present and
+  // past tense as the call settles.
+  const variantPair = VARIANT_TITLE_KEYS[variant]
+  const titleKey = toolTitleKey ?? (state === 'running' ? variantPair.running : variantPair.done)
+  // Settled duration only: `callTime` is the paired call's own timestamp
+  // (null when the window truncated it out), never recomputed against a live
+  // clock, so a row's duration never ticks after it renders.
+  const durationMs = done && block.callTime !== null
+    ? Math.max(0, block.time - block.callTime)
+    : null
   return {
     variant,
-    titleKey: toolTitleKey ?? VARIANT_TITLE_KEYS[variant],
+    titleKey,
     summary,
     filePath: deriveFilePath(variant, argsRaw),
     bodyRaw,
     output,
     errorSummary,
     state,
+    durationMs,
   }
 }

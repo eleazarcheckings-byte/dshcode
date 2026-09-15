@@ -208,7 +208,9 @@ export function OrbitalCanvas({ motion, state }: OrbitalCanvasProps) {
             </linearGradient>
             <clipPath id={`${fallbackId}-front`}><rect x="0" y="130" width="720" height="120" /></clipPath>
           </defs>
-          <g transform="rotate(-14.3 360 130)">
+          {/* -18°: the one signature tilt (SPEC §2), matching the favicon/mark
+              and the live canvas (orbital-field.ts's RING_TILT_RADIANS). */}
+          <g transform="rotate(-18 360 130)">
             <g stroke={`url(#${fallbackId}-ring)`} strokeWidth="0.7">
               {[146, 156, 166, 176, 186, 196, 206, 216, 226, 236, 246, 256].map(radius => (
                 <ellipse key={radius} cx="360" cy="130" rx={radius} ry={radius * 0.255} />

@@ -13,7 +13,9 @@ import {
   terminalCardModel,
   terminalFailed,
 } from '../models/terminal-card-model.ts'
-import { formatToolBody, toolRowModel, type ToolRowState } from '../models/tool-call-model.ts'
+import {
+  formatToolBody, formatToolDuration, toolRowModel, type ToolRowState,
+} from '../models/tool-call-model.ts'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
 import css from './bash-sample.module.css'
 
@@ -52,6 +54,7 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
     ? 'error'
     : model.state
   const status = stateStatus(state, t)
+  const durationLabel = model.durationMs == null ? null : formatToolDuration(model.durationMs, t)
   const [expanded, setExpanded] = useState(false)
   // Execution failures and persistent-shell results have no terminal card.
   // Keep their recorded args and complete output reachable through the generic
@@ -103,6 +106,7 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
         <span className={css.leading}>{leading}</span>
         {status !== null && <span className={css.visuallyHidden}>{status}</span>}
         <span className={css.title}>{t(model.titleKey)}</span>
+        {durationLabel !== null && <span className={css.duration}>{durationLabel}</span>}
         <span className={css.sep} aria-hidden />
         <span className={clsx(css.summary, failureLine !== null && css.errorSummary)}>
           {failureLine ?? terminal?.description ?? model.summary}

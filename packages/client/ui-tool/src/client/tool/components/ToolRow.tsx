@@ -17,7 +17,7 @@ import {
 } from '../models/primitive-labels.ts'
 import type { AskQuestionCardModel } from '../models/ask-question-card-model.ts'
 import {
-  formatToolBody, type ToolRowState, type ToolRowVariant,
+  formatToolBody, formatToolDuration, type ToolRowState, type ToolRowVariant,
 } from '../models/tool-call-model.ts'
 import type { WebCardModelProps } from '../models/web-card-model.ts'
 import { AskQuestionCard } from './AskQuestionCard.tsx'
@@ -54,6 +54,12 @@ export interface ToolRowProps {
   search?: SearchCardModel | null | undefined
   web?: WebCardModelProps | null | undefined
   state: ToolRowState
+  /**
+   * Elapsed wall time in ms, shown beside the title as a settled receipt
+   * (matching the message footer's "Ran for Xs" style); null/absent renders
+   * no duration (a running row, or one whose call fell outside the window).
+   */
+  duration?: number | null | undefined
   /**
    * Filesystem path from tool args; when set with onOpenFile, the summary
    * renders as a hover-underline link that opens the host default app.
@@ -107,6 +113,7 @@ export function ToolRow({
   search,
   web,
   state,
+  duration,
   filePath,
   onOpenFile,
   inspect,
@@ -137,6 +144,9 @@ export function ToolRow({
     [bodyRaw, card, open, variant],
   )
   const status = stateStatus(state, t)
+  // Elapsed-time receipt (message footer's "Ran for Xs" style), rendered only
+  // for a settled row whose duration is known.
+  const durationLabel = duration == null ? null : formatToolDuration(duration, t)
   // A failure must replace, not supplement, the normal summary.
   const failureLine = state === 'error' ? errorSummary ?? null : null
   const summaryText = failureLine ?? terminalBody?.description ?? summary
@@ -218,29 +228,36 @@ export function ToolRow({
         expandOnRowClick
         keepContentWhenOpen
         onToggle={toggleExpand}
-        collapsedContent={summaryText !== '' && (
-          /* An empty summary drops the separator with it (a row that is only
-             its title shows no trailing dot). */
+        collapsedContent={(durationLabel !== null || summaryText !== '') && (
+          /* An empty summary (and no duration) drops the separator with it (a
+             row that is only its title shows no trailing dot); a duration
+             alone renders without one (it reads as part of the title, not a
+             second summary). */
           <>
-            <span className={css.sep} aria-hidden />
-            {fileLink ? (
-              <button
-                type="button"
-                className={css.fileLink}
-                onClick={openFile}
-                onKeyDown={fileLinkKeyDown}
-              >
-                {summaryText}
-              </button>
-            ) : (
-              <span
-                className={clsx(css.summary, failureLine !== null && css.errorSummary)}
-              >
-                {summaryText}
-              </span>
-            )}
-            {suffix !== null && (
-              <span className={clsx(css.summarySuffix, suffix === diffStat && css.diffStat)}>{suffix}</span>
+            {durationLabel !== null && <span className={css.duration}>{durationLabel}</span>}
+            {summaryText !== '' && (
+              <>
+                <span className={css.sep} aria-hidden />
+                {fileLink ? (
+                  <button
+                    type="button"
+                    className={css.fileLink}
+                    onClick={openFile}
+                    onKeyDown={fileLinkKeyDown}
+                  >
+                    {summaryText}
+                  </button>
+                ) : (
+                  <span
+                    className={clsx(css.summary, failureLine !== null && css.errorSummary)}
+                  >
+                    {summaryText}
+                  </span>
+                )}
+                {suffix !== null && (
+                  <span className={clsx(css.summarySuffix, suffix === diffStat && css.diffStat)}>{suffix}</span>
+                )}
+              </>
             )}
           </>
         )}

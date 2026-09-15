@@ -32,6 +32,16 @@
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;
+
+  /* Running prose (paragraphs, lists, quotes, headings) reads best capped
+     near ~70 characters — a separate axis from --dsh-chat-content-width
+     above, which keeps sizing the outer column, the composer, and tool
+     cards. Code fences and tables are exempt (MarkdownText.module.css
+     applies this only to the textual-flow elements, not the container), so a
+     wide diff or a many-column table still uses the full column.
+     2026-09-15 transcript-polish, recon/desktop-ux-audit.md R1: unchanged in
+     code since 2026-09-14 (77-110ch measured, median ≈100). */
+  --dsh-chat-prose-measure: 70ch;
 }
 
 .header {

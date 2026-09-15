@@ -72,9 +72,13 @@
   font: var(--dsl-code-block-content-font);
   padding: 16px;
   margin: 0 !important;
+  /* A coding tool's fences never wrap a token: a long identifier or a wide
+     diff pasted into a fence scrolls horizontally instead (2026-09-15
+     transcript-polish, recon/desktop-ux-audit.md R2) — the same policy the
+     sibling TerminalBlock/DiffBlock/ReadBlock/SearchBlock primitives already
+     use, which this rule previously contradicted. */
   overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
   background: var(--dsw-alias-markdown-code-block);
   /* Bottom radii live on <pre>: overflow:hidden on .block would kill the
      sticky banner, and this opaque fill otherwise squares off the wrapper. */

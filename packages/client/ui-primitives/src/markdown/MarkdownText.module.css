@@ -9,6 +9,16 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Prose measure (2026-09-15 transcript-polish): capped on the textual-flow
+   elements themselves, not on `.markdown`'s own box — a block child cannot
+   render wider than its parent's containing block, so capping the container
+   would squeeze code fences and tables down with it. Targeting p/li/
+   blockquote/headings directly leaves `.markdown` (and therefore any
+   sibling `pre`/table wrapper inside it) at the full transcript width. */
+.markdown :where(p, li, blockquote, h1, h2, h3, h4, h5, h6) {
+  max-width: var(--dsh-chat-prose-measure, 70ch);
+}
+
 .markdown strong {
   font-weight: 600;
 }
@@ -60,7 +70,7 @@
      keeps design-platform brand-text as near-black, so links use the blue
      business-primary alias instead. */
   color: var(--dsw-alias-state-business-primary);
-  transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
+  transition: box-shadow var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
   position: relative;
   text-decoration: none;
   /* Transparent hit-area padding; literal zero-alpha only (no painted color). */

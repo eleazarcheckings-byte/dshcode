@@ -190,8 +190,17 @@ export const zh = {
   'row.showInFolder': '在文件夹中显示',
   'row.menu.aria': '文件操作',
   'tool.title.search': '搜索',
-  'tool.title.read': '读取',
-  'tool.title.bash': 'Bash',
+  // Verb-first, present/past pair (2026-09-15 transcript-polish): the running
+  // state names the act in progress, the settled state names what happened —
+  // a bare noun ("读取"/"Bash") read as a debugger label, not a considered
+  // product voice (recon/desktop-ux-audit.md item R4). Scoped to the three
+  // tools the audit measured; other variants (write/edit/code/glob/pwsh) keep
+  // their existing single label, unchanged, to avoid an uncontrolled copy
+  // ripple this session did not review.
+  'tool.title.read.running': '读取文件中…',
+  'tool.title.read': '已读取文件',
+  'tool.title.bash.running': '执行中…',
+  'tool.title.bash': '已执行',
   'tool.title.write': '写入',
   'tool.title.edit': '编辑',
   'tool.title.code': '代码',
@@ -201,7 +210,8 @@ export const zh = {
   'tool.title.stopCordis': '停止 Cordis 插件',
   'tool.title.removeCordis': '移除 Cordis 插件',
   'tool.title.pwsh': 'Pwsh',
-  'tool.title.grep': 'Grep',
+  'tool.title.grep.running': '搜索中…',
+  'tool.title.grep': '已搜索',
   'tool.title.glob': 'Glob',
   'tool.title.webSearch': '网页搜索',
   'tool.title.webFetch': '网页获取',
@@ -481,15 +491,18 @@ export const en = {
   'todo.progress.pending': '{pending} pending',
   'todo.rowTitle': 'Update to-do list',
   'todo.title': 'To-dos',
-  'tool.title.bash': 'Bash',
+  'tool.title.bash.running': 'Running…',
+  'tool.title.bash': 'Ran',
   'tool.title.code': 'Code',
   'tool.title.edit': 'Edit',
   'tool.title.generic': 'Tool call',
   'tool.title.glob': 'Glob',
-  'tool.title.grep': 'Grep',
+  'tool.title.grep.running': 'Searching…',
+  'tool.title.grep': 'Searched',
   'tool.title.inspect': 'Inspect',
   'tool.title.pwsh': 'Pwsh',
-  'tool.title.read': 'Read',
+  'tool.title.read.running': 'Reading file…',
+  'tool.title.read': 'Read file',
   'tool.title.removeCordis': 'Remove Cordis Plugin',
   'tool.title.runCordis': 'Run Cordis Plugin',
   'tool.title.search': 'Search',

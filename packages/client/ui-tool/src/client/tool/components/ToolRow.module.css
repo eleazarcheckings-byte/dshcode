@@ -143,11 +143,39 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
   cursor: pointer;
+  transition: color var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
 }
 
 .fileLink:hover {
   color: var(--dsw-alias-label-primary);
   text-decoration-color: currentColor;
+}
+
+/* Settled-call receipt (message footer's "Ran for Xs" style), between the
+   title and the summary separator. Mono, one step dimmer than the suffix's
+   tertiary — same relationship .diffStat has to .summarySuffix — so the
+   number reads as metadata, not as more summary text. Its entrance is the
+   row's own "receipt arriving" beat (design-law motion budget item, SPEC §2):
+   a settled call's duration fades and nudges into place instead of snapping in. */
+.duration {
+  flex: none;
+  margin-left: 8px;
+  font-family: var(--ds-font-family-code);
+  font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 2px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  color: var(--dsw-alias-label-caption);
+  animation: dsh-tool-duration-in var(--saturn-dur-2, 200ms) var(--saturn-ease-out, ease-out);
+}
+
+@keyframes dsh-tool-duration-in {
+  from {
+    opacity: 0;
+    transform: translateY(1px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Error row's collapsed summary: the failure's first line in the error color. */
@@ -183,7 +211,7 @@
   line-height: 16px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 100ms ease;
+  transition: opacity var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
 }
 
 .root:hover .inspectButton,

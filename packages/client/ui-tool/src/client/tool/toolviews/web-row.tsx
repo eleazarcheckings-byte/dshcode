@@ -33,6 +33,7 @@ export function WebRow({ toolName, block, inspect, t }: WebRowProps) {
       errorSummary={model.errorSummary}
       web={web}
       state={model.state}
+      duration={model.durationMs}
       inspect={inspect}
     />
   )
