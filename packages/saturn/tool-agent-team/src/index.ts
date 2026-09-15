@@ -32,6 +32,8 @@ const POLICY = `Agent Teams is available for coordinated work. Follow the sessio
 
 The Team Lead and all teammates share the same working directory and filesystem. Edits are immediately visible to every member. Split write work into disjoint scopes, record expected write scopes on shared tasks, and use task dependencies when work must be ordered. Give every teammate a concrete deliverable, its allowed write scopes, relevant context, and a verification requirement. Shared-task write scopes describe planned work. When claim_scope is available, each writer must also acquire its own file claims before editing and release them after verification; a task assignment alone grants no file ownership. Never bypass a claim denial.
 
+A teammate spawned with isolation "worktree" is the exception to the shared directory: it works in a private checkout of the current commit, so its edits are invisible here until you call merge_teammate, and yours are invisible to it. Reach for it when a teammate's work rewrites files others are reading; keep the default shared isolation for ordinary parallel work in disjoint scopes. merge_teammate applies that teammate's whole diff or none of it, and refuses any file another member has claimed — read the refusal, resolve the ownership, then merge again. Merge before you rely on isolated work, and before the task that depends on it starts.
+
 Prefer read/edit/write for file changes. If a file operation returns FS_STALE_VERSION, read the current file, rebase your intended change onto the new content, and retry. Bash, formatters, code generators, and scripts are not fully protected by the filesystem version guard; coordinate them explicitly and have the Lead review the final diff and run tests.
 
 Use send_message for quiet information that must not start an idle teammate. Use followup_task when the target should run another turn. A delivered peer item starts with its stable message id and sender name. A successful send is already durable even when its result says queued; do not resend it. Shared-task workflow is list, get, claim with the current revision, perform the work, then complete. Task readiness never starts an owner. Before wait_agent, use list_agents and make sure another required member is running or provisioning; use followup_task first when the required member is inactive. wait_agent observes only changes after that call starts, never wakes a member, and returns noProgress immediately when no other member can produce a change. Re-list after wakeup or timeout. The Lead must wait for required teammates before giving the final answer.`
@@ -56,7 +58,41 @@ const MEMBER_VIEW_SCHEMA = {
     provider: { type: 'string' },
     context: { type: 'string', enum: ['fresh', 'fork'] },
     model: { type: 'string' },
+    isolation: { type: 'string', enum: ['shared', 'worktree'] },
+    worktree: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        path: { type: 'string', required: true },
+        baseRevision: { type: 'string', required: true },
+      },
+    },
     diagnostics: { type: 'array', required: true, items: { type: 'string' } },
+  },
+} as const
+
+/** One merged, previewed, or refused teammate diff. */
+const MERGE_VALUE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    target: { type: 'string', required: true },
+    status: { type: 'string', required: true, enum: ['merged', 'unchanged', 'denied', 'previewed'] },
+    files: { type: 'array', required: true, items: { type: 'string' } },
+    conflicts: {
+      type: 'array',
+      required: true,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          path: { type: 'string', required: true },
+          holder: { type: 'string', required: true },
+          lane: { type: 'string', required: true },
+          claimId: { type: 'string', required: true },
+        },
+      },
+    },
   },
 } as const
 
@@ -182,6 +218,11 @@ function install(agent: Agent, ctx: Context, config: Required<Config>): () => vo
           enum: ['fresh', 'fork'],
           description: 'fresh starts without Lead history; fork inherits completed Lead turns. Defaults to fresh.',
         },
+        isolation: {
+          type: 'string',
+          enum: ['shared', 'worktree'],
+          description: 'shared puts the teammate in your working directory, where its edits are immediately visible to everyone. worktree gives it a private checkout of the current commit, invisible until you call merge_teammate; use it when the work rewrites files others are reading, and only in a git repository. Defaults to shared.',
+        },
       },
       output: jsonOutput(SPAWN_VALUE_SCHEMA),
       async execute(args, exec) {
@@ -193,8 +234,36 @@ function install(agent: Agent, ctx: Context, config: Required<Config>): () => vo
           prompt: [{ type: 'text', text: args.prompt }],
           context,
           provider: context === 'fork' ? config.forkProvider : config.freshProvider,
+          ...args.isolation === undefined ? {} : { isolation: args.isolation },
           signal: exec.signal,
         })
+      },
+    })))
+
+    register(scoped.tools.register(defineTool({
+      name: 'merge_teammate',
+      description: 'Bring an isolated teammate\'s work into your working directory. Reports every file in its diff, applies the whole diff or none of it, and refuses any file another member has claimed. Team Lead only.',
+      parameters: {
+        target: { type: 'string', required: true, description: 'Teammate name.' },
+        dry_run: { type: 'boolean', description: 'Report the files and their owners without changing anything.' },
+      },
+      output: jsonOutput(MERGE_VALUE_SCHEMA),
+      async execute(args, exec) {
+        const result = await ctx.agentTeams.mergeTeammate(callingAgent(exec.agent, 'merge_teammate'), {
+          target: args.target,
+          ...args.dry_run === undefined ? {} : { dryRun: args.dry_run },
+          signal: exec.signal,
+        })
+        // A refusal must arrive as a failed call: a denial the model reads as
+        // an ordinary result is a denial it will act as though it never got.
+        if (result.status === 'denied') {
+          throw new Error([
+            `merge_teammate DENIED: ${result.conflicts.length} file(s) in "${result.target}"'s diff are owned by another member. Nothing was changed.`,
+            ...result.conflicts.map(conflict => `${conflict.path} is held by ${conflict.holder} (lane ${conflict.lane}, claim ${conflict.claimId}).`),
+            'Ask the holder to release the claim, or have the teammate drop those files from its change, then merge again.',
+          ].join('\n'))
+        }
+        return result
       },
     })))
 
