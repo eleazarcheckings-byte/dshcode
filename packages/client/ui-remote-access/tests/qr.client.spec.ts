@@ -83,12 +83,15 @@ function reservedMap(version: number): boolean[][] {
   const mark = (row: number, col: number): void => {
     if (row >= 0 && row < size && col >= 0 && col < size) reserved[row]![col] = true
   }
+  // Top-left keeps nine rows and nine columns (finder, separator, format);
+  // the other two corners keep eight in the direction facing the edge, so the
+  // ninth row/column there stays available to data.
   for (let row = 0; row <= 8; row += 1) {
-    for (let col = 0; col <= 8; col += 1) {
-      mark(row, col)
-      mark(row, size - 1 - col)
-      mark(size - 1 - row, col)
-    }
+    for (let col = 0; col <= 8; col += 1) mark(row, col)
+    for (let col = 0; col <= 7; col += 1) mark(row, size - 1 - col)
+  }
+  for (let row = 0; row <= 7; row += 1) {
+    for (let col = 0; col <= 8; col += 1) mark(size - 1 - row, col)
   }
   for (let at = 0; at < size; at += 1) {
     mark(6, at)
@@ -145,10 +148,12 @@ function readCodewords(matrix: QrMatrix, mask: number): number[] {
   const bits: number[] = []
   let upward = true
   for (let right = size - 1; right >= 1; right -= 2) {
-    const pair = right === 6 ? 5 : right
+    // The vertical timing column is not a data column: the walk steps over it
+    // and every later pair shifts with it.
+    if (right === 6) right = 5
     for (let step = 0; step < size; step += 1) {
       const row = upward ? size - 1 - step : step
-      for (const col of [pair, pair - 1]) {
+      for (const col of [right, right - 1]) {
         if (reserved[row]![col]!) continue
         const module = modules[row]![col]!
         bits.push((module !== apply(row, col)) ? 1 : 0)

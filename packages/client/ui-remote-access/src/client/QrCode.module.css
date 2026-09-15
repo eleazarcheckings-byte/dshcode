@@ -1,0 +1,22 @@
+/* The pairing code. A scanner needs one thing from a QR — contrast — so the
+   symbol keeps a light ground and dark modules in both themes rather than
+   inverting with the surface and becoming a puzzle for the camera. The card
+   around it carries the product's palette; the code itself carries the data. */
+
+.code {
+  display: block;
+  width: 180px;
+  height: 180px;
+  border-radius: 4px;
+  /* The one hairline that ties it to the rest of the card. */
+  outline: 0.5px solid var(--dsw-alias-border-l1);
+  outline-offset: 0;
+}
+
+.ground {
+  fill: #ffffff;
+}
+
+.modules {
+  fill: #0b0b12;
+}

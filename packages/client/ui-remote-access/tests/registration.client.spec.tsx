@@ -7,8 +7,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
@@ -103,10 +102,9 @@ describe('Remote settings section', () => {
 
   it('turns LAN access on, shows the address and the certificate fingerprint, and lists paired devices', async () => {
     const injected = face()
-    const user = userEvent.setup()
     render(<RemoteSection {...injected} t={t} close={() => {}} />)
     await screen.findByText(en.stateOff)
-    await user.click(screen.getByRole('button', { name: en.turnOn }))
+    fireEvent.click(screen.getByRole('button', { name: en.turnOn }))
     await waitFor(() => { expect(injected.enable).toHaveBeenCalledWith('lan') })
     expect(await screen.findByText('https://192.168.1.24:8765')).toBeTruthy()
     expect(screen.getByText(/bbbb/u)).toBeTruthy()
@@ -115,12 +113,11 @@ describe('Remote settings section', () => {
 
   it('draws the pairing QR only on request and never prints the token as text', async () => {
     const injected = face({ status: vi.fn().mockResolvedValue(ON) })
-    const user = userEvent.setup()
     const { container } = render(<RemoteSection {...injected} t={t} close={() => {}} />)
     await screen.findByText('https://192.168.1.24:8765')
     expect(screen.queryByTestId('remote-qr')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: en.showCode }))
+    fireEvent.click(screen.getByRole('button', { name: en.showCode }))
     await waitFor(() => { expect(injected.pairingCode).toHaveBeenCalledTimes(1) })
     const qr = await screen.findByTestId('remote-qr')
     expect(qr.tagName.toLowerCase()).toBe('svg')
@@ -130,10 +127,9 @@ describe('Remote settings section', () => {
 
   it('revokes a paired device and drops it from the list', async () => {
     const injected = face({ status: vi.fn().mockResolvedValue(ON) })
-    const user = userEvent.setup()
     render(<RemoteSection {...injected} t={t} close={() => {}} />)
     await screen.findByText('izzy iPhone')
-    await user.click(screen.getByRole('button', { name: t('revokeDevice', { name: 'izzy iPhone' }) }))
+    fireEvent.click(screen.getByRole('button', { name: t('revokeDevice', { name: 'izzy iPhone' }) }))
     await waitFor(() => { expect(injected.revoke).toHaveBeenCalledWith('dev-1') })
     await waitFor(() => { expect(screen.queryByText('izzy iPhone')).toBeNull() })
   })
