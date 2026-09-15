@@ -43,20 +43,24 @@ claim 命名的是仓库中的界面，而不是仓库某一个检出中的界�
 
 `ledger.ts` 负责算术——scope 规范化、按路径分量比较的重叠判定、过期，以及工具渲染的视图。`store.ts` 负责持久性：每个 workspace 一份 JSON 文档，在跨进程写者锁下原子替换；只有当锁记录的属主可被证明已消失时，等待者才可以打破它。`write-guard.ts` 与 `shell-guard.ts` 是 `tools/execute` 总线上的两个强制点。`workspace.ts` 依据 git 自身的 `commondir` 记录解析 claim 空间，凡是读不到的情况都回退为目录本身。`service.ts` 发布 `ctx.claims`，为代表他人写入 workspace 的 host 代码提供只读接口——Agent Teams 的 `merge_teammate` 正是通过它询问传入 diff 中哪些路径已被同伴占有。
 
+<a id="model-experience"></a>
 ## 模型体验
 
-### 模型看到什么
+### claim 工具与常驻协议
 
-一段常驻 policy 段落把协议写成可执行的规则：首次编辑前先 claim，每次写入前先 check，验证后即释放，一个界面只有一个写者，以及 shell 命令不是绕开拒绝的方法。拒绝信息会指出持有者、lane、claim id、剩余分钟数以及被阻断的确切路径，然后说明应当怎么做——请求移交、收窄 scope，或等待租约到期。
+#### 模型看到什么
 
-### Token 影响
+一段常驻 policy 段落把协议写成可执行的规则：首次编辑前先 `claim_scope`，每次写入前先 `claim_check`，验证后即 `release_scope`，一个界面只有一个写者，以及 shell 命令不是绕开拒绝的方法。拒绝信息会指出持有者、lane、claim id、剩余分钟数以及被阻断的确切路径，然后说明应当怎么做——请求移交、收窄 scope，或等待租约到期。
+
+#### Token 影响
 
 四个紧凑工具，加上约 350 token 的 policy 段落。工具结果是单行 JSON；一次拒绝只花费几十个 token，取代的却是"两个 agent 互相覆盖"这一昂贵得多的事后发现。
 
-### KV Cache 影响
+#### KV Cache 影响
 
 policy 段落是静态的，与其他常驻段落一起位于 prompt 前缀中，因此随前缀一同缓存。claim 结果作为普通工具结果到达，绝不会重写此前的轮次。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - shell 命令只在其参数能够表明的范围内受到守卫。formatter、代码生成器、构建脚本，或从程序内部写文件的解释器，都超出静态阅读的范围，仍需显式协调；policy 禁止用它们来绕开拒绝。
@@ -65,6 +69,7 @@ policy 段落是静态的，与其他常驻段落一起位于 prompt 前缀中�
 - claim 空间对每个目录只解析一次并在进程生命周期内缓存，因此若某仓库在 harness 运行期间才变成链接 worktree，它在重启前仍沿用先前的 ledger。
 - 第一方守卫在派发期间持有 ledger 锁，因而在一个 workspace 内串行化受保护的修改。shell 守卫刻意不这么做，代价是留下一个很窄的窗口：检查期间新取得的 claim 会被漏掉。
 
+<a id="dev-note"></a>
 ### 开发者说明
 
 [运行时决策](../../../.agents/notes/implemented/bug-fix/2026-09-14-saturn-team-file-ownership.zh.md)记录了最初的权衡，[worktree 隔离](../../../.agents/notes/implemented/feature/2026-09-15-agent-team-worktree-isolation.zh.md)记录了 ledger 为何改为以仓库为键。本包不发布运行时 invariant 安装器：ledger 事务与两个派发守卫在每次修改处强制该关系，行为测试直接覆盖被拒绝的写入。

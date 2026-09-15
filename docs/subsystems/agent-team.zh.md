@@ -6,10 +6,7 @@
 
 ## 身份与 roster
 
-SaturnBot 通过 `ctx.saturnbot` 提供具有角色约束的独立运营团队，包括编排、开发、增长、运营和财务角色。
-其[包参考](../../packages/saturn/saturnbot/README.zh.md)负责说明定时周期、隔离的 Git 暂存工作区、
-类型化工具、审批以及只追加的执行日志。右上角的 SaturnBot 按钮会打开管理窗口。
-下文的 Team 类型描述共享的交互式编码团队；SaturnBot 的业务执行周期类型由其包拥有。
+SaturnBot 通过 `ctx.saturnbot` 提供具有角色约束的独立运营团队，包括编排、开发、增长、运营和财务角色。其[包参考](../../packages/saturn/saturnbot/README.zh.md)负责说明定时周期、隔离的 Git 暂存工作区、类型化工具、审批以及只追加的执行日志。右上角的 SaturnBot 按钮会打开管理窗口。下文的 Team 类型描述共享的交互式编码团队；SaturnBot 的业务执行周期类型由其包拥有。
 
 `TeamId` 是具有独立[品牌](core.zh.md#branded-ids)的 Root `SessionId`。`TeamTaskId` 在 Team 内按 `task-<n>` 单调分配；`TeamMessageId` 是全局随机值。teammate 的 Session id 始终是持久身份，而 `name` 是不可变的模型／UI 标签。
 

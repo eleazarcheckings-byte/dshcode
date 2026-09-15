@@ -6,11 +6,7 @@ Types shared by the experimental implicit-root Team domain, model tools, and hos
 
 ## Identity and roster
 
-SaturnBot adds a separate role-bound operating team through `ctx.saturnbot`: an orchestrator,
-developer, growth, operations, and finance role. Its [package reference](../../packages/saturn/saturnbot/README.md)
-owns scheduled cycles, isolated Git stages, typed tools, approvals, and the append-only execution journal.
-The top-right SaturnBot launcher opens its management window. The Team types below describe the
-shared interactive coding team; SaturnBot's business-cycle types are owned by its package.
+SaturnBot adds a separate role-bound operating team through `ctx.saturnbot`: an orchestrator, developer, growth, operations, and finance role. Its [package reference](../../packages/saturn/saturnbot/README.md) owns scheduled cycles, isolated Git stages, typed tools, approvals, and the append-only execution journal. The top-right SaturnBot launcher opens its management window. The Team types below describe the shared interactive coding team; SaturnBot's business-cycle types are owned by its package.
 
 `TeamId` is the root `SessionId` under a distinct [brand](core.md#branded-ids). `TeamTaskId` is Team-local and monotonically allocated as `task-<n>`; `TeamMessageId` is globally random. A teammate's Session id remains its persistent identity, while `name` is an immutable model/UI label.
 

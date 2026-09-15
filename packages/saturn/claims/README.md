@@ -45,15 +45,17 @@ A claim names a surface in the repository, not in one checkout of it. When a ses
 
 ## Model Experience
 
-### What the model sees
+### Claim tools and the standing protocol
 
-A standing policy section states the protocol as rules it can act on: claim before the first edit, check before each write burst, release on verification, one writer per surface, and that a shell command is not a way around a denial. A refusal names the holder, the lane, the claim id, the remaining minutes, and the exact blocked paths, then says what to do instead — request a handoff, narrow the scope, or wait for the lease.
+#### What the model sees
 
-### Token effect
+A standing policy section states the protocol as rules it can act on: `claim_scope` before the first edit, `claim_check` before each write burst, `release_scope` on verification, one writer per surface, and that a shell command is not a way around a denial. A refusal names the holder, the lane, the claim id, the remaining minutes, and the exact blocked paths, then says what to do instead — request a handoff, narrow the scope, or wait for the lease.
+
+#### Token effect
 
 Four compact tools and one policy section of roughly 350 tokens. Tool results are single-line JSON; a denial costs a few dozen tokens and replaces the far more expensive discovery that two agents overwrote each other.
 
-### KV Cache effect
+#### KV Cache effect
 
 The policy section is static and sits with the other standing sections, so it is cached with the prompt prefix. Claim results arrive as ordinary tool results and never rewrite earlier turns.
 
