@@ -29,6 +29,30 @@
   font-display: swap;
 }
 
+/* SPEC.md §2 "size-adjust fallbacks" (Mars r1 finding #4): a metrics-matched
+   local fallback shown during the `font-display: swap` block/swap window, so
+   the swap-in doesn't reflow the layout. size-adjust/ascent-override/
+   descent-override are approximations tuned by eye against each system
+   font's usual metrics on Android/iOS, not a generated fontaine/capsize
+   report — good enough to kill the visible jump, not a metrics guarantee. */
+@font-face {
+  font-family: 'Instrument Sans Fallback';
+  src: local('Arial'), local('Helvetica Neue'), local('Helvetica');
+  size-adjust: 104%;
+  ascent-override: 92%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Commit Mono Fallback';
+  src: local('Consolas'), local('Menlo'), local('Courier New');
+  size-adjust: 104%;
+  ascent-override: 82%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
 :root {
   --saturn-bg: #0b0b12;
   --saturn-surface: #15151f;
@@ -65,7 +89,7 @@ body {
   margin: 0;
   background: var(--saturn-bg);
   color: var(--saturn-ink);
-  font-family: 'Instrument Sans', -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Instrument Sans', 'Instrument Sans Fallback', -apple-system, 'Segoe UI', sans-serif;
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
@@ -187,7 +211,7 @@ body {
 }
 
 .textarea {
-  font-family: 'Commit Mono', ui-monospace, monospace;
+  font-family: 'Commit Mono', 'Commit Mono Fallback', ui-monospace, monospace;
   font-size: 12px;
   background: var(--saturn-bg);
   color: var(--saturn-ink);
@@ -330,7 +354,7 @@ video[data-scan-video] {
 }
 
 .verdict-card__meta {
-  font-family: 'Commit Mono', ui-monospace, monospace;
+  font-family: 'Commit Mono', 'Commit Mono Fallback', ui-monospace, monospace;
   font-size: 11px;
   color: var(--saturn-ink-muted);
   margin-top: 6px;

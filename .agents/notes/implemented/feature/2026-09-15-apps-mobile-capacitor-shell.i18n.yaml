@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-15-apps-mobile-capacitor-shell.md
-2026-09-15-apps-mobile-capacitor-shell.md: 112727a530bd8652c91072628797b7792442a214
-2026-09-15-apps-mobile-capacitor-shell.zh.md: bfbe7a2e083ce426bef532bbe471a0e8fd74d63a
+2026-09-15-apps-mobile-capacitor-shell.md: 4188bf3e6d04898f95d84599576265512a133955
+2026-09-15-apps-mobile-capacitor-shell.zh.md: 75d2e86200ae12cc1ad06e2f74b9321c7205a3ec

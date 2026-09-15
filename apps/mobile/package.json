@@ -16,8 +16,10 @@
     "android:assembleDebug": "cd android && gradlew.bat assembleDebug"
   },
   "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "@capacitor/android": "^8.5.2",
     "@capacitor/app": "^8.1.1",
+    "@capacitor/background-runner": "3.0.0",
     "@capacitor/camera": "^8.2.4",
     "@capacitor/core": "^8.5.2",
     "@capacitor/ios": "^8.5.2",
@@ -25,7 +27,6 @@
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",
-    "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "jsqr": "^1.4.0"
   },
   "devDependencies": {

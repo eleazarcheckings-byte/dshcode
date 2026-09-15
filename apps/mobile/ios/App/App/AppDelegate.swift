@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import CapacitorBackgroundRunner
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,6 +9,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        // SPEC.md §8 DELIVER: background poll of /saturn/remote/events ->
+        // local notifications (Mars r1 finding #2). Registers the
+        // BGTaskScheduler task capacitor.config.ts's plugins.BackgroundRunner
+        // and Info.plist's BGTaskSchedulerPermittedIdentifiers configure —
+        // requires the Background Modes capability (Background fetch +
+        // Background processing) enabled in Xcode's Signing & Capabilities,
+        // which cannot be done from a text edit; see README.md "iOS — Mac steps".
+        BackgroundRunnerPlugin.registerBackgroundTask()
+        BackgroundRunnerPlugin.handleApplicationDidFinishLaunching(launchOptions: launchOptions)
         return true
     }
 

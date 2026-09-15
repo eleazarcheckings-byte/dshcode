@@ -1,4 +1,6 @@
+/// <reference types="@capacitor/background-runner" />
 import type { CapacitorConfig } from '@capacitor/cli';
+import { buildBackgroundRunnerConfig } from './src/lib/backgroundSync.ts';
 
 // Saturn AI companion shell (SPEC.md §8, M3). The app pairs with a host
 // discovered at runtime (a LAN IP or a *.trycloudflare.com tunnel), so the
@@ -38,6 +40,10 @@ const config: CapacitorConfig = {
       smallIcon: 'ic_stat_saturn_ring',
       iconColor: '#dda43a',
     },
+    // SPEC.md §8 DELIVER: background poll of /saturn/remote/events -> local
+    // notifications (Mars r1 finding #2). See apps/mobile/assets/background-runner.js
+    // and src/lib/backgroundSync.ts, which is this block's single source of truth.
+    BackgroundRunner: buildBackgroundRunnerConfig(),
   },
 };
 

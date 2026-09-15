@@ -66,5 +66,21 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- @capacitor/background-runner (SPEC.md §8 DELIVER: background poll of
+	     /saturn/remote/events -> local notifications). BGTaskSchedulerPermittedIdentifiers
+	     must match capacitor.config.ts's plugins.BackgroundRunner.label. The
+	     Background Modes capability (Background fetch + Background processing)
+	     still needs enabling in Xcode's Signing & Capabilities tab, and
+	     AppDelegate.swift needs the two BackgroundRunnerPlugin calls -- both are
+	     Mac-only steps, see README.md "iOS -- Mac steps". -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>ai.saturnai.mobile.events-poll</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
 </dict>
 </plist>

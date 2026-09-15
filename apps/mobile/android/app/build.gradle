@@ -27,6 +27,10 @@ android {
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+        // @capacitor/background-runner (SPEC.md §8 DELIVER: background poll
+        // of /saturn/remote/events -> local notifications). Required per
+        // node_modules/@capacitor/background-runner/README.md "Android" install step.
+        dirs '../../node_modules/@capacitor/background-runner/android/src/main/libs', 'libs'
     }
 }
 

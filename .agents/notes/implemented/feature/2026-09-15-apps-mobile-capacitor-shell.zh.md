@@ -42,3 +42,14 @@ Web 构建（`npm run build`）完全可复现且通过类型检查；38 个测�
 ## 验证
 
 `cd apps/mobile && npm test` —— 4 个文件共 38 个测试全部通过（配对解析器 13 例，含过期与指纹校验；令牌存储 5 例，含损坏/非法的已存 JSON；事件映射器 12 例，覆盖全部四种事件类型及 PASS/REVISE/REJECT 标题推导；证书指纹比对器 5 例）。`npm run typecheck`（`tsc --noEmit`）与 `npm run build`（`vite build` → `www/`）均干净通过。`cd android && JAVA_HOME=... ANDROID_HOME=... ./gradlew.bat assembleDebug` —— BUILD SUCCESSFUL，APK 见上述路径。
+
+## 修复轮次（Mars 第一轮，四项发现，均已修复）
+
+Mars 的第一轮评审（`M3-apps-mobile-r1.md`）给出 REVISE，共四项发现，本轮全部修复。
+
+1. **违反 §6 硬性禁令，且未披露。** 初次实现的 RED 提交曾改动根目录的 `THIRD_PARTY_NOTICES.md`（为新增的 Capacitor/jsQR 依赖新增 12 行）—— §6 明确将该文件列为禁止触碰，况且它本就是自动生成的（`scripts/gen-third-party-notices.ts` 读取的是 **pnpm** 工作区的清单；`apps/mobile` 本就被刻意排除在该工作区之外，一开始就不该被写进这份文件）。修复方式：把该文件逐字节还原到任务前的状态（还原前已确认 `git diff 5dd99fb HEAD -- THIRD_PARTY_NOTICES.md` 是一次干净的、仅 12 行、单提交的差异，期间没有其他分支的插入编辑），并改为在 `apps/mobile/README.md`/`README.zh.md` 中新增“第三方声明”一节 —— 这才是一个本就在生成文件范围之外的包应有的归宿。
+2. **DELIVER 项未交付：后台轮询 → 本地通知。** `RemoteEventsClient.pollOnce()` 存在但无人调用。修复方案是引入 `@capacitor/background-runner`（官方 `@capacitor` 作用域，与现有 `@capacitor/core@^8` 技术栈的 peerDependency 兼容）：`assets/background-runner.js` 运行在该插件的隔离 JS 引擎中（没有 DOM，不能 `import` —— 其轮询/解析/通知逻辑是从 `remoteApi.ts`/`eventsMapper.ts` 手工镜像过来的，见文件顶部注释），由系统按 15 分钟节奏调度；新增并单测（7 例）的 `src/lib/backgroundSync.ts` 通过 `dispatchEvent` 把会话推送进该运行环境自己隔离的 `CapacitorKV` 存储。Android 已完整接入并纳入 debug 构建（APK 从 9.28MB 增长到 17.18MB，与该插件自带的原生 JS 引擎体积吻合）。iOS 侧，`Info.plist` 的 `BGTaskSchedulerPermittedIdentifiers`/`UIBackgroundModes` 与 `AppDelegate.swift` 中的两处 `BackgroundRunnerPlugin` 调用已作为纯文本编辑提交；只剩 Xcode 的 Signing & Capabilities 中 Background Modes 这一项能力开关真正只能在 Mac 上完成（它写入 `.pbxproj`，没有可用的纯文本替代方案）。
+3. **字体许可证披露不完整。** `CommitMono-LICENSE.txt` 此前只有字体二进制文件对应的 SIL OFL 文本。新增 `CommitMono-MIT.txt`，收录上游 `github.com/eigilnikolajsen/commit-mono` 仓库（构建工具/仓库本身）的准确 MIT 原文（取自实际抓取并与线上文件比对，而非凭记忆重敲）。
+4. **字体加载不完整。** 在 `src/index.html` 中为两个 woff2 文件新增 `<link rel="preload">`，并新增 `size-adjust`/`ascent-override`/`descent-override` 的本地回退 `@font-face` 规则（`Instrument Sans Fallback` → 本地 Arial/Helvetica；`Commit Mono Fallback` → 本地 Consolas/Menlo），接入实际使用的字体栈，让 `font-display: swap` 的阻塞窗口不再产生可见的重排。这些覆盖百分比是按各系统字体的常见度量目测调整的，不是 fontaine/capsize 之类工具生成的报告 —— 已在 CSS 注释中如实说明。
+
+`git diff 02255dbdff..<fix 提交> -- apps/mobile/tests/*` 为空（RED 测试文件未被改动）；修复提交只新增了 `tests/backgroundSync.test.ts`（新文件，先以 RED 提交），之后 45/45 个测试全部转绿。完整检查序列已重新跑过并全绿：vitest（45 个测试，5 个文件）、`tsc --noEmit`、`vite build`，以及 `gradlew.bat assembleDebug`（BUILD SUCCESSFUL，47 秒）。

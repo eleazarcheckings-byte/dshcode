@@ -90,7 +90,8 @@ open ios/App/App.xcodeproj      # or: npx cap open ios
 2. 选择 **App** scheme 与某个模拟器或真机，Product → Run，先验证配对/锁屏/离线三个界面，再着手签名。
 3. **签名**：项目设置 → Signing & Capabilities → 选择你的 Team；使用个人 Apple ID 时 Xcode 会自动管理开发证书。即便只是真机调试，这一步也是必需的，早于 TestFlight。
 4. **证书锁定**（见上文“安全模型”）：添加一个 `WKNavigationDelegate`，在 `didReceive challenge` 中拦截 `NSURLAuthenticationMethodServerTrust`，取出叶证书的 DER 字节（`SecCertificateCopyData`）、做 SHA-256，与 Android 端 `PinningWebViewClient` 读取的同一枚指纹比对（从 `UserDefaults` 的 `CapacitorStorage` group 中取 —— 这是 `@capacitor/preferences` 在 iOS 上的存储位置 —— 键名 `saturn.remote.session`，取其中的 `fingerprint` 字段）。将其接入 `ios/App/App/AppDelegate.swift` 或 Capacitor 桥接视图控制器上的 `WKUIDelegate`。
-5. **TestFlight**：这正是 SPEC.md §8 点名的资金关卡（Gate）—— 需要先有 Apple 开发者计划会员资格（每年 99 美元），Xcode 才能创建 App Store Connect 记录。在做出这个决定之前，以上所有步骤都无需付费会员资格。做出决定后：Product → Archive，通过 App Store Connect 分发，再到 App Store Connect → TestFlight 中添加构建版本与测试人员。
+5. **Background Modes 能力**（见下文“后台事件投递”）：Signing & Capabilities → **+ Capability** → **Background Modes** → 勾选 **Background fetch** 与 **Background processing**。`Info.plist` 的 `BGTaskSchedulerPermittedIdentifiers` 与 `AppDelegate.swift` 中的 `BackgroundRunnerPlugin` 调用已经提交；这个勾选框是唯一必须由 Xcode 写入 `.pbxproj` 的部分。
+6. **TestFlight**：这正是 SPEC.md §8 点名的资金关卡（Gate）—— 需要先有 Apple 开发者计划会员资格（每年 99 美元），Xcode 才能创建 App Store Connect 记录。在做出这个决定之前，以上所有步骤都无需付费会员资格。做出决定后：Product → Archive，通过 App Store Connect 分发，再到 App Store Connect → TestFlight 中添加构建版本与测试人员。
 
 ## 为什么用 npm 而不是 pnpm
 
@@ -102,12 +103,44 @@ open ios/App/App.xcodeproj      # or: npx cap open ios
 
 `@capacitor-community/barcode-scanner`（`@capacitor-community` 作用域下唯一对应的插件）的 peerDependency 是 `@capacitor/core@^5`，与本应用所用的 `@capacitor/core@^8` 技术栈不兼容。SPEC.md §8 要求的是“摄像头（或条码扫描器）”—— 括号内给出了另一种选择的余地 —— 因此配对界面使用官方的 `@capacitor/camera` 拍一张照片，再用 `jsqr`（MIT 协议，零原生依赖）在本地解码，而不是为了迁就一个未跟进维护的插件而把整套 Capacitor 技术栈降级。
 
+## 后台事件投递
+
+iOS 与 Android 都不会在应用进入后台后继续保持 `EventSource` 连接，因此由 `@capacitor/background-runner`（官方 `@capacitor` 作用域）安排一个独立于 WebView、自行运行的周期性轮询：
+
+- **`assets/background-runner.js`** 运行在该插件的隔离 JS 引擎中（没有 DOM，也不能 `import` 模块 —— 其中的常量与事件映射逻辑是从 `src/lib/remoteApi.ts`/`eventsMapper.ts` 手工镜像过来的，见该文件顶部注释），并通过 `CapacitorNotifications.schedule` 为任何比它自己 `CapacitorKV` 存储里记录的“最后一个事件 id”更新的事件触发本地通知。
+- **`src/lib/backgroundSync.ts`** 是应用侧的另一半：在配对成功后、撤销/忘记主机时、以及每次启动时，通过 `dispatchEvent('storeSession', …)` 把已配对的会话推送进这个隔离的 KV 存储 —— 该运行环境看不到 `@capacitor/preferences`。
+- **`capacitor.config.ts`** 的 `plugins.BackgroundRunner` 配置块（`buildBackgroundRunnerConfig()`）注册了一个每 15 分钟重复一次的轮询（这是 Android 对重复后台任务的下限；iOS 的 BGTaskScheduler 只把这个数字当作提示，实际节奏由系统自行决定）。
+- **Android**：已完整接入，且是下面 debug 构建的一部分 —— `android/app/build.gradle` 的 `flatDir` 条目与 Gradle 插件模块均已就位；APK 一侧不需要额外代码。
+- **iOS**：`Info.plist` 的 `BGTaskSchedulerPermittedIdentifiers`/`UIBackgroundModes` 与 `AppDelegate.swift` 中的两处 `BackgroundRunnerPlugin` 调用均已提交，但 **Background Modes 能力**（Background fetch + Background processing）仍需在 Xcode 的 Signing & Capabilities 标签页中手动打开 —— 这一步是仅限 Mac、修改 Xcode 工程文件的操作，没有可用纯文本编辑替代的办法。见下文“Mac 上的步骤”。
+- **无论哪个平台**：真正“锁屏也能立即收到推送”（完全没有轮询延迟）都需要主机通过 APNs/FCM 推送，这仍然超出本分支范围，与此前一致。
+
 ## 已知限制与遗留工作
 
-- **后台事件投递只是尽力而为。** iOS 与 Android 都不会在应用进入后台后继续保持 `EventSource` 连接；`RemoteEventsClient.pollOnce()` 是为后台任务触发预留的方法，但本应用尚未注册任何操作系统级后台执行能力（BGTaskScheduler / WorkManager）去真正周期性调用它 —— 要做到“后台也能收到通知”，需要主机通过 APNs/FCM 推送，这超出了本分支的范围。
-- **iOS 未在本机构建。** Xcode 工程、其 Swift Package 依赖，以及证书锁定用的 `WKNavigationDelegate`，上文均已写明步骤，但均未在真机/模拟器上验证，详见“Mac 上的步骤”。
+- **iOS 未在本机构建。** Xcode 工程、其 Swift Package 依赖、证书锁定用的 `WKNavigationDelegate`，以及上面提到的 Background Modes 能力开关，均已写明步骤，但均未在真机/模拟器上验证，详见“Mac 上的步骤”。
 - **Android debug APK 未签名**（使用 Gradle 自动生成的 debug 密钥库）—— 侧载安装是预期用法，尚不适用于 Play 管理中心上架。
 - **没有针对 §2 样式的视觉回归测试**（圆环标记、裁定卡片配色）——`npm test` 覆盖的是配对/令牌/通知的*逻辑*，不覆盖像素级输出。
+
+## 第三方声明
+
+仓库根目录的 `THIRD_PARTY_NOTICES.md` 是从 **pnpm** 工作区的清单文件生成的（`scripts/gen-third-party-notices.ts`，由 pre-commit 钩子强制执行），而根据上文“为什么用 npm 而不是 pnpm”，本包被刻意排除在该工作区之外 —— 它的依赖闭包只存在于 `apps/mobile/package-lock.json` 中，因此其许可证改在此处披露：
+
+| 包 | 许可证 |
+| --- | --- |
+| [`@aparajita/capacitor-biometric-auth`](https://github.com/aparajita/capacitor-biometric-auth) | MIT |
+| [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/app`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/background-runner`](https://github.com/ionic-team/capacitor-background-runner) | MIT |
+| [`@capacitor/camera`](https://github.com/ionic-team/capacitor-camera) | MIT |
+| [`@capacitor/cli`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/ios`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/local-notifications`](https://github.com/ionic-team/capacitor-local-notifications) | MIT |
+| [`@capacitor/preferences`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/splash-screen`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/status-bar`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`jsqr`](https://github.com/cozmo/jsQR) | Apache-2.0 |
+
+字体许可证单独收录在 `assets/fonts/` 中（Instrument Sans：SIL OFL 1.1；Commit Mono：字体二进制文件本身是 SIL OFL 1.1，上游构建仓库另附 MIT —— 见 `CommitMono-LICENSE.txt` 与 `CommitMono-MIT.txt`）。
 
 ## 模型体验（Model Experience）
 

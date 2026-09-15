@@ -1,9 +1,11 @@
 import { App } from '@capacitor/app'
 import { SplashScreen } from '@capacitor/splash-screen'
+import { BackgroundRunner } from '@capacitor/background-runner'
 import { CapacitorPreferencesStorage } from './lib/capacitorStorage.js'
 import { TokenStore, type DeviceSession } from './lib/tokenStore.js'
 import { unlockWithBiometrics } from './lib/lock.js'
 import { checkHostReachable, pairWithHost, RemoteEventsClient } from './lib/remoteApi.js'
+import { syncBackgroundSession } from './lib/backgroundSync.js'
 import { mapEventToNotification } from './lib/eventsMapper.js'
 import type { RemoteEvent } from './lib/eventsMapper.js'
 import { ensureNotificationPermission, fireNotification, onNotificationTapped } from './lib/notify.js'
@@ -88,6 +90,7 @@ async function completePairing(payload: PairingPayload): Promise<void> {
     pairedAt: new Date().toISOString(),
   }
   await tokenStore.save(session)
+  await syncBackgroundSession(BackgroundRunner, session)
   await enterPairedState(session)
 }
 
@@ -106,6 +109,7 @@ function wireOfflineScreen(session: DeviceSession): void {
   document.querySelector('[data-action="unpair"]')?.addEventListener('click', () => {
     void (async () => {
       await tokenStore.clear()
+      await syncBackgroundSession(BackgroundRunner, undefined)
       eventsClient?.stop()
       showScreen('pairing')
     })()
@@ -142,6 +146,11 @@ async function bootstrap(): Promise<void> {
     showScreen('pairing')
     return
   }
+
+  // Rehydrates the background runner's isolated KV store on every boot (a
+  // reinstall or an OS-level app-data clear wipes it independently of
+  // tokenStore's own @capacitor/preferences-backed storage).
+  await syncBackgroundSession(BackgroundRunner, session)
 
   showScreen('connecting')
   const reachable = await checkHostReachable(session.hostUrl, session.deviceToken)

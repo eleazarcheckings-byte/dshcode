@@ -88,7 +88,8 @@ open ios/App/App.xcodeproj      # or: npx cap open ios
 2. Select the **App** scheme and a Simulator or a physical device, then Product → Run to sanity-check the pairing/lock/offline screens before wiring signing.
 3. **Signing**: Project settings → Signing & Capabilities → pick your Team; Xcode manages a development certificate automatically for a personal Apple ID. A physical-device build needs this even before TestFlight.
 4. **Certificate pinning** (see "Security model" above): add a `WKNavigationDelegate` that intercepts `didReceive challenge` for `NSURLAuthenticationMethodServerTrust`, extracts the leaf certificate's DER bytes (`SecCertificateCopyData`), SHA-256-hashes them, and compares against the same pinned fingerprint the Android `PinningWebViewClient` reads (fetch it from `UserDefaults` under the `CapacitorStorage` suite — `@capacitor/preferences`'s iOS storage — key `saturn.remote.session`, field `fingerprint`). Wire it in `ios/App/App/AppDelegate.swift` or via `WKUIDelegate` on the Capacitor bridge view controller.
-5. **TestFlight**: this is the money Gate SPEC.md §8 calls out — an Apple Developer Program membership ($99/yr) is required before Xcode can create an App Store Connect record. Once that decision is made: Product → Archive, distribute via App Store Connect, then add build/testers in App Store Connect → TestFlight. Nothing above this line needs the paid membership.
+5. **Background Modes capability** (see "Background event delivery" above): Signing & Capabilities → **+ Capability** → **Background Modes** → check **Background fetch** and **Background processing**. `Info.plist`'s `BGTaskSchedulerPermittedIdentifiers` and `AppDelegate.swift`'s `BackgroundRunnerPlugin` calls are already committed; this checkbox is the one piece Xcode itself has to write into the `.pbxproj`.
+6. **TestFlight**: this is the money Gate SPEC.md §8 calls out — an Apple Developer Program membership ($99/yr) is required before Xcode can create an App Store Connect record. Once that decision is made: Product → Archive, distribute via App Store Connect, then add build/testers in App Store Connect → TestFlight. Nothing above this line needs the paid membership.
 
 ## Why npm, not pnpm
 
@@ -100,12 +101,44 @@ Practical effect for anyone building this locally: run `npm install` from a plai
 
 `@capacitor-community/barcode-scanner` (the one plugin in the `@capacitor-community` scope for this) peer-depends on `@capacitor/core@^5`, and is incompatible with the `@capacitor/core@^8` stack this app uses. SPEC.md §8 asks for "camera (or barcode scanner)" — the parenthetical permits either — so the pairing screen uses the official `@capacitor/camera` to take one photo and decodes it locally with `jsqr` (MIT, zero native dependencies) rather than downgrading the whole Capacitor stack to match an unmaintained plugin's peer range.
 
+## Background event delivery
+
+Neither iOS nor Android keeps an `EventSource` connection alive once the app is backgrounded, so `@capacitor/background-runner` (official `@capacitor` scope) schedules a periodic tick that polls on its own, independent of the WebView:
+
+- **`assets/background-runner.js`** runs in the plugin's isolated JS engine (no DOM, no module imports — its constants and event-mapping logic are hand-mirrored from `src/lib/remoteApi.ts`/`eventsMapper.ts`, see that file's header comment) and fires local notifications via `CapacitorNotifications.schedule` for anything newer than the last-seen event id it keeps in its own `CapacitorKV` store.
+- **`src/lib/backgroundSync.ts`** is the app-side half: it pushes the paired session into that isolated KV store via `dispatchEvent('storeSession', …)` after pairing, on revoke/forget, and once at boot — the runner's context can't see `@capacitor/preferences`.
+- **`capacitor.config.ts`**'s `plugins.BackgroundRunner` block (`buildBackgroundRunnerConfig()`) registers a repeating tick every 15 minutes (Android's own floor for a repeating background task; iOS's BGTaskScheduler treats the number as a hint and decides the actual cadence itself).
+- **Android**: fully wired and part of the debug build below — `android/app/build.gradle`'s `flatDir` entry and the Gradle plugin modules are already in place; no APK-side app code needed.
+- **iOS**: `Info.plist`'s `BGTaskSchedulerPermittedIdentifiers`/`UIBackgroundModes` and `AppDelegate.swift`'s two `BackgroundRunnerPlugin` calls are already committed, but the **Background Modes capability** (Background fetch + Background processing) still has to be turned on in Xcode's Signing & Capabilities tab — that one step is a Mac-only, Xcode-project-file change with no text-editable equivalent. See "iOS — Mac steps" below.
+- **Either platform**: true push-while-locked delivery (no periodic-tick delay at all) would need the host to push through APNs/FCM — out of this cell's scope, same as before.
+
 ## Known Limitations and Deferred Work
 
-- **Background event delivery is best-effort.** Neither iOS nor Android keeps an `EventSource` connection alive once the app is backgrounded; `RemoteEventsClient.pollOnce()` exists for a background-task tick, but this app registers no OS background-execution capability (BGTaskScheduler / WorkManager) to actually invoke it periodically — true "notified while backgrounded" delivery needs the host to push through APNs/FCM, which is out of this cell's scope.
-- **iOS is not built on this machine.** The Xcode project, its Swift Package dependencies, and the certificate-pinning `WKNavigationDelegate` are all documented above but unverified on-device; see the Mac steps.
+- **iOS is not built on this machine.** The Xcode project, its Swift Package dependencies, the certificate-pinning `WKNavigationDelegate`, and the Background Modes capability toggle above are all documented but unverified on-device; see the Mac steps.
 - **The Android debug APK is unsigned** (Gradle's auto-generated debug keystore) — expected for sideloading, not suitable for Play Console.
 - **No visual regression coverage** for the §2 styling (ring mark, verdict-card colors) — `npm test` covers the pairing/token/notification *logic*, not pixel output.
+
+## Third-party notices
+
+Root `THIRD_PARTY_NOTICES.md` is generated from the **pnpm** workspace's manifests (`scripts/gen-third-party-notices.ts`, pre-commit-enforced) and, per "Why npm, not pnpm" above, this package is deliberately outside that workspace — its dependency closure lives only in `apps/mobile/package-lock.json`, so its licenses are disclosed here instead:
+
+| Package | License |
+| --- | --- |
+| [`@aparajita/capacitor-biometric-auth`](https://github.com/aparajita/capacitor-biometric-auth) | MIT |
+| [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/app`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/background-runner`](https://github.com/ionic-team/capacitor-background-runner) | MIT |
+| [`@capacitor/camera`](https://github.com/ionic-team/capacitor-camera) | MIT |
+| [`@capacitor/cli`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/ios`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/local-notifications`](https://github.com/ionic-team/capacitor-local-notifications) | MIT |
+| [`@capacitor/preferences`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/splash-screen`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/status-bar`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`jsqr`](https://github.com/cozmo/jsQR) | Apache-2.0 |
+
+Font licenses are covered separately in `assets/fonts/` (Instrument Sans: SIL OFL 1.1; Commit Mono: SIL OFL 1.1 for the font binaries plus MIT for the upstream build repository — see `CommitMono-LICENSE.txt` and `CommitMono-MIT.txt`).
 
 ## Model Experience
 
