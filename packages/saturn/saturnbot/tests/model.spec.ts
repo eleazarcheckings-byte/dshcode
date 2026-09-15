@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore from '@deepseek-ai/dsh-session'
 import JsonlPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
-import LlmRuntime from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { afterEach, expect, it, vi } from 'vitest'
 import { LoggedBotModel, botModelPrompt } from '../src/model.ts'
@@ -108,7 +108,7 @@ it('records cancellation and bounds model-visible input before a provider reques
 
 it('resolves the coordinator route through a connected model router instead of the configured provider', async () => {
   const { ctx, context, model } = await setup()
-  const adapter = new MockAdapter([textResponse('{"summary":"idle","tasks":[]}')])
+  const adapter = new MockAdapter([textResponse('{"summary":"idle","tasks":[]}')], { efforts: [{ id: ReasoningEffortId('high'), name: 'High' }] })
   ctx.llm.registerAdapter(['fixture', 'routed'], adapter)
   const resolve = vi.fn().mockReturnValue({ provider: 'routed', model: 'routed-model', reasoningEffort: 'high' })
   const dispose = ctx.provide('modelRouter', { resolve })
