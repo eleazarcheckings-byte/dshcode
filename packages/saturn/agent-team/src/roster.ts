@@ -1,6 +1,7 @@
 /** Team membership, continuable-child provisioning, and roster-owned teardown. */
 
 import { randomUUID } from 'node:crypto'
+import { relative, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -15,12 +16,29 @@ import type { TeamState } from './projection.ts'
 import { messageAccepted } from './session-message.ts'
 import { TeamId } from './types.ts'
 import type {
+  MergeTeammateRequest,
+  MergeTeammateResult,
   SpawnTeammateRequest,
   SpawnTeammateResult,
   TeamMemberSnapshot,
   TeamMemberView,
+  TeamMergeConflict,
 } from './types.ts'
 import { requiredText } from './validation.ts'
+import type { WorktreeManager, WorktreeRecord } from './worktree.ts'
+
+/**
+ * The claim ledger as this roster needs it. Enforced claims are an optional
+ * neighbour, not a dependency: a deployment without them merges unguarded, and
+ * one with them refuses to land a diff over a surface a peer owns.
+ */
+interface ClaimsGuard {
+  conflictsFor(request: {
+    workspace: string
+    paths: readonly string[]
+    ignoreSessionIds?: readonly string[]
+  }): Promise<readonly { path: string; holder: string; lane: string; claimId: string }[]>
+}
 
 const MEMBER_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
 
@@ -68,6 +86,7 @@ export class TeamRoster {
     private readonly journal: TeamJournal,
     private readonly lifecycle: TeamRuntimeLifecycle,
     private readonly maxMembers: number,
+    private readonly worktrees: WorktreeManager,
   ) {}
 
   /**
@@ -133,6 +152,7 @@ export class TeamRoster {
       name: 'lead',
       role: 'lead',
       status: root.status,
+      isolation: 'shared',
       ...root.options.model === undefined ? {} : { model: root.options.model },
       diagnostics: [],
     }]
@@ -151,6 +171,8 @@ export class TeamRoster {
         description: member.description,
         provider: member.provider,
         context: member.context,
+        isolation: member.isolation ?? 'shared',
+        ...member.worktree === undefined ? {} : { worktree: member.worktree },
         ...model === undefined ? {} : { model },
         diagnostics: member.error === undefined ? [] : [member.error],
       })
@@ -241,6 +263,132 @@ export class TeamRoster {
     await this.lifecycle.withTimeout(this.ctx.subagents.drainContinuableChildren(root, childIds))
   }
 
+  /**
+   * Apply one isolated teammate's work into the Lead workspace, whole or not
+   * at all.
+   *
+   * The merge is the moment the coordination that isolation deferred comes
+   * due, so it is also the moment a claim must be consulted: the Lead is about
+   * to write files a peer may own. Every path in the diff is checked before the
+   * first byte lands, and a single owned path refuses the whole patch — a
+   * half-applied merge would leave the Lead workspace in a state neither member
+   * produced, which is worse than either diff alone.
+   * @param caller - exact live Lead Agent.
+   * @param request - target teammate, dry-run flag, and cancellation.
+   * @returns what was applied, or what refused it.
+   */
+  async merge(caller: Agent, request: MergeTeammateRequest): Promise<MergeTeammateResult> {
+    const membership = this.membership(caller)
+    if (membership.role !== 'lead') {
+      throw new TeamError('only the Team Lead can merge teammate work', 'TEAM_LEAD_REQUIRED')
+    }
+    const root = membership.root
+    const workspace = this.workspaceOf(root)
+    const state = this.journal.state(root)
+    const target = resolveActiveMember(root, state, request.target)
+    const member = state.members.find(candidate => candidate.id === target.id)
+    if (member?.worktree === undefined) {
+      throw new TeamError(
+        `teammate "${target.name}" works in the shared Lead workspace, so its work is already here and there is nothing to merge`,
+        'TEAM_NOT_ISOLATED',
+      )
+    }
+    const change = await this.worktrees.collect(member.worktree.path, request.signal)
+    if (change.paths.length === 0) {
+      return { target: member.name, status: 'unchanged', files: [], conflicts: [] }
+    }
+    const files = await this.workspaceRelative(workspace, change.paths, request.signal)
+    const conflicts = await this.claimConflicts(workspace, files, [root.id, member.id])
+    if (conflicts.length > 0) {
+      return { target: member.name, status: 'denied', files, conflicts }
+    }
+    if (request.dryRun === true) return { target: member.name, status: 'previewed', files, conflicts: [] }
+    await this.worktrees.apply(workspace, change.patch, request.signal)
+    return { target: member.name, status: 'merged', files, conflicts: [] }
+  }
+
+  /**
+   * Remove every isolated checkout this Team created.
+   *
+   * Driven from the durable roster rather than from memory, so a Lead resumed
+   * in a later process still cleans up the checkouts of the members it finds.
+   */
+  async removeWorktrees(): Promise<void> {
+    for (const agent of this.ctx.agents.list()) {
+      const membership = this.tryMembership(agent)
+      if (membership?.role !== 'lead') continue
+      const workspace = agent.session.header.cwd
+      if (workspace === undefined || workspace === '') continue
+      for (const member of this.journal.state(agent).members) {
+        if (member.worktree === undefined) continue
+        try {
+          await this.worktrees.remove(workspace, member.worktree.path, this.lifecycle.signal)
+        } catch (error: unknown) {
+          this.ctx.logger.warn(`removing the isolated checkout of "${member.name}" failed: ${errorMessage(error)}`)
+        }
+      }
+    }
+  }
+
+  /** The Lead workspace, which every isolation and merge operation needs. */
+  private workspaceOf(root: Agent): string {
+    const workspace = root.session.header.cwd
+    if (workspace === undefined || workspace === '') {
+      throw new TeamError('this operation needs the Team Lead session to have a workspace', 'TEAM_WORKTREE_UNAVAILABLE')
+    }
+    return workspace
+  }
+
+  /** The Lead workspace, proved able to host an isolated checkout. */
+  private async isolatedWorkspace(root: Agent, signal: AbortSignal): Promise<string> {
+    const workspace = this.workspaceOf(root)
+    if (!await this.worktrees.isRepository(workspace, signal)) {
+      throw new TeamError(
+        `worktree isolation needs a git repository with at least one commit at "${workspace}"; spawn this teammate with shared isolation instead`,
+        'TEAM_WORKTREE_UNAVAILABLE',
+      )
+    }
+    return workspace
+  }
+
+  /** Restate repository-relative diff paths against the Lead workspace. */
+  private async workspaceRelative(
+    workspace: string,
+    paths: readonly string[],
+    signal: AbortSignal,
+  ): Promise<string[]> {
+    const repository = await this.worktrees.repositoryRoot(workspace, signal)
+    const files = paths.map(path => relative(workspace, resolve(repository, path)).replace(/\\/gu, '/'))
+    const outside = files.filter(file => file === '' || file.startsWith('../'))
+    if (outside.length > 0) {
+      // Ownership is recorded per workspace, so a diff reaching above this one
+      // cannot be checked against it. Refusing is the honest answer; applying
+      // it blind is the one that loses somebody's work.
+      throw new TeamError(
+        `the teammate diff changes files outside the Lead workspace (${outside.join(', ')}), where ownership cannot be checked`,
+        'TEAM_MERGE_OUT_OF_SCOPE',
+      )
+    }
+    return files
+  }
+
+  /** Ask the claim ledger which of these paths a peer already owns. */
+  private async claimConflicts(
+    workspace: string,
+    paths: readonly string[],
+    ignoreSessionIds: readonly string[],
+  ): Promise<TeamMergeConflict[]> {
+    const claims = this.ctx.get('claims') as unknown as ClaimsGuard | undefined
+    if (typeof claims?.conflictsFor !== 'function') return []
+    const conflicts = await claims.conflictsFor({ workspace, paths, ignoreSessionIds })
+    return conflicts.map(conflict => ({
+      path: conflict.path,
+      holder: conflict.holder,
+      lane: conflict.lane,
+      claimId: conflict.claimId,
+    }))
+  }
+
   /** Perform one creation admitted before the Team runtime disposal cutoff. */
   private async spawnAdmitted(
     caller: Agent,
@@ -256,6 +404,10 @@ export class TeamRoster {
     const name = this.memberName(request.name)
     const description = requiredText(request.description, 'description', 200)
     const childId = brandString<SessionId>(randomUUID())
+    const isolation = request.isolation ?? 'shared'
+    // Proved before anything durable is written: a workspace that cannot host a
+    // checkout must leave the Team exactly as it was, with the name still free.
+    const workspace = isolation === 'worktree' ? await this.isolatedWorkspace(root, signal) : undefined
     const member: TeamMemberSnapshot = {
       id: childId,
       name,
@@ -263,6 +415,7 @@ export class TeamRoster {
       provider: requiredText(request.provider, 'provider', 200),
       context: request.context,
       phase: 'provisioning',
+      isolation,
     }
 
     await this.journal.transact(root.id, async () => {
@@ -277,7 +430,9 @@ export class TeamRoster {
     })
 
     let started: ContinuableStart
+    let worktree: WorktreeRecord | undefined
     try {
+      if (workspace !== undefined) worktree = await this.worktrees.create(workspace, root.id, name, signal)
       started = await this.ctx.subagents.startContinuable({
         childId,
         provider: request.provider,
@@ -286,6 +441,7 @@ export class TeamRoster {
           prompt: request.prompt,
           parent: root,
         },
+        ...worktree === undefined ? {} : { cwd: worktree.path },
         signal,
       })
       await this.checkpointInitialPrompt(childId, started.messageId, signal)
@@ -298,6 +454,9 @@ export class TeamRoster {
       try {
         const phase = await this.settleProvisioning(root, failed)
         await this.stopTeammates(root, [childId])
+        if (workspace !== undefined && worktree !== undefined) {
+          await this.worktrees.remove(workspace, worktree.path, this.lifecycle.signal)
+        }
         if (phase === 'active') {
           throw new TeamError(
             `teammate "${name}" became active while its creator reported failure`,
@@ -313,6 +472,7 @@ export class TeamRoster {
     const active = {
       ...member,
       phase: 'active' as const,
+      ...worktree === undefined ? {} : { worktree },
     } satisfies TeamMemberSnapshot
     // Once the continuation accepted its first prompt, it is a real child. If
     // this checkpoint fails, keep the in-memory active edge instead of inventing
@@ -442,6 +602,8 @@ export class TeamRoster {
       description: member.description,
       provider: member.provider,
       context: member.context,
+      isolation: member.isolation ?? 'shared',
+      ...member.worktree === undefined ? {} : { worktree: member.worktree },
       ...live?.options.model === undefined ? {} : { model: live.options.model },
       diagnostics: [],
     }

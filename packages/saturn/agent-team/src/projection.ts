@@ -64,6 +64,11 @@ const contentBlockSchema: z.ZodType<ContentBlock> = z.lazy(() => z.union([
   ),
 ])) as z.ZodType<ContentBlock>
 
+const teamWorktreeSnapshotSchema = z.object({
+  path: z.string().min(1),
+  baseRevision: z.string().min(1),
+}).strict()
+
 const teamMemberSnapshotSchema = z.object({
   id: sessionIdSchema,
   name: z.string(),
@@ -72,6 +77,10 @@ const teamMemberSnapshotSchema = z.object({
   context: z.enum(['fresh', 'fork']),
   phase: z.enum(['provisioning', 'active', 'failed']),
   error: z.string().optional(),
+  // Absent in every row written before isolation existed; those members all
+  // shared the Lead workspace, so the reader treats absence as `shared`.
+  isolation: z.enum(['shared', 'worktree']).optional(),
+  worktree: teamWorktreeSnapshotSchema.optional(),
 }).strict() as z.ZodType<TeamMemberSnapshot>
 
 const teamTaskSnapshotSchema = z.object({

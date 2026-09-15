@@ -43,6 +43,21 @@ export function TeamMessageId(id: string): TeamMessageId {
 /** Durable teammate lifecycle. */
 export type TeamMemberPhase = 'provisioning' | 'active' | 'failed'
 
+/**
+ * Where a teammate's files live. `shared` is the Lead's own workspace, which
+ * every member sees at once; `worktree` is a git checkout of the Lead's HEAD
+ * that only that member can see, whose work reaches the Lead through a merge.
+ */
+export type TeamIsolation = 'shared' | 'worktree'
+
+/** One member's isolated checkout, recorded so it survives a restart. */
+export interface TeamWorktreeSnapshot {
+  /** Absolute path of the checkout. */
+  readonly path: string
+  /** The exact commit it was created from. */
+  readonly baseRevision: string
+}
+
 /** Whole durable value written on every teammate lifecycle change. */
 export interface TeamMemberSnapshot {
   readonly id: SessionId
@@ -52,6 +67,10 @@ export interface TeamMemberSnapshot {
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
   readonly error?: string
+  /** Absent on rows written before isolation existed, which were all shared. */
+  readonly isolation?: TeamIsolation
+  /** Present only for a member whose isolation is `worktree`. */
+  readonly worktree?: TeamWorktreeSnapshot
 }
 
 /** Current runtime-enriched roster row. */
@@ -64,6 +83,10 @@ export interface TeamMemberView {
   readonly provider?: string
   readonly context?: 'fresh' | 'fork'
   readonly model?: string
+  /** Where this member works; the Lead row is always shared. */
+  readonly isolation?: TeamIsolation
+  /** The member's isolated checkout, when it has one. */
+  readonly worktree?: TeamWorktreeSnapshot
   readonly diagnostics: string[]
 }
 
@@ -139,6 +162,12 @@ export interface Config {
   readonly maxMessageBytes?: number
   /** Maximum milliseconds allowed for Team-owned runtime disposal. */
   readonly disposalTimeoutMs?: number
+  /**
+   * Directory holding isolated teammate checkouts. Defaults to
+   * `<DSH_HOME>/worktrees`; deliberately outside every workspace, so a checkout
+   * can never appear in the repository it was taken from.
+   */
+  readonly worktreeRoot?: string
 }
 
 /** Input for creating one durable teammate. */
@@ -148,12 +177,52 @@ export interface SpawnTeammateRequest {
   readonly prompt: ContentBlock[]
   readonly context: 'fresh' | 'fork'
   readonly provider: string
+  /** Where the teammate works. Defaults to `shared`, the Lead's own workspace. */
+  readonly isolation?: TeamIsolation
   readonly signal: AbortSignal
 }
 
 /** Result after one teammate reaches a durable active or failed edge. */
 export interface SpawnTeammateResult {
   readonly member: TeamMemberView
+}
+
+/** Input for merging one isolated teammate's work into the Lead workspace. */
+export interface MergeTeammateRequest {
+  /** Durable teammate name. */
+  readonly target: string
+  /** Report what would be merged, and what owns it, without changing a file. */
+  readonly dryRun?: boolean
+  /** Caller cancellation. */
+  readonly signal: AbortSignal
+}
+
+/** One path in a teammate's diff that a peer's live claim owns. */
+export interface TeamMergeConflict {
+  /** The workspace-relative path the diff would change. */
+  readonly path: string
+  /** Who holds it. */
+  readonly holder: string
+  /** The holding claim's lane. */
+  readonly lane: string
+  /** The holding claim's id. */
+  readonly claimId: string
+}
+
+/** What one merge attempt did, or refused to do. */
+export interface MergeTeammateResult {
+  /** The teammate whose work this is. */
+  readonly target: string
+  /**
+   * `merged` applied the whole diff, `unchanged` found nothing to apply,
+   * `denied` applied nothing because a peer owns part of the surface, and
+   * `previewed` answered a dry run.
+   */
+  readonly status: 'merged' | 'unchanged' | 'denied' | 'previewed'
+  /** Every workspace-relative path in the teammate's diff, sorted. */
+  readonly files: string[]
+  /** The owned paths that refused the merge; empty unless the status is `denied`. */
+  readonly conflicts: TeamMergeConflict[]
 }
 
 /** Input for one durable peer message. */

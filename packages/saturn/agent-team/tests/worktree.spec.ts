@@ -95,7 +95,9 @@ async function setup(workspace: string = repo, withClaims = false) {
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   if (withClaims) await ctx.plugin(ClaimsPlugin)
   const teamFiber = await ctx.plugin(TeamService, { worktreeRoot })
-  ctx.llm.registerAdapter(['mock'], new MockAdapter(['hang']))
+  // One script entry per model call: every teammate this suite spawns must have
+  // a turn of its own to hang on, or it settles and its Agent disappears.
+  ctx.llm.registerAdapter(['mock'], new MockAdapter(['hang', 'hang', 'hang', 'hang']))
   const lead = ctx.agentLoop.create(SessionId('worktree-lead'), { provider: 'mock', model: 'mock' }, { cwd: workspace })
   return { ctx, lead, teamFiber }
 }

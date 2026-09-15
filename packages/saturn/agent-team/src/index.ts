@@ -15,9 +15,12 @@ import { TeamRoster } from './roster.ts'
 import type { TeamMembership } from './roster.ts'
 import { TeamTaskBoard } from './task-board.ts'
 import { TeamId, TeamTaskId } from './types.ts'
+import { WorktreeManager } from './worktree.ts'
 import type {
   Config,
   CreateTeamTaskRequest,
+  MergeTeammateRequest,
+  MergeTeammateResult,
   SendTeamMessageRequest,
   SendTeamMessageResult,
   SpawnTeammateRequest,
@@ -31,6 +34,8 @@ import type {
 } from './types.ts'
 
 export type * from './types.ts'
+export { WorktreeManager, WORKTREE_DIR } from './worktree.ts'
+export type { WorktreeChange, WorktreeRecord } from './worktree.ts'
 export type { TeamMembership } from './roster.ts'
 export { TeamId, TeamMessageId, TeamTaskId } from './types.ts'
 export { TeamError } from './error.ts'
@@ -65,10 +70,15 @@ export class TeamService extends TypertRemoteService {
     maxPendingMessagesPerMember: z.number().step(1).min(1).default(DEFAULT_MAX_PENDING_MESSAGES),
     maxMessageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_MESSAGE_BYTES),
     disposalTimeoutMs: z.number().step(1).min(1).default(DEFAULT_DISPOSAL_TIMEOUT_MS),
+    worktreeRoot: z.string(),
   })
 
-  /** Validated deployment limits used by every Team operation. */
-  private readonly config: Required<Config>
+  /**
+   * Validated deployment limits used by every Team operation. The worktree
+   * root is not one of them: it is resolved once into the checkout manager,
+   * and no operation reads it again.
+   */
+  private readonly config: Required<Omit<Config, 'worktreeRoot'>>
 
   private readonly activity: TeamActivity
   private readonly lifecycle: TeamRuntimeLifecycle
@@ -96,7 +106,15 @@ export class TeamService extends TypertRemoteService {
     this.activity = new TeamActivity()
     this.lifecycle = new TeamRuntimeLifecycle(this.config.disposalTimeoutMs)
     this.journal = new TeamJournal(ctx, (root) => { this.activity.notify(TeamId(root.id)) })
-    this.roster = new TeamRoster(ctx, this.journal, this.lifecycle, this.config.maxMembers)
+    this.roster = new TeamRoster(
+      ctx,
+      this.journal,
+      this.lifecycle,
+      this.config.maxMembers,
+      config.worktreeRoot === undefined || config.worktreeRoot === ''
+        ? new WorktreeManager()
+        : new WorktreeManager(config.worktreeRoot),
+    )
     this.mailbox = new TeamMailbox(
       ctx,
       this.journal,
@@ -152,6 +170,16 @@ export class TeamService extends TypertRemoteService {
    */
   async spawnTeammate(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult> {
     return await this.roster.spawn(caller, request)
+  }
+
+  /**
+   * Apply one isolated teammate's work into the Lead workspace.
+   * @param caller - exact live Lead Agent.
+   * @param request - target teammate name, dry-run flag, and cancellation.
+   * @returns the applied paths, or the owned paths that refused the merge.
+   */
+  async mergeTeammate(caller: Agent, request: MergeTeammateRequest): Promise<MergeTeammateResult> {
+    return await this.roster.merge(caller, request)
   }
 
   /**
@@ -316,6 +344,13 @@ export class TeamService extends TypertRemoteService {
       } catch (error: unknown) {
         failures.push(error)
       }
+    }
+    // After the members are stopped: an isolated checkout is removed only once
+    // nothing is still writing into it.
+    try {
+      await this.roster.removeWorktrees()
+    } catch (error: unknown) {
+      failures.push(error)
     }
     if (failures.length > 0) throw new AggregateError(failures, 'Agent Teams runtime disposal failed')
   }
