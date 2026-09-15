@@ -246,6 +246,24 @@ Types: [TokenUsage](subsystems/llm-streaming.md)
 
 Source: [`packages/core/session/src/types.ts:300`](../packages/core/session/src/types.ts)
 
+### `checkpoints/*`
+
+<a id="checkpointschange--log-only"></a>
+
+#### `checkpoints/change` — log-only
+
+```ts persistence-catalog
+/**
+ * Whole-value replace of ONE checkpoint record, keyed by its id: log-only,
+ * non-surface. A capture that extends an open checkpoint re-emits it with
+ * the added entry, so the last event for an id is that checkpoint's
+ * complete recorded state. A log with none folds to an empty catalog.
+ */
+'checkpoints/change': { readonly next: CheckpointRecord }
+```
+
+Source: [`packages/saturn/checkpoints/src/types.ts:124`](../packages/saturn/checkpoints/src/types.ts)
+
 ### `command/*`
 
 <a id="commanddone--log-only"></a>
@@ -400,6 +418,23 @@ Types: [ContentBlock](subsystems/core.md) · [TokenUsage](subsystems/llm-streami
 
 Source: [`packages/compaction/compaction/src/types.ts:34`](../packages/compaction/compaction/src/types.ts)
 
+### `done/*`
+
+<a id="donechange--log-only"></a>
+
+#### `done/change` — log-only
+
+```ts persistence-catalog
+/**
+ * Whole-value replace of this session's definition of done: log-only,
+ * non-surface. The last `done/change` wins; a log with none folds to
+ * `null` — no definition of done has been stated yet.
+ */
+'done/change': { readonly next: DoneState | null }
+```
+
+Source: [`packages/saturn/done/src/types.ts:62`](../packages/saturn/done/src/types.ts)
+
 ### `feedback/*`
 
 <a id="feedbackrecord--log-only"></a>
@@ -540,6 +575,26 @@ Source: [`packages/core/session/src/types.ts:333`](../packages/core/session/src/
 ```
 
 Source: [`packages/api/session-controller/src/types.ts:41`](../packages/api/session-controller/src/types.ts)
+
+### `orchestrate/*`
+
+<a id="orchestratemode--log-only"></a>
+
+#### `orchestrate/mode` — log-only
+
+```ts persistence-catalog
+/**
+ * Whether multi-task (always-orchestrate) mode is in force from this point
+ * on: log-only, non-surface, whole-value replace. The last
+ * `orchestrate/mode` wins; a log with none folds to **active** through the
+ * projection unit's init — the standing posture of this harness
+ * (`~/.dsh/SATURN-HARNESS-ADDENDUM.md`), so a fresh or resumed session is
+ * orchestrated unless someone turns it off.
+ */
+'orchestrate/mode': { active: boolean }
+```
+
+Source: [`packages/saturn/orchestrate/src/types.ts:21`](../packages/saturn/orchestrate/src/types.ts)
 
 ### `permission/*`
 
@@ -808,7 +863,7 @@ Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:17`](../p
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMemberSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:223`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:223`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -826,7 +881,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:223`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageId](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:229`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:229`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -839,7 +894,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:229`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:227`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:227`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -852,7 +907,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:227`](../packages/experi
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamTaskSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/experimental/agent-team/src/types.ts:225`](../packages/experimental/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:225`](../packages/saturn/agent-team/src/types.ts)
 
 ### `todo/*`
 

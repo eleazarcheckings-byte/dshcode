@@ -1,5 +1,14 @@
-// Keyless assembled-browser coverage for the private Agent Teams Web profiles
+// Keyless assembled-browser coverage for the shipped Agent Teams Web surface
 // over the real Host Typert Remote flow.
+//
+// The three Team rows (`agent-team`, `tool-agent-team`, `ui-agent-team`) ship
+// once, in `packages/bundle/web-app/cordis.patch.yml` — the single home for a
+// product's feature rows. The base-backed opt-in layers
+// (`@saturnai/dsh-agent-team-profile` / `@saturnai/dsh-agent-team-web-profile`)
+// are therefore NOT stacked here: composing them over the shipped Web bundle
+// would declare those ids a second time, and the Loader rejects a repeated
+// explicit id with `TypeError: duplicate loader entry id`, which fails the
+// whole plugin tree.
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
@@ -17,27 +26,43 @@ import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './suppor
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/agent-team-panel', import.meta.url))
 const PANEL_EXPECTED = join(SNAPSHOT_DIR, 'task.expected.md')
-const OVERLAY = fileURLToPath(new URL('./agent-team-panel.overlay.yml', import.meta.url))
-const HOST_PATCH = fileURLToPath(new URL('../../../packages/experimental/agent-team-profile/cordis.patch.yml', import.meta.url))
-const WEB_PATCH = fileURLToPath(new URL('../../../packages/experimental/agent-team-web-profile/cordis.patch.yml', import.meta.url))
-const INSTALL_ANCHORS = [
-  fileURLToPath(new URL('../../../packages/experimental/agent-team-profile/package.json', import.meta.url)),
-  fileURLToPath(new URL('../../../packages/experimental/agent-team-web-profile/package.json', import.meta.url)),
-]
+const WEB_APP_PATCH = fileURLToPath(new URL('../../../packages/bundle/web-app/cordis.patch.yml', import.meta.url))
 const MODE = webSnapshotMode()
 
-function profileEntries(path: string): unknown[] {
+/**
+ * Every explicit entry id one bundle patch declares: the top-level list, each
+ * patch row's own `insert` list, and a group's `config` children — exactly the
+ * positions `applyEntryPatches` flattens into the composed entry list. A config
+ * payload that merely *names* an id (`disableControlsOnInstall`, `entryIds`) is
+ * not an entry, so it is not counted; counting it would report the pre-existing
+ * `web-ui` disable reference as a duplicate declaration.
+ */
+function declaredIds(path: string): string[] {
   const parsed = yaml.load(readFileSync(path, 'utf8'), { schema: entryListSchema })
-  if (!Array.isArray(parsed)) throw new Error(`profile layer at ${path} must be a list`)
-  return parsed
+  if (!Array.isArray(parsed)) throw new Error(`patch at ${path} must be a list`)
+  const ids: string[] = []
+  const walk = (entries: unknown): void => {
+    if (!Array.isArray(entries)) return
+    for (const item of entries) {
+      if (item === null || typeof item !== 'object') continue
+      const entry = item as Record<string, unknown>
+      if (typeof entry.id === 'string') ids.push(entry.id)
+      walk(entry.insert)
+      if (entry.group === true) walk(entry.config)
+    }
+  }
+  walk(parsed)
+  return ids
 }
 
-describe('Agent Teams panel overlay', () => {
-  it('matches the shipped Host and Web profile layers', () => {
-    expect(profileEntries(OVERLAY)).toEqual([
-      ...profileEntries(HOST_PATCH),
-      ...profileEntries(WEB_PATCH),
-    ])
+describe('shipped Agent Teams Web surface', () => {
+  it('declares the three Team rows exactly once, in the shipped web bundle patch', () => {
+    const ids = declaredIds(WEB_APP_PATCH)
+    for (const id of ['agent-team', 'tool-agent-team', 'ui-agent-team']) {
+      expect(ids.filter(candidate => candidate === id)).toHaveLength(1)
+    }
+    const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index)
+    expect([...new Set(duplicates)]).toEqual([])
   })
 })
 
@@ -48,7 +73,7 @@ describe('web e2e: Agent Teams panel', () => {
   let tripwire: ReturnType<typeof watchConsole>
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY, extraInstallAnchors: INSTALL_ANCHORS })
+    scaffold = await launchWebScaffold()
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)

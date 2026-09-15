@@ -248,6 +248,24 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/core/session/src/types.ts:300`](../packages/core/session/src/types.ts)
 
+### `checkpoints/*`
+
+<a id="checkpointschange--log-only"></a>
+
+#### `checkpoints/change` — log-only
+
+```ts persistence-catalog
+/**
+ * Whole-value replace of ONE checkpoint record, keyed by its id: log-only,
+ * non-surface. A capture that extends an open checkpoint re-emits it with
+ * the added entry, so the last event for an id is that checkpoint's
+ * complete recorded state. A log with none folds to an empty catalog.
+ */
+'checkpoints/change': { readonly next: CheckpointRecord }
+```
+
+来源：[`packages/saturn/checkpoints/src/types.ts:124`](../packages/saturn/checkpoints/src/types.ts)
+
 ### `command/*`
 
 <a id="commanddone--log-only"></a>
@@ -402,6 +420,23 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/compaction/compaction/src/types.ts:34`](../packages/compaction/compaction/src/types.ts)
 
+### `done/*`
+
+<a id="donechange--log-only"></a>
+
+#### `done/change` — log-only
+
+```ts persistence-catalog
+/**
+ * Whole-value replace of this session's definition of done: log-only,
+ * non-surface. The last `done/change` wins; a log with none folds to
+ * `null` — no definition of done has been stated yet.
+ */
+'done/change': { readonly next: DoneState | null }
+```
+
+来源：[`packages/saturn/done/src/types.ts:62`](../packages/saturn/done/src/types.ts)
+
 ### `feedback/*`
 
 <a id="feedbackrecord--log-only"></a>
@@ -541,6 +576,26 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 ```
 
 来源：[`packages/api/session-controller/src/types.ts:41`](../packages/api/session-controller/src/types.ts)
+
+### `orchestrate/*`
+
+<a id="orchestratemode--log-only"></a>
+
+#### `orchestrate/mode` — log-only
+
+```ts persistence-catalog
+/**
+ * Whether multi-task (always-orchestrate) mode is in force from this point
+ * on: log-only, non-surface, whole-value replace. The last
+ * `orchestrate/mode` wins; a log with none folds to **active** through the
+ * projection unit's init — the standing posture of this harness
+ * (`~/.dsh/SATURN-HARNESS-ADDENDUM.md`), so a fresh or resumed session is
+ * orchestrated unless someone turns it off.
+ */
+'orchestrate/mode': { active: boolean }
+```
+
+来源：[`packages/saturn/orchestrate/src/types.ts:21`](../packages/saturn/orchestrate/src/types.ts)
 
 ### `permission/*`
 
@@ -809,7 +864,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMemberSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/experimental/agent-team/src/types.ts:206`](../packages/experimental/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:206`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -827,7 +882,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMessageId](subsystems/agent-team.zh.md)
 
-来源：[`packages/experimental/agent-team/src/types.ts:212`](../packages/experimental/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:212`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -840,7 +895,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMessageSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/experimental/agent-team/src/types.ts:210`](../packages/experimental/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:210`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -853,7 +908,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamTaskSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/experimental/agent-team/src/types.ts:208`](../packages/experimental/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:208`](../packages/saturn/agent-team/src/types.ts)
 
 ### `todo/*`
 

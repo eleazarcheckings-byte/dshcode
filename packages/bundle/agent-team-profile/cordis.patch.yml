@@ -1,0 +1,44 @@
+# Agent Teams profile layer for base-backed profiles. Apply after dsh-base so
+# these replacements remove the global continuable-child controls before the
+# scoped Team tools register the overlapping list_agents, send_message, and
+# interrupt_agent names.
+#
+# The shipped dsh-web-app bundle carries the same rows and the same disables.
+# Never stack this layer over it: a repeated explicit `id:` makes the Loader
+# throw `duplicate loader entry id` and the whole plugin tree fails to load.
+# Each row has one home per composition — this layer for base-backed profiles,
+# packages/bundle/web-app/cordis.patch.yml for the shipped Web surface.
+
+- id: tool-subagent-control
+  disabled: true
+
+- id: tool-subagent-list-agents
+  disabled: true
+
+- id: tool-subagent
+  config:
+    provider: spawn
+    toolName: subagent
+    backgroundMode: one-shot
+
+- id: tool-subagent-fork
+  config:
+    provider: fork
+    toolName: subagent_fork
+    backgroundMode: one-shot
+
+- insert:
+    - id: agent-team
+      name: '@saturnai/dsh-agent-team'
+      config:
+        maxMembers: 8
+        maxTasks: 256
+        maxPendingMessagesPerMember: 64
+        maxMessageBytes: 65536
+        disposalTimeoutMs: 5000
+
+    - id: tool-agent-team
+      name: '@saturnai/dsh-tool-agent-team'
+      config:
+        freshProvider: spawn
+        forkProvider: fork

@@ -321,6 +321,34 @@
     - id: saturn-claims
       name: '@saturnai/dsh-claims'
 
+    # Saturn AI Agent Teams: the host plugin owns the implicit-root roster, the
+    # durable peer mailbox, and the shared task DAG over the subagent lifecycle;
+    # the tool row registers the Team-scoped model-facing tools; the client row
+    # renders the roster, task board, and teammate navigation. The same-named
+    # BASE rows stay disabled below (tool-subagent-control,
+    # tool-subagent-list-agents, and both tool-subagent rows), so the host plane
+    # exposes this one delegation surface. A preset that declares its own rows
+    # in its own scope — the shipped standard/ptc/cordis `delegation` groups do —
+    # is a separate composition no top-level patch can reach; the Agent Teams
+    # Web note records that limitation.
+    - id: agent-team
+      name: '@saturnai/dsh-agent-team'
+      config:
+        maxMembers: 8
+        maxTasks: 256
+        maxPendingMessagesPerMember: 64
+        maxMessageBytes: 65536
+        disposalTimeoutMs: 5000
+
+    - id: tool-agent-team
+      name: '@saturnai/dsh-tool-agent-team'
+      config:
+        freshProvider: spawn
+        forkProvider: fork
+
+    - id: ui-agent-team
+      name: '@saturnai/dsh-client-ui-agent-team'
+
     - id: ui-attachment
       name: '@deepseek-ai/dsh-client-ui-attachment'
 

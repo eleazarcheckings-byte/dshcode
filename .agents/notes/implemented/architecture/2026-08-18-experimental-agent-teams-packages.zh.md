@@ -37,3 +37,11 @@ profile 启动会先解析所选 bundle，再修复模块 fallback。共享 fall
 Agent Teams 可以使用完整仓库依赖图与质量检查，而不进入正式 tarball，也不会成为受支持的运行时依赖。在 Team 包 promotion 前，发布包不能暴露 Team，因此 CLI 实验会安装显式的私有 profile 层，而不是修改已发布 bundle。通用 profile launcher 可以接受该层，而不会让它的 plugin 依赖进入 dsh 发布闭包。
 
 孵化期间的产品职责分组不够直接。promotion 会按照实验性包命名决策产生路径和 npm 名改动。
+
+## Promotion 结果（2026-09-14）
+
+五个包全部离开 `packages/experimental/`，成为 `@saturnai` 族的发布成员：`packages/saturn/agent-team`（`@saturnai/dsh-agent-team`）、`packages/saturn/tool-agent-team`（`@saturnai/dsh-tool-agent-team`）、`packages/client/ui-agent-team`（`@saturnai/dsh-client-ui-agent-team`）、`packages/bundle/agent-team-profile`（`@saturnai/dsh-agent-team-profile`）与 `packages/bundle/agent-team-web-profile`（`@saturnai/dsh-agent-team-web-profile`）。每个 manifest 去掉 `private`、写明 `publishConfig.access: public` 并记录 `repository.directory`；版本与既有 `@saturnai` 包一致，均为 `0.1.0`。
+
+三行 Team 配置从私有 profile 层移到已发布的 Web bundle patch `packages/bundle/web-app/cordis.patch.yml`。这一归属遵循部署侧 `duplicate loader entry id` 事故确立的不变量：Saturn feature 行只在已发布的 web bundle patch 中声明一次，因为 boot include 会把所有层展平成同一个 entry 列表，而 Loader 会拒绝重复的显式 id。因此两个 profile 层只留给尚未挂载已发布 Web bundle Team 行的组合使用，标准 Web profile 两者都不添加。
+
+本记录之外仍有两处发布基础设施缺口：release family 仍按 npm scope 前缀枚举成员，而发布族声明只接受 `@deepseek-ai/`，因此 `@saturnai` 族还不是发布族；且尚无具名稳定 owner 签署本次 promotion。Web agent preset 仍在自己的 scope 内挂载旧版 continuable-child 控件，顶层 Host 覆盖无法禁用它们，因此在 preset 变为 Team-aware 之前，两套 delegation 表面都可能到达模型。
