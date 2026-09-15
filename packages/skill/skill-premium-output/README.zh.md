@@ -9,13 +9,14 @@ kind: "package-reference"
 
 ## 概览
 
-本插件通过现有提示词与技能注册表提供共享产出质量策略和三个内置技能。使用 base 的 profile 默认启用它，因此普通 standard、PTC、Cordis 和自定义 agent 都能获得相同要求，无需依赖用户的私有指令文件或外部 Design brain 连接。策略要求 agent 确定一致的设计方向、保存可用的初始版本、以完整增量逐步完善、检查渲染结果，并区分已完成检查与尚未验证的工作。
+本插件通过现有提示词与技能注册表提供共享产出质量策略和三个内置技能。使用 base 的 profile 默认启用它，因此普通 standard、PTC、Cordis 和自定义 agent 都能获得相同要求，无需依赖用户的私有指令文件或外部 Design brain 连接。策略要求 agent 确定一致的设计方向、保存可用的初始版本、以完整增量逐步完善、检查渲染结果、在移交重大视觉交付物前依据共享评分标准派遣新鲜上下文的评审者，并区分已完成检查与尚未验证的工作。
 
 ## 目录
 
 - [使用本包](#use-this-package)
 - [配置与作用域](#configuration-and-scope)
 - [内置资源](#packaged-resources)
+- [可视化评审循环](#visual-review-loop)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
 - [开发说明](#dev-note)
@@ -50,6 +51,18 @@ kind: "package-reference"
 
 每份指南返回自身资源目录的绝对路径。源码和安装包中的相对助手路径都以此目录为基准。读取指南不会启动脚本、安装浏览器、联系提供方或在用户主目录创建文件。读取失败通过技能注册表现有的技能不可用处理机制传递。
 
+<a id="visual-review-loop"></a>
+## 可视化评审循环
+
+在重大视觉交付物移交前，共享策略与全部三份指南现在都要求由一个新鲜上下文的评审者——一个看不到构建 agent 私有推理过程的独立上下文——对其评分，并明确记录这一步骤，而不是默默跳过：
+
+- [`scripts/review-grade.mjs`](scripts/review-grade.mjs) 是针对已渲染 HTML 页面的确定性同质化痕迹与卫生检查探针。它使用 `jsdom`（而非真实浏览器）解析计算样式，并对 [`rubric.schema.json`](rubric.schema.json) 中的十二项检查清单——即 `scripts/harness/SATURN-DESIGN-RULES.md` 中的上线前检查清单——评分，写出 `rubric.json` 与便于阅读的 `rubric.md`。它移植了 SaturnAI design brain 的 `collect-evidence.js`（v2）中的多个探针（渐变/色相痕迹、卡片同质化统计、批量淡入统计、对比度取样、预置装饰痕迹），并在脚本头部注释中注明出处；不会修改该文件。四项检查清单条目（品牌测试、唯一命名机制、偏差记录、写者 ≠ 评审者）始终返回 `UNVERIFIED` 且评分为 `null`——它们是任何标记探针都无法判定的主观或流程事实，绝不猜测通过。
+- [`tests/fixtures/premium.html`](tests/fixtures/premium.html) 与 [`tests/fixtures/slop.html`](tests/fixtures/slop.html) 是探针自身测试所依据的 PASS/REJECT 参照对照页面。
+- 各指南现在还要求在实现之前将工作方向保存为 `.saturn/design-plan.md`，而不仅仅是对话中的文字，并将 CSS 锚点定位与 Popover API 组合列为菜单、工具提示或其他分层浮层的默认方案。
+- 当 design brain 连接可用时，收集到的证据也会传递给 `mcp__saturnai__review`。
+
+评审者子 agent 仍需要真实的桌面端与 400px 宽度截图（见上文 `scripts/review-web.mjs`）——`review-grade.mjs` 评的是标记，不是像素，是评审循环的另一半，而非替代对渲染页面的实际查看。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -70,15 +83,15 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
-这些工作流改善 agent 收到的指令，但不保证模型遵循、审美质量或结果已适合生产。尽早保存的指导不会强制预留 token，也不会改变推理强度。模型仍负责选择相关指南并执行检查。不会自动运行额外模型评审或付费提供方调用。
-
-浏览器检查依赖 agent 可用的浏览器工具。内置助手需要其文档所述的本地运行时依赖；依赖不可用时应明确标记检查缺口。构建通过、截图文件或自动报告本身并不能证明视觉质量。完整自定义 persona 和 minimal 预设可有意省略这些指导。
-
-Windows 的 workspace-write 沙箱目前会阻止 Playwright 所需的带管道子进程启动，即使 Chromium 已安装（[沙箱限制](../../sandbox/sandbox-windows-acl/README.zh.md#known-limitations-and-deferred-work)）。助手遇到 Windows `spawn EPERM` 启动拒绝时会报告检查不可用且未生成截图，并引导调用者使用已授权的浏览器集成，或由运维支持且保持 shell 策略的浏览器执行方式。它不会自动关闭沙箱。其他 Windows 限制也可能产生相同错误，因此诊断不会断言具体原因。
+- **不保证合规。** 这些工作流改善 agent 收到的指令，但不保证模型遵循、审美质量或结果已适合生产。尽早保存的指导不会强制预留 token，也不会改变推理强度。模型仍负责选择相关指南并执行检查，包括按上文要求派遣新鲜上下文的评审者。不会自动运行额外模型评审或付费提供方调用，完整自定义 persona 和 minimal 预设可有意省略这些指导。
+- **浏览器检查仍依赖截图。** `review-web.mjs` 依赖 agent 可用的浏览器工具及其文档所述的本地运行时依赖；依赖不可用时应明确标记为检查缺口。构建通过、截图文件或自动报告本身并不能证明视觉质量。
+- **Windows 下的 Playwright 启动。** Windows 的 workspace-write 沙箱目前会阻止 Playwright 所需的带管道子进程启动，即使 Chromium 已安装（[沙箱限制](../../sandbox/sandbox-windows-acl/README.zh.md#known-limitations-and-deferred-work)）。助手遇到 Windows `spawn EPERM` 启动拒绝时会报告检查不可用且未生成截图，并引导调用者使用已授权的浏览器集成，或由运维支持且保持 shell 策略的浏览器执行方式。它不会自动关闭沙箱。其他 Windows 限制也可能产生相同错误，因此诊断不会断言具体原因。
+- **`review-grade.mjs` 是静态探针，不是浏览器。** 没有布局引擎：不测量渲染后的字符测量宽度与点击目标尺寸。`jsdom` 的 CSSOM 不解析 `oklch()`/`lab()` 颜色声明，会报告为未解析，而非猜测。JS 驱动的动效（任何未以 CSS `animation`/`animation-timeline` 表达的动效）对它不可见。十二项检查清单中的四项按设计始终为 `UNVERIFIED`（见上文）——该探针绝不会用猜测替代新鲜上下文评审者对这些条目的判断。
+- **不强制执行评审步骤本身。** 策略要求派遣新鲜上下文的评审者并保存 `.saturn/design-plan.md`；但本包中没有任何机制会在 agent 跳过其中一项时阻止工具调用或移交。该要求是指令性的，与本包既有的"没有独立可变投影"设计一致（见开发说明）。
 
 <a id="dev-note"></a>
-## 开发说明
+### 开发说明
 
-[决策记录](../../../.agents/notes/implemented/feature/2026-09-15-packaged-output-quality.zh.md) 说明共享部署归属与限制。单元测试覆盖配置、释放、优先级、工具可见性、资源路径与完整提示词行为。真实 Loader 夹具在已发布的 Headless profile 中以 native 和 PTC 模式运行脚本化模型。它检查持久化策略与指南输出，并证明已完成的文件写入在后续完善响应被截断时仍然保留，且该响应的工具调用不会执行。它不评估生成设计的质量或模型遵循情况。
+[决策记录](../../../.agents/notes/implemented/feature/2026-09-15-packaged-output-quality.zh.md) 说明共享部署归属与限制。单元测试覆盖配置、释放、优先级、工具可见性、资源路径与完整提示词行为。真实 Loader 夹具在已发布的 Headless profile 中以 native 和 PTC 模式运行脚本化模型。它检查持久化策略与指南输出，并证明已完成的文件写入在后续完善响应被截断时仍然保留，且该响应的工具调用不会执行。它不评估生成设计的质量或模型遵循情况。[可视化评审循环决策记录](../../../.agents/notes/implemented/feature/2026-09-15-visual-review-loop.zh.md) 涵盖上文新增的 `scripts/review-grade.mjs`、`rubric.schema.json`、新鲜上下文评审者策略条款以及 `.saturn/design-plan.md` 交付物要求。
 
 **运行时不变量：** 不发布配套检查。本插件拥有不可变的内置内容和由 effect 管理的注册项，没有需要与独立可变状态对账的投影。

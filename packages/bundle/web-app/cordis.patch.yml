@@ -321,6 +321,23 @@
     - id: saturn-claims
       name: '@saturnai/dsh-claims'
 
+    # Saturn AI multi-harness teammates: the native Claude Code / Codex
+    # subagent providers, mounted on the Host plane behind the
+    # `saturn-model-router.externalHarnesses` settings toggle (default off —
+    # see @saturnai/dsh-model-router in the base bundle). Each row also
+    # self-hides when its own package-local platform CLI package is not
+    # installed, so a fresh install without the optional Bundle mounts
+    # neither row even if a user flips the toggle on. The matching preset
+    # tool rows (`tool-subagent-codex`, `tool-subagent-claude-code`) gate on
+    # the same check; Host availability alone grants no tool.
+    - id: subagent-codex
+      name: '@deepseek-ai/dsh-subagent-codex'
+      disabled: !!js ctx.get('modelRouter')?.externalHarnessMounted('codex') !== true
+
+    - id: subagent-claude-code
+      name: '@deepseek-ai/dsh-subagent-claude-code'
+      disabled: !!js ctx.get('modelRouter')?.externalHarnessMounted('claude-code') !== true
+
     # Saturn AI Agent Teams: the host plugin owns the implicit-root roster, the
     # durable peer mailbox, and the shared task DAG over the subagent lifecycle;
     # the tool row registers the Team-scoped model-facing tools; the client row

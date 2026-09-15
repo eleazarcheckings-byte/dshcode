@@ -141,6 +141,10 @@
     "@saturnai/dsh-client-ui-saturnbot": "workspace:^",
     "@saturnai/dsh-design-brain": "workspace:^"
   },
+  "optionalDependencies": {
+    "@deepseek-ai/dsh-subagent-claude-code": "workspace:^",
+    "@deepseek-ai/dsh-subagent-codex": "workspace:^"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:^",
     "@deepseek-ai/dsh-shell-env": "workspace:^",

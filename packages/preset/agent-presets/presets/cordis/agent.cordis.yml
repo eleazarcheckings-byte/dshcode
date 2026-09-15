@@ -186,13 +186,16 @@
         toolName: subagent_fork
         backgroundMode: !!js "ctx.get('agentTeams') === undefined ? 'continuable' : 'one-shot'"
 
-    # Production dsh does not install these optional providers. Install the
-    # matching Bundle in this Profile and restart the Host, then copy this
-    # preset and remove `disabled` from the matching tool row. Host availability
-    # alone grants no tool.
+    # Native product subagents. On a fresh install both stay hidden: the
+    # matching Host row (packages/bundle/web-app/cordis.patch.yml) mounts only
+    # when `saturn-model-router.externalHarnesses` is on AND the provider's
+    # package-local platform CLI package is installed, and these tool rows
+    # gate on that exact same check so a Host mount without this tool row (or
+    # this tool row without a Host mount) cannot happen. Host availability
+    # alone still grants no tool — see @saturnai/dsh-model-router.
     - id: tool-subagent-codex
       name: '@deepseek-ai/dsh-tool-subagent'
-      disabled: true
+      disabled: !!js ctx.get('modelRouter')?.externalHarnessMounted('codex') !== true
       config:
         provider: codex
         toolName: subagent_codex
@@ -201,7 +204,7 @@
 
     - id: tool-subagent-claude-code
       name: '@deepseek-ai/dsh-tool-subagent'
-      disabled: true
+      disabled: !!js ctx.get('modelRouter')?.externalHarnessMounted('claude-code') !== true
       config:
         provider: claude-code
         toolName: subagent_claude_code

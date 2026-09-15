@@ -18,7 +18,7 @@ kind: "package-reference"
 - [进一步探索](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发说明](#dev-note)
+- [开发备注](#dev-note)
 
 <a id="use-this-package"></a>
 ## 使用本包
@@ -70,6 +70,7 @@ Host 拥有一个串行的连接生命周期。成功要求生产 MCP 监督器�
 
 连接状态和工具可见性不变时，段落保持稳定。连接、断开或失去可用性会改变组合的提示与工具集合。常规 request/header 和工具结果记录仍是模型实际收到内容的证据。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
 - 连接器提供指导和工具访问，不保证视觉质量或模型遵循指令。
@@ -78,7 +79,7 @@ Host 拥有一个串行的连接生命周期。成功要求生产 MCP 监督器�
 - 外部评审使用调用方提供的证据。连接时不会静默捕获或上传项目文件、截图或对话历史。
 
 <a id="dev-note"></a>
-### 开发说明
+### 开发备注
 
 <details>
 <summary>维护者工作上下文——点击展开</summary>

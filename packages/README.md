@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The harness is assembled from npm packages under `packages/`, grouped by capability family: sessions and the agent loop, model-facing tools, shell and filesystem execution, web access, subagents, and the rest. Use this page as the top-level map: find the owning group, then open its README for the package list. Every package is scoped `@deepseek-ai/dsh-*` and lives in exactly one group; each group README is the authoritative package map for its family.
+The harness is assembled from npm packages under `packages/`, grouped by capability family: sessions and the agent loop, model-facing tools, shell and filesystem execution, web access, subagents, and the rest. Use this page as the top-level map: find the owning group, then open its README for the package list. Most packages are scoped `@deepseek-ai/dsh-*`; the `saturn/` group and the Saturn-branded packages under `client/` (`ui-brand-saturn`, `ui-skin-saturn`, `ui-orchestrate`, `ui-done`, `ui-fleet`, `ui-saturnbot`, `ui-agent-team`) are scoped `@saturnai/dsh-*` instead. Every package lives in exactly one group; each group README is the authoritative package map for its family.
 
 ## Table of Contents
 
@@ -58,6 +58,7 @@ Every package lives in exactly one group; new packages join existing groups, and
 | [`todo/`](todo/README.md) | The model-facing `todo_write` tool |
 | [`plan/`](plan/README.md) | Plan collaboration state with a direct entry command and reviewed exit |
 | [`preset/`](preset/README.md) | Per-session agent composition from preset `cordis.yml` files |
+| [`saturn/`](saturn/README.md) | Saturn AI harness family: Agent Teams peer messaging, checkpoints, workspace claims, the design-brain connector, definition of done, multi-task orchestration, and the autonomous SaturnBot operator |
 | [`guard/`](guard/README.md) | Loop-hygiene guards: advisory repeat-call reminders + the `tools/execute` deadline enforcer |
 | [`bundle/`](bundle/README.md) | Installable `dsh --profile` patch layers |
 | [`extensions/`](extensions/README.md) | Agent runtime self-modification: live plugin/service inspection and model-written mount/unmount |

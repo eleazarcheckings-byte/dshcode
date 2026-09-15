@@ -9,13 +9,14 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This plugin supplies a shared output-quality policy and three packaged skills through the existing prompt and skill registries. Base-backed profiles enable it by default, so ordinary standard, PTC, Cordis, and custom agents receive the same expectations without depending on a user's private instruction files or an external Design brain connection. The policy asks agents to establish a coherent direction, save a usable first version, refine it in completed increments, inspect rendered output, and distinguish completed checks from unverified work.
+This plugin supplies a shared output-quality policy and three packaged skills through the existing prompt and skill registries. Base-backed profiles enable it by default, so ordinary standard, PTC, Cordis, and custom agents receive the same expectations without depending on a user's private instruction files or an external Design brain connection. The policy asks agents to establish a coherent direction, save a usable first version, refine it in completed increments, inspect rendered output, dispatch a fresh-context reviewer against a shared rubric before handing off a substantial visual deliverable, and distinguish completed checks from unverified work.
 
 ## Table of Contents
 
 - [Use this package](#use-this-package)
 - [Configuration and scope](#configuration-and-scope)
 - [Packaged resources](#packaged-resources)
+- [Visual review loop](#visual-review-loop)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -47,6 +48,17 @@ Packaged skills use rank `600`. Existing project and user skills with the same n
 
 Each guide returns its own absolute resource directory. Relative helper paths resolve against that directory in source and installed packages. Reading a guide never launches its scripts, installs a browser, contacts a provider, or creates files in the user's home. Read failures propagate through the skill registry's normal unavailable-skill handling.
 
+## Visual review loop
+
+Before a substantial visual deliverable ships, the shared policy and all three guides now require a fresh-context reviewer — a separate context with no visibility into the building agent's private reasoning — to grade it, and log the step explicitly rather than skip it silently:
+
+- [`scripts/review-grade.mjs`](scripts/review-grade.mjs) is a deterministic slop-tell and hygiene probe over an already-rendered HTML page. It resolves computed style with `jsdom` (never a live browser) and grades the twelve [`rubric.schema.json`](rubric.schema.json) checklist items — the pre-ship checklist in `scripts/harness/SATURN-DESIGN-RULES.md` — writing `rubric.json` and a human-readable `rubric.md`. It ports several probes (gradient/hue tells, the uniform-card census, the blanket fade-up census, contrast-pair sampling, priced-in decoration tells) from the SaturnAI design brain's `collect-evidence.js` (v2), attributed in the script's header comment; it does not modify that file. Four checklist items (Brand test, One named mechanism, Deviation log, Writer ≠ reviewer) always return `UNVERIFIED` with a `null` score — they are judgment or process facts no markup probe can settle, never a guessed pass.
+- [`tests/fixtures/premium.html`](tests/fixtures/premium.html) and [`tests/fixtures/slop.html`](tests/fixtures/slop.html) are the reference PASS/REJECT pair the probe's own tests grade against.
+- The guides now also require the working direction to be saved as `.saturn/design-plan.md` before implementation, not only as conversation prose, and name CSS anchor positioning together with the Popover API as the default recipe for a menu, tooltip, or other layered overlay.
+- When a design brain connection is available, the collected evidence is also passed to `mcp__saturnai__review`.
+
+The reviewer subagent still needs a real desktop and 400px-wide screenshot (`scripts/review-web.mjs`, above) — `review-grade.mjs` grades markup, not pixels, and is the other half of the loop, not a replacement for looking at the rendered page.
+
 ## Model Experience
 
 ### Shared quality policy and progressive guide loading
@@ -65,14 +77,14 @@ The section is stable for an unchanged policy and tool view. The existing `reque
 
 ## Known Limitations and Deferred Work
 
-These workflows improve the instructions agents receive; they do not guarantee model compliance, aesthetic quality, or a production-ready result. Early-save guidance does not enforce a token reserve or change reasoning effort. Models remain responsible for choosing relevant guides and acting on their checks. No extra model critique or paid-provider call runs automatically.
+- **No compliance guarantee.** These workflows improve the instructions agents receive; they do not guarantee model compliance, aesthetic quality, or a production-ready result. Early-save guidance does not enforce a token reserve or change reasoning effort. Models remain responsible for choosing relevant guides and acting on their checks, including dispatching the fresh-context reviewer described above. No extra model critique or paid-provider call runs automatically, and complete custom personas and the minimal preset can intentionally omit the guidance.
+- **Browser inspection stays screenshot-dependent.** `review-web.mjs` requires browser tooling available to the agent and its documented local runtime dependencies; unavailable dependencies remain a named review gap. A passing build, screenshot file, or automated report alone does not prove visual quality.
+- **Windows Playwright launch.** The Windows workspace-write sandbox currently blocks the piped child-process launch Playwright requires, even with Chromium installed ([sandbox limitation](../../sandbox/sandbox-windows-acl/README.md#known-limitations-and-deferred-work)). The helper reports a Windows `spawn EPERM` launch denial as unavailable with no screenshots, and directs callers to an authorized browser integration or operator-supported execution that preserves shell policy. It does not automatically disable sandboxing. Other Windows restrictions can produce the same error, so the diagnostic does not claim its exact cause.
+- **`review-grade.mjs` is a static probe, not a browser.** No layout engine: rendered character measure and tap-target size are not measured. `oklch()`/`lab()` color declarations are not resolved by `jsdom`'s CSSOM and are reported as unresolved, never guessed. JS-driven motion (anything not expressed as a CSS `animation`/`animation-timeline`) is invisible to it. Four of the twelve checklist items are always `UNVERIFIED` by design (see above) — the probe never substitutes a guess for the fresh-context reviewer's judgment on those.
+- **No enforcement of the review step itself.** The policy asks for a fresh-context reviewer and a saved `.saturn/design-plan.md`; nothing in this package blocks a tool call or a handoff when an agent skips either. The requirement is instructional, matching this package's existing "no independently mutable projection" design (see Dev Note).
 
-Browser inspection requires browser tooling available to the agent. The bundled helper requires its documented local runtime dependencies; unavailable dependencies remain a named review gap. A passing build, screenshot file, or automated report alone does not prove visual quality. Complete custom personas and the minimal preset can intentionally omit the guidance.
+### Dev Note
 
-The Windows workspace-write sandbox currently blocks the piped child-process launch Playwright requires, even with Chromium installed ([sandbox limitation](../../sandbox/sandbox-windows-acl/README.md#known-limitations-and-deferred-work)). The helper reports a Windows `spawn EPERM` launch denial as unavailable with no screenshots, and directs callers to an authorized browser integration or operator-supported execution that preserves shell policy. It does not automatically disable sandboxing. Other Windows restrictions can produce the same error, so the diagnostic does not claim its exact cause.
-
-## Dev Note
-
-The [decision record](../../../.agents/notes/implemented/feature/2026-09-15-packaged-output-quality.md) explains shared deployment ownership and limits. Unit tests cover config, disposal, precedence, tool visibility, resource paths, and complete-prompt behavior. A real Loader fixture runs a scripted model through the shipped Headless profile in native and PTC modes. It checks durable policy and guide output, and proves that a completed file write survives a later truncated refinement whose tool calls never execute. It does not evaluate generated designs or model compliance.
+The [decision record](../../../.agents/notes/implemented/feature/2026-09-15-packaged-output-quality.md) explains shared deployment ownership and limits. Unit tests cover config, disposal, precedence, tool visibility, resource paths, and complete-prompt behavior. A real Loader fixture runs a scripted model through the shipped Headless profile in native and PTC modes. It checks durable policy and guide output, and proves that a completed file write survives a later truncated refinement whose tool calls never execute. It does not evaluate generated designs or model compliance. The [visual review loop decision record](../../../.agents/notes/implemented/feature/2026-09-15-visual-review-loop.md) covers `scripts/review-grade.mjs`, `rubric.schema.json`, the fresh-context-reviewer policy addition, and the `.saturn/design-plan.md` artifact requirement added above.
 
 **Runtime invariant:** No companion is published. This plugin owns immutable packaged content and effect-owned registrations, with no independently mutable projection to reconcile.

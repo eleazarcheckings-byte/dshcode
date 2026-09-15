@@ -1,0 +1,31 @@
+# Agent Note: a deterministic visual review loop before handoff
+
+Status: implemented
+
+English | [中文](2026-09-15-visual-review-loop.zh.md)
+
+## Problem
+
+`skill-premium-output` asked an agent to inspect rendered work and to consider an independent reviewer "optional for small work," but named no rubric, no script, and no required moment to actually dispatch one. The design-direction step lived only as conversation prose, so a later session or a reviewer had nothing durable to check it against. Nothing in the guides mentioned the design brain's `SATURN-DESIGN-RULES.md` pre-ship checklist by name, and no packaged tool could grade a page against it deterministically — every "is this slop" judgment depended entirely on the same context that built the page.
+
+## Decision
+
+Add `scripts/review-grade.mjs`: a static-DOM (jsdom) probe over an already-rendered HTML file that grades all twelve pre-ship checklist items from `scripts/harness/SATURN-DESIGN-RULES.md` into a `rubric.json` matching the new `rubric.schema.json`. It ports several probes — gradient/hue tells, the uniform-card census, the blanket fade-up census (a scroll-reveal class with no `animation-timeline` is the tell; the same class on a real scroll-driven timeline is technique, not a tell), contrast-pair sampling, and priced-in decoration tells — from the SaturnAI design brain's browser-console evidence collector, `G:/My Drive/Projects/mac/active/izzy-design/collect-evidence.js` (v2), read for reference and attributed in the script's header comment; that file is not modified. Four checklist items (Brand test, One named mechanism, Deviation log, Writer ≠ reviewer) are judgment or process facts no markup probe can settle — they always come back `UNVERIFIED` with a `null` score, never a guessed PASS, matching the honest-instrument posture this package's `review-web.mjs` already carries (`visualQualityAssessed: false`).
+
+`policy.ts` and all three SKILL.md guides now require a fresh-context reviewer — a separate context with no visibility into the building agent's private reasoning — before handoff of a substantial visual deliverable: grade a desktop and a 400px screenshot against the rubric, and grade the rendered markup with `review-grade.mjs`. Skipping either is a logged deviation, never silent. When a design brain connection is available, the collected evidence is also passed to `mcp__saturnai__review`. The guides also now require the working direction to be saved as `.saturn/design-plan.md` before implementation — a durable artifact, not only conversation prose — and name CSS anchor positioning together with the Popover API as the default overlay recipe for a menu, tooltip, or popover.
+
+## Alternatives considered
+
+**Drive the probe through a real browser (Playwright), like `review-web.mjs`.** Rejected for this half of the loop: `review-web.mjs` already owns the screenshot pass, explicitly declining to grade what it captures. A second Playwright-driven script would duplicate that dependency and its Windows `spawn EPERM` sandbox limitation for no new capability. `jsdom` resolves computed style (colors, gradients, fonts, radii, shadows, `animation-timeline`, custom properties) without a browser or a canvas 2D context, which covers every probe ported from `collect-evidence.js`; it cannot see layout geometry, so those checks (rendered character measure, tap-target size) are reported as unmeasured rather than guessed.
+
+**Score all twelve checklist items mechanically.** Rejected: Brand test, One named mechanism, Deviation log, and Writer ≠ reviewer are judgment or process facts a page's markup cannot settle. Inventing a score for them would be exactly the fabricated-verification failure this package's policy already warns against elsewhere ("never invent... successful actions"). `UNVERIFIED` with a `null` score says so honestly instead.
+
+**Enforce the review step in code (block a tool call or a `done` claim without it).** Out of scope for this package by design — it owns effect-registered prompt/skill content with "no independently mutable projection to reconcile" (see the existing Dev Note). Enforcement belongs to `@saturnai/dsh-done`/`@saturnai/dsh-review` (SPEC §3 C4), which this package's policy text points toward by naming the requirement explicitly rather than leaving it implicit.
+
+## Consequences
+
+An agent building a substantial visual deliverable now has a named script and rubric to run before calling the work done, and the four items no script can judge are called out by name instead of silently passing. `.saturn/design-plan.md` gives a fresh reviewer (and a later session) something durable to grade the *decision* against, not only the *artifact*. The package's `README.md`/`README.zh.md` gain a "Visual review loop" section documenting all of this; `Known Limitations and Deferred Work` is now a bulleted list (previously prose paragraphs) and states plainly that nothing here enforces the step — it is instructional, like the rest of this package's guidance.
+
+## Verification
+
+`tests/review-grade.spec.ts` covers `parseArgs`, `gradePage` against the new `tests/fixtures/premium.html` (every mechanically-scored criterion PASSes) and `tests/fixtures/slop.html` (every named tell fires and the overall verdict is REJECT), the four judgment criteria always returning `UNVERIFIED`/`null` on both fixtures, the CSS-scroll-driven-timeline-is-technique-not-a-tell nuance, and the CLI's exit codes (0/1/2) plus its written `rubric.json`/`rubric.md`. Committed RED first (module-not-found), then implemented. The package's existing `skill-premium-output.spec.ts` (including the policy-text snapshot) and `premium-output.e2e.ts` were re-run after the policy text changed; the snapshot was regenerated to match.
