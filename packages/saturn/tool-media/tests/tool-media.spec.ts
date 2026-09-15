@@ -180,7 +180,11 @@ describe('the spend Gate precedes every billable network call', () => {
   it('higgsfield: the free /estimate call may run before approval, but /higgsfield-ai/... never fires before it', async () => {
     const mock = await server((request, res) => {
       if (request.path.startsWith('/estimate/')) { jsonReply(res, 200, { credits: '1.0', usd: '0.05' }); return }
-      if (request.path === '/higgsfield-ai/soul/standard') {
+      if (request.method === 'POST' && request.path === '/higgsfield-ai/soul/standard') {
+        jsonReply(res, 200, { status: 'queued', request_id: 'req-ok', status_url: `${mock.url}/requests/req-ok/status`, cancel_url: `${mock.url}/requests/req-ok/cancel` })
+        return
+      }
+      if (request.path === '/requests/req-ok/status') {
         jsonReply(res, 200, { status: 'completed', request_id: 'req-ok', images: [{ url: `${mock.url}/out.jpg` }] })
         return
       }
