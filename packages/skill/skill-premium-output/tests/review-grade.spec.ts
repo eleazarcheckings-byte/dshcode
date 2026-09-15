@@ -141,7 +141,7 @@ describe('review-grade: gradePage', () => {
   it('treats a CSS scroll-driven reveal (animation-timeline) as technique, not a blanket-fade-up tell', async () => {
     const html = await readFile(join(fixtures, 'premium.html'), 'utf8')
     const rubric = await helper.gradePage(html)
-    expect(itemFor(rubric, 'ai-slop scan').evidence).not.toMatch(/blanket fade-up/)
+    expect(itemFor(rubric, 'ai-slop scan').evidence).not.toMatch(/animation-timeline/)
     expect(itemFor(rubric, 'Motion budget respected').verdict).toBe('PASS')
   })
 })
