@@ -11,7 +11,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
@@ -46,12 +46,12 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
 
   /** Tokenize the lane-owned preset root after general aria normalization. */
   function withPresetRoot(snapshot: string): string {
-    const rootSuffix = `/${userRoot.split(/[\\/]/).pop()!}`
+    const rootName = userRoot.split(/[\\/]/).pop()!
     return snapshot.split('\n').map((line) => {
-      const rootStart = line.indexOf(rootSuffix)
+      const rootStart = line.indexOf(rootName)
       if (rootStart === -1) return line
       const pathStart = line.lastIndexOf(' ', rootStart) + 1
-      return `${line.slice(0, pathStart)}{{presetRoot}}${line.slice(rootStart + rootSuffix.length)}`
+      return `${line.slice(0, pathStart)}{{presetRoot}}${line.slice(rootStart + rootName.length)}`
     }).join('\n')
   }
 
@@ -149,7 +149,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     const snapshot = withPresetRoot(
       await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd))
     await compareOrRefreshGolden(CREATED_EXPECTED, snapshot, MODE)
-    expect(snapshot).toContain('{{presetRoot}}/my-agent')
+    expect(snapshot).toContain(`{{presetRoot}}${sep}my-agent`)
 
     // The host copied the whole directory and rewrote only the display
     // metadata: the composition is byte-identical to the shipped source, the
