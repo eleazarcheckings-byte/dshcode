@@ -15,7 +15,7 @@ import { SettingsSchemaService } from '@deepseek-ai/dsh-client-ui-settings/src/c
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { SettingsScopeController } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-scope.ts'
 import { FirstLight } from '../src/client/FirstLight.tsx'
-import type { FirstLightProps } from '../src/client/FirstLight.tsx'
+import type { FirstLightProps, WorkspacePickOutcome, WorkspaceRegistrationOutcome } from '../src/client/FirstLight.tsx'
 import { decodeFirstLightSection, FirstLightStore } from '../src/client/first-light-store.ts'
 import type { ModelsSettingsState, ModelsSettingsStore } from '../src/client/store.ts'
 import type { ModelsOperations } from '../src/client/operations.ts'
@@ -59,7 +59,8 @@ const useSessionPendingInteraction: FirstLightProps['useSessionPendingInteractio
 /** Build one First Light over a process-local scope (memory mode: no wire). */
 function harness(options: {
   verifyBrain?: () => Promise<DesignBrainOutcome>
-  pickWorkspace?: () => Promise<string | null>
+  pickWorkspace?: () => Promise<WorkspacePickOutcome>
+  registerWorkspace?: (path: string) => Promise<WorkspaceRegistrationOutcome>
   locale?: 'en' | 'zh'
 } = {}) {
   const appRoot = document.createElement('div')
@@ -89,6 +90,12 @@ function harness(options: {
   } as unknown as ModelsOperations
   const complete = vi.fn()
   const unusedHook = (() => { throw new Error('unused standard hook') }) as never
+  const pickWorkspace = vi.fn<() => Promise<WorkspacePickOutcome>>(
+    options.pickWorkspace ?? (() => Promise.resolve({ kind: 'picked', path: 'C:\\built' })),
+  )
+  const registerWorkspace = vi.fn<(path: string) => Promise<WorkspaceRegistrationOutcome>>(
+    options.registerWorkspace ?? (() => Promise.resolve({ kind: 'registered' })),
+  )
   const props: FirstLightProps = {
     stepId: 'first-light',
     complete,
@@ -103,30 +110,40 @@ function harness(options: {
     useFirstLight: bindSnapshotSelector(controller.store),
     useModels: bindSnapshotSelector(modelsStore),
     verifyDesignBrain: options.verifyBrain ?? (() => Promise.resolve({ kind: 'verified', tools: ['intake'] })),
-    pickWorkspace: options.pickWorkspace ?? (() => Promise.resolve('C:\\built')),
-    registerWorkspace: () => Promise.resolve({ kind: 'registered' }),
+    pickWorkspace,
+    registerWorkspace,
     writeAgentMemory: () => Promise.resolve({ kind: 'stored' }),
     t: key => (options.locale === 'zh' ? zh[key] : en[key]),
   }
-  return { ...render(<FirstLight {...props} />), props, controller, complete }
+  return { ...render(<FirstLight {...props} />), props, controller, complete, pickWorkspace, registerWorkspace }
 }
+
+/** The locale dictionary shape both `en` and `zh` satisfy. */
+type Copy = { readonly [Key in keyof typeof en]: string }
 
 /** The single primary "Continue" of the current step. */
-function continueButton(): HTMLButtonElement {
-  return screen.getByRole<HTMLButtonElement>('button', { name: en.firstLightContinue })
+function continueButton(t: Copy = en): HTMLButtonElement {
+  return screen.getByRole<HTMLButtonElement>('button', { name: t.firstLightContinue })
 }
 
-async function advanceToBrain(): Promise<void> {
-  await screen.findByRole('dialog', { name: en.firstLightWelcomeTitle })
-  fireEvent.click(continueButton())
-  fireEvent.change(screen.getByLabelText(en.firstLightName), { target: { value: 'Izzy' } })
-  fireEvent.change(screen.getByLabelText(en.firstLightBuilding), { target: { value: 'brands' } })
-  fireEvent.click(continueButton())
+async function advanceToBrain(t: Copy = en): Promise<void> {
+  await screen.findByRole('dialog', { name: t.firstLightWelcomeTitle })
+  fireEvent.click(continueButton(t))
+  fireEvent.change(screen.getByLabelText(t.firstLightName), { target: { value: 'Izzy' } })
+  fireEvent.change(screen.getByLabelText(t.firstLightBuilding), { target: { value: 'brands' } })
+  fireEvent.click(continueButton(t))
   // The Model step reports its own live check with `firstLightModelVerified`;
   // `firstLightModelReady` belongs to the receipt's Model row, one step later.
-  await screen.findByText(en.firstLightModelVerified)
-  fireEvent.click(continueButton())
-  await screen.findByRole('dialog', { name: en.firstLightBrainTitle })
+  await screen.findByText(t.firstLightModelVerified)
+  fireEvent.click(continueButton(t))
+  await screen.findByRole('dialog', { name: t.firstLightBrainTitle })
+}
+
+async function advanceToWorkspace(t: Copy = en): Promise<void> {
+  await advanceToBrain(t)
+  fireEvent.click(screen.getByRole('button', { name: t.firstLightNotNow }))
+  fireEvent.click(continueButton(t))
+  await screen.findByRole('dialog', { name: t.firstLightWorkspaceTitle })
 }
 
 describe('FirstLight', () => {
@@ -168,6 +185,106 @@ describe('FirstLight', () => {
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toBe(`${en.firstLightBrainFailed}: the endpoint answered 503`)
     expect(continueButton().disabled).toBe(true)
+  })
+
+  it('opens the folder chooser on the Workspace step and applies the picked folder', async () => {
+    const h = harness({ pickWorkspace: () => Promise.resolve({ kind: 'picked', path: 'C:\\Projects\\izzy' }) })
+    await advanceToWorkspace()
+    expect(continueButton().disabled).toBe(true)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en.firstLightChooseFolder }))
+    })
+
+    expect(h.pickWorkspace).toHaveBeenCalledTimes(1)
+    expect(h.registerWorkspace).toHaveBeenCalledWith('C:\\Projects\\izzy')
+    expect(screen.getByText('C:\\Projects\\izzy')).toBeTruthy()
+    expect(screen.getByText(en.firstLightWorkspaceRegistered)).toBeTruthy()
+    expect(continueButton().disabled).toBe(false)
+  })
+
+  it('surfaces a chooser that cannot open instead of a dead click', async () => {
+    const h = harness({
+      pickWorkspace: () => Promise.resolve({ kind: 'failed', message: en.firstLightWorkspacePickerFailed }),
+    })
+    await advanceToWorkspace()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en.firstLightChooseFolder }))
+    })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe(en.firstLightWorkspacePickerFailed)
+    expect(continueButton().disabled).toBe(true)
+    // The button stays usable: the click always lands on a visible result.
+    expect(screen.getByRole('button', { name: en.firstLightChooseFolder })).toBeTruthy()
+    expect(h.registerWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('reports a thrown picker (host unreachable) rather than swallowing it', async () => {
+    harness({ pickWorkspace: () => Promise.reject(new Error('the carrier dropped')) })
+    await advanceToWorkspace()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en.firstLightChooseFolder }))
+    })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe(en.firstLightWorkspacePickerFailed)
+    expect(continueButton().disabled).toBe(true)
+  })
+
+  it('treats a cancelled chooser as no choice, never as an error', async () => {
+    const h = harness({ pickWorkspace: () => Promise.resolve({ kind: 'declined' }) })
+    await advanceToWorkspace()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en.firstLightChooseFolder }))
+    })
+
+    expect(h.pickWorkspace).toHaveBeenCalledTimes(1)
+    expect(h.registerWorkspace).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(continueButton().disabled).toBe(true)
+  })
+
+  it('names a refused folder and keeps the retry available', async () => {
+    const h = harness({
+      pickWorkspace: () => Promise.resolve({ kind: 'picked', path: 'C:\\locked' }),
+      registerWorkspace: () => Promise.resolve({
+        kind: 'failed', message: `${en.firstLightWorkspaceFailed} that folder is not readable.`,
+      }),
+    })
+    await advanceToWorkspace()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en.firstLightChooseFolder }))
+    })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe(`${en.firstLightWorkspaceFailed} that folder is not readable.`)
+    expect(continueButton().disabled).toBe(true)
+
+    // Retry re-registers the same folder without reopening the chooser.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: en.firstLightWorkspaceRetry }))
+    })
+    expect(h.registerWorkspace).toHaveBeenCalledTimes(2)
+  })
+
+  it('renders the picker failure in the active locale', async () => {
+    harness({
+      locale: 'zh',
+      pickWorkspace: () => Promise.resolve({ kind: 'failed', message: zh.firstLightWorkspacePickerFailed }),
+    })
+    await advanceToWorkspace(zh)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: zh.firstLightChooseFolder }))
+    })
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe(zh.firstLightWorkspacePickerFailed)
   })
 
   it('walks every step and seals only on Start, with the receipt naming declines', async () => {

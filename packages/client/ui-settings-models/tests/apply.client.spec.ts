@@ -14,6 +14,7 @@ import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import { FirstLight } from '../src/client/FirstLight.tsx'
 import { DeepSeekOnboardingDialog } from '../src/client/DeepSeekOnboardingDialog.tsx'
 import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
+import { zh } from '../src/client/locales.ts'
 import { apply as hostApply } from '../src/index.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
@@ -26,6 +27,27 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
   ctx.provide('locale', locale)
+  // First Light drives the Host's own directory chooser. The Remote namespace
+  // must be mounted and injected: a lookup without it throws "cannot get
+  // property without inject", which is what made the button a silent no-op.
+  const directoryPicker = {
+    pick: vi.fn(async (): Promise<{ ok: boolean; value?: string | null; error?: { message: string } }> =>
+      ({ ok: true, value: 'C:\\picked' })),
+  }
+  // The chosen folder becomes a real Workspace through the same Remote the
+  // normal pick-a-folder flow uses.
+  const workspace = {
+    create: vi.fn(async (): Promise<{ ok: boolean; value?: unknown; error?: { message: string } }> => ({
+      ok: true,
+      value: {
+        created: true,
+        workspace: {
+          workspaceId: 'ws-1', path: 'C:\\built', title: 'built',
+          sessionIds: [], createdAt: '0', updatedAt: '0',
+        },
+      },
+    })),
+  }
   const remote = new TestRemote(ctx, {
     credentials: {
       describe: vi.fn(() => Promise.resolve({ ok: true, value: {} })),
@@ -44,23 +66,20 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
     settings: settings ?? scriptedSettingsRemote().settings,
     // First Light registers the chosen folder as the session default; the
     // namespace must be mounted for the plugin's inject to be satisfied.
-    workspace: {
-      create: vi.fn(() => Promise.resolve({
-        ok: true,
-        value: {
-          created: true,
-          workspace: {
-            workspaceId: 'ws-1', path: 'C:\\built', title: 'built',
-            sessionIds: [], createdAt: '0', updatedAt: '0',
-          },
-        },
-      })),
-    },
+    workspace,
+    directoryPicker,
   })
   // The fixed Host facts the settings provider reads its persistence from.
   remote.$host = { home: undefined, isLoopback }
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, remote }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, remote, directoryPicker, workspace }
+}
+
+/** The registered First Light step's injected face, resolved as the shell would. */
+function firstLightInjected(slots: SlotRegistry): import('../src/client/FirstLight.tsx').FirstLightInjected {
+  const entry = slots.entries('settings.onboarding')
+    .find(candidate => candidate.options.id === 'first-light')!
+  return (entry.inject as unknown as () => import('../src/client/FirstLight.tsx').FirstLightInjected)()
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -84,8 +103,54 @@ describe('ui-settings-models apply', () => {
   it('declares the services it uses', () => {
     expect(inject).toEqual([
       'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
-      'remote.workspace', 'settingsScope', 'settingsSchema',
+      'remote.workspace', 'remote.directoryPicker', 'settingsScope', 'settingsSchema',
     ])
+  })
+
+  it('opens the real folder chooser for the First Light workspace step', async () => {
+    const b = await bench()
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const face = firstLightInjected(b.slots)
+
+    expect(await face.pickWorkspace()).toEqual({ kind: 'picked', path: 'C:\\picked' })
+    expect(b.directoryPicker.pick).toHaveBeenCalledTimes(1)
+
+    b.directoryPicker.pick.mockResolvedValueOnce({ ok: true, value: null })
+    expect(await face.pickWorkspace()).toEqual({ kind: 'declined' })
+
+    // A refusal is a named outcome, not a silent null: the click must land on
+    // a user-visible error. The bench runs the zh locale, so the copy is zh.
+    b.directoryPicker.pick.mockResolvedValueOnce({ ok: false, error: { message: 'no chooser here' } })
+    expect(await face.pickWorkspace()).toEqual({
+      kind: 'failed', message: zh.firstLightWorkspacePickerFailed,
+    })
+    expect(b.directoryPicker.pick).toHaveBeenCalledTimes(3)
+
+    b.directoryPicker.pick.mockRejectedValueOnce(new Error('carrier down'))
+    expect(await face.pickWorkspace()).toEqual({
+      kind: 'failed', message: zh.firstLightWorkspaceUnreachable,
+    })
+  })
+
+  it('registers the picked folder through the Workspace Remote and names a refusal', async () => {
+    const b = await bench()
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const face = firstLightInjected(b.slots)
+
+    expect(await face.registerWorkspace('C:\\picked')).toEqual({ kind: 'registered' })
+    expect(b.workspace.create).toHaveBeenCalledWith({ path: 'C:\\picked' })
+
+    b.workspace.create.mockResolvedValueOnce({ ok: false, error: { message: 'refused' } })
+    expect(await face.registerWorkspace('C:\\picked')).toEqual({
+      kind: 'failed', message: `${zh.firstLightWorkspaceFailed} refused`,
+    })
+
+    b.workspace.create.mockRejectedValueOnce(new Error('carrier down'))
+    expect(await face.registerWorkspace('C:\\picked')).toEqual({
+      kind: 'failed', message: zh.firstLightWorkspaceUnreachable,
+    })
   })
 
   it('registers the models nav entry for declarations before or after apply', async () => {

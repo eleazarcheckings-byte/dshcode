@@ -67,7 +67,7 @@ export function refreshIfLoaded(controller: ModelsSettingsStore): void {
  */
 export const inject = [
   'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
-  'remote.workspace', 'settingsScope', 'settingsSchema',
+  'remote.workspace', 'remote.directoryPicker', 'settingsScope', 'settingsSchema',
 ]
 
 /**
@@ -125,16 +125,30 @@ export function apply(ctx: ClientContext): void {
     schema,
     hooks: { firstLight: firstLightController.store, models: controller.store },
     // Both verifiers are real: the brain probe performs the MCP handshake and
-    // reports failure when it cannot, and the picker is the Host's own.
+    // reports failure when it cannot, and the picker is the Host's own, reached
+    // through the same `remote.directoryPicker` namespace the workspace flow
+    // drives. A picker failure is named, never swallowed: a click that can do
+    // nothing is the defect this wiring exists to prevent.
     verifyDesignBrain: () => verifyDesignBrain(),
     pickWorkspace: async () => {
-      const response = await ctx.remote.directoryPicker.pick()
-      return response.ok ? response.value : null
+      try {
+        const response = await ctx.remote.directoryPicker.pick()
+        if (!response.ok) return { kind: 'failed', message: t('firstLightWorkspacePickerFailed') }
+        return response.value === null
+          ? { kind: 'declined' }
+          : { kind: 'picked', path: response.value }
+      } catch {
+        // A carrier failure is not a refusal by the picker: naming the app as
+        // unreachable keeps the retry honest instead of blaming the folder.
+        return { kind: 'failed', message: t('firstLightWorkspaceUnreachable') }
+      }
     },
     registerWorkspace: async (path) => {
       try {
         const result = await ctx.remote.workspace.create({ path })
-        return result.ok ? { kind: 'registered' } : { kind: 'failed', message: result.error.message }
+        return result.ok
+          ? { kind: 'registered' }
+          : { kind: 'failed', message: `${t('firstLightWorkspaceFailed')} ${result.error.message}` }
       } catch {
         // A carrier failure is not a refusal to register: saying "the app could
         // not be reached" keeps the retry honest instead of blaming the folder.

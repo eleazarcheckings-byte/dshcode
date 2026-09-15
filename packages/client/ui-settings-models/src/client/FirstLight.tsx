@@ -59,6 +59,15 @@ export type WorkspaceRegistrationOutcome =
   /** The Host refused or the attempt failed; the message is plain language. */
   | { readonly kind: 'failed'; readonly message: string }
 
+/** How the folder chooser answered. A failure is a named outcome, never a swallowed rejection. */
+export type WorkspacePickOutcome =
+  /** The chooser returned a folder. */
+  | { readonly kind: 'picked'; readonly path: string }
+  /** The user closed the chooser without choosing; not an error. */
+  | { readonly kind: 'declined' }
+  /** The chooser could not be opened at all; the message is plain language. */
+  | { readonly kind: 'failed'; readonly message: string }
+
 /** Outcome of mirroring the profile into user-global agent memory. */
 export type AgentMemoryOutcome =
   /** The Host wrote the profile into the user-global memory file. */
@@ -93,8 +102,13 @@ export interface FirstLightInjected {
   schema: SettingsSchemaOperations
   /** Verify the Design brain endpoint; never faked. */
   verifyDesignBrain: () => Promise<DesignBrainOutcome>
-  /** Open the native folder picker; resolves to the chosen path, or null when declined. */
-  pickWorkspace: () => Promise<string | null>
+  /**
+   * Open the native folder picker and report the one outcome: the chosen path,
+   * the user's cancel, or a named failure. A picker that cannot open is
+   * reported through the same union instead of rejecting, so the click always
+   * lands on something the user can see.
+   */
+  pickWorkspace: () => Promise<WorkspacePickOutcome>
   /**
    * Make the chosen folder the session default through the Host workspace
    * registry. Never local-only: the step's promise is that the next chat opens
@@ -264,11 +278,24 @@ export function FirstLight(props: FirstLightProps): ReactNode {
 
   /** Pick a folder, then make it the default. A declined picker is not an error. */
   const chooseWorkspace = async (): Promise<void> => {
-    const picked = await pickWorkspace()
-    if (picked === null) return
-    setWorkspacePath(picked)
+    setWorkspaceError(null)
+    let outcome: WorkspacePickOutcome
+    try {
+      outcome = await pickWorkspace()
+    } catch {
+      // A throwing picker is one that could not open at all: report it rather
+      // than letting the click land nowhere, and keep the folder choosable.
+      outcome = { kind: 'failed', message: t('firstLightWorkspacePickerFailed') }
+    }
+    if (outcome.kind === 'declined') return
+    if (outcome.kind === 'failed') {
+      setWorkspaceStatus('failed')
+      setWorkspaceError(outcome.message)
+      return
+    }
+    setWorkspacePath(outcome.path)
     setWorkspaceDeclined(false)
-    await registerChosen(picked)
+    await registerChosen(outcome.path)
   }
 
   /** Retry the folder already picked, without reopening the picker. */
@@ -515,7 +542,7 @@ export function FirstLight(props: FirstLightProps): ReactNode {
               ? <p className={css.status}>{t('firstLightWorkspaceRegistered')}</p>
               : null}
             {workspaceStatus === 'failed' && workspaceError !== null
-              ? <p className={css.error} role="alert">{`${t('firstLightWorkspaceFailed')} ${workspaceError}`}</p>
+              ? <p className={css.error} role="alert">{workspaceError}</p>
               : null}
             {workspaceDeclined ? <p className={css.note}>{t('firstLightWorkspaceDeclined')}</p> : null}
             <div className={css.actions}>
@@ -531,12 +558,11 @@ export function FirstLight(props: FirstLightProps): ReactNode {
               >
                 {t('firstLightNotNow')}
               </button>
-              {workspaceStatus === 'failed'
+              {workspaceStatus === 'failed' && workspacePath !== null
                 ? (
                   <button
                     type="button"
                     className={css.secondary}
-                    disabled={workspacePath === null}
                     onClick={() => { void retryWorkspace() }}
                   >
                     {t('firstLightWorkspaceRetry')}
