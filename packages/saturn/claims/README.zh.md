@@ -32,7 +32,7 @@ kind: "package-reference"
 
 ### 强制了什么
 
-同伴的活跃 claim 会在派发之前拒绝会修改文件的第一方工具调用，并且 ledger 事务贯穿该次派发，因此别的进程无法在检查与写入之间抢走该 scope。shell 调用则按其参数能够证明的内容扫描：输出重定向的目标，以及以修改文件为目的的命令的操作数（`rm`、`mv`、`cp`、`tee`、`sed -i`、`git checkout`、`Set-Content`、`Remove-Item` 及同类）。读取从不被阻断，而且 shell 检查会在命令运行前释放 ledger——一次构建若持有跨进程锁，会在其整个时长里拖住其他所有 session 的 claim。
+同伴的活跃 claim 会在派发之前拒绝会修改文件的第一方工具调用，并且 ledger 事务贯穿该次派发，因此别的进程无法在检查与写入之间抢走该 scope。shell 调用则按其参数能够证明的内容扫描：输出重定向的目标，以及以修改文件为目的的命令的操作数（`rm`、`mv`、`cp`、`tee`、`sed -i`、`git checkout`、`Set-Content`、`Remove-Item` 及同类）。`bash` 与 `pwsh` 按各自的词汇表来读，因为它们的可执行文件是事实；而 `terminal` 的命令行两种词汇表都读，因为终端背后是会话当时打开的那个 shell，主机平台并不能决定它。读取从不被阻断，而且 shell 检查会在命令运行前释放 ledger——一次构建若持有跨进程锁，会在其整个时长里拖住其他所有 session 的 claim。
 
 ### claim 空间
 

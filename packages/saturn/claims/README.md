@@ -32,7 +32,7 @@ Mount it in any deployment where more than one agent can write one workspace: a 
 
 ### What is enforced
 
-A peer's live claim denies a mutating first-party tool call before dispatch, and the ledger transaction is held across that dispatch so no other process can take the scope between the check and the write. A shell call is scanned for what its arguments can prove: an output redirection target, and the operands of a command whose purpose is to change files (`rm`, `mv`, `cp`, `tee`, `sed -i`, `git checkout`, `Set-Content`, `Remove-Item`, and their kin). Reads are never blocked, and the shell check releases the ledger before the command runs, because a build holding a cross-process lock would stall every other session's claims for its whole duration.
+A peer's live claim denies a mutating first-party tool call before dispatch, and the ledger transaction is held across that dispatch so no other process can take the scope between the check and the write. A shell call is scanned for what its arguments can prove: an output redirection target, and the operands of a command whose purpose is to change files (`rm`, `mv`, `cp`, `tee`, `sed -i`, `git checkout`, `Set-Content`, `Remove-Item`, and their kin). `bash` and `pwsh` are read in their own vocabulary, because their executable is a fact; a `terminal` line is read in both, because the shell behind a terminal is whatever the session opened and the host platform does not decide it. Reads are never blocked, and the shell check releases the ledger before the command runs, because a build holding a cross-process lock would stall every other session's claims for its whole duration.
 
 ### Claim space
 
