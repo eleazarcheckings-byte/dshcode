@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-15-saturnai-tools-front.md
-2026-09-15-saturnai-tools-front.md: e8c80a903b54f6e8f471122445acad1904837e8f
-2026-09-15-saturnai-tools-front.zh.md: eb4fccd670366b9c0ad9f82e4449a1dea08340ee
+2026-09-15-saturnai-tools-front.md: adaf01c77a44036fa5bc0d1ff7c989a650297733
+2026-09-15-saturnai-tools-front.zh.md: e3e4a389f3143cc0284aca855a377bf3104db697

@@ -42,3 +42,9 @@ New: `tests/status-strip.client.spec.tsx`, `tests/connect-forms.client.spec.tsx`
 ## Known follow-up
 
 A live model-router-backed provider/model picker and a real host `.env` path surfaced through `firstRun` are both one small step past what this cell could reach inside its own IN scope; see Deviations above.
+
+## Consequences
+
+`Configuration.tsx`'s raw JSON textarea is no longer the primary integrations UI: it now lives under a nested "Advanced JSON" disclosure, and `IntegrationConnectForms` is what an operator sees first. Connect forms are generated from `snapshot.integrationCatalog` rather than hand-built per provider, so a new adapter shows up as a working form with no UI change in this package — the catalog entry is the only thing that has to exist. A secret field never echoes a value back into the UI; it shows only the required environment variable's name, a copy action, and a `.env` path hint, so the runtime's own env-var resolution stays the one place a credential's value is ever read from.
+
+`packages/saturn/saturnbot/src/wizard.ts` — the runtime contract this package widens locally in `contracts.ts` (`SaturnBotSnapshot`'s `firstRun` and `integrationCatalog`) — is now load-bearing: the wizard's resume behavior, the status strip's gap detection, and every generated connect form all read `snapshot.firstRun`, so a future change to that runtime contract's shape must keep this package's readers degrading gracefully (as they already do when a field is absent) or update them in the same change. The local widened type is a bridge, not a permanent fork: once C8a's `BotSnapshot` carries `firstRun` and `integrationCatalog` natively, the two shapes need reconciling rather than left to drift apart.

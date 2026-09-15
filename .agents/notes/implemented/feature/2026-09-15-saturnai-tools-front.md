@@ -1,21 +1,15 @@
----
-kind: feature
-date: 2026-09-15
-cell: C10a-site-tools
-scope: engine (G:/My Drive/Projects/mac/active/izzy-design) + deploy mirror output
----
+# Agent Note: saturnai.tools front: one visual language, a live playground, real receipts
 
-# saturnai.tools front: one visual language, a live playground, real receipts
+Status: implemented
 
 English | [中文](2026-09-15-saturnai-tools-front.zh.md)
 
-## Summary
+## Problem
 
 `saturnai.tools` served three different visual languages across three clicks a
-visitor is invited to take. It now serves one, and the one thing the product
-actually outputs — the verdict — is the mechanism that carries it.
-
-## Provenance, proved before anything was edited
+visitor is invited to take: `/`, `/design/`, and `/design/connect/` each looked
+like a different product. Provenance, proved before anything was edited, is
+why:
 
 | deployed page | what generates it (before) | what generates it (now) |
 |---|---|---|
@@ -28,9 +22,17 @@ the mirror's `design/home/index.html`; `middleware.js:66-72` carries the
 `HOST_MAP` root; `dist/index.html` and `design/index.html` were both 640,080
 bytes at the same mtime. The Drive `dev-site/design` copy was stale (8,835 vs
 13,419 bytes for home), confirming the deploy mirror — not Drive — held the
-live truth, and that neither home nor connect had an engine source at all.
+live truth, and that neither home nor connect had an engine source at all: two
+of the three pages were hand-authored directly in the deploy mirror, with
+nothing in the engine (`G:/My Drive/Projects/mac/active/izzy-design`)
+generating them.
 
-## What changed
+## Decision
+
+The engine (`E` = `G:/My Drive/Projects/mac/active/izzy-design`) is now
+canonical for all three surfaces; the deploy mirror is build output only. Built
+in cell `C10a-site-tools`, scoped to the engine and the deploy-mirror output it
+writes to:
 
 - **`E/site/`** is new and is now the source of the product front: `saturn.css`
   (the one visual language), `home.html` + `home.js`, `connect.html` +
@@ -99,3 +101,45 @@ and fails if a swapped binary ever disagrees with the text beside it.
 needs neither. Never hand-edit `design/home`, `design/connect` or
 `design/assets/saturn.css` in the deploy mirror — they are build output and the
 next build overwrites them.
+
+## Alternatives considered
+
+**Keep hand-editing the deploy mirror instead of generating from the engine.**
+This is what `/` and `/design/connect/` already did, and it is the problem, not
+a fix: two hand-authored pages with no shared source drifted into their own
+visual language apiece, and nothing caught the drift because nothing in the
+engine generated them. It lost because the deploy mirror is exactly the layer
+that must stop being hand-written for the three surfaces to converge on one
+visual language.
+
+**Adopt Astro to satisfy the `framework` premium-stack slot.** SPEC §3 C10a
+authorizes declaring this slot rather than proving it, and the engine's
+plain-HTML, zero-client-framework build stays offline and deterministic (two
+consecutive builds produce identical bytes). Bringing in a framework to turn
+one declared slot into a proven one would add a build dependency and a runtime
+this static front does not otherwise need, for a slot the receipt can instead
+state honestly as not attempted.
+
+**Name the redistributed Commit Mono license file `-MIT` or `-OFL`.** Rejected:
+the shipped binaries assert OFL 1.1 in their own OpenType `name` table while the
+upstream repository's `LICENSE` file is MIT — two upstream statements that
+genuinely disagree. Either name would assert a claim the evidence does not
+fully support, so the file stays neutrally named (`LICENSE-commit-mono.txt`)
+and its body reproduces both texts verbatim with each claim's provenance
+instead.
+
+## Consequences
+
+A maintainer changes the product front by editing `E/site/*` and running `node
+build.mjs`; hand-editing `design/home`, `design/connect`, or
+`design/assets/saturn.css` in the deploy mirror no longer does anything durable
+— those paths are build output, and the next build overwrites any manual
+change. The receipts rendered into `/` and `/design/connect/` regenerate only
+when `node build-receipts.mjs` runs with network access and a system Chrome;
+`node build.mjs` itself stays offline, so `site/receipts.json` keeps whatever
+verdicts it last recorded until that networked step is run again. The deploy
+mirror (`design/**` under the mirror root) is now purely generated output, and
+the four declared premium-stack slots (`framework`, `images`, `a11y-gate`,
+`cwv-gate`, `audit`) stay declared rather than proven until, respectively, a
+framework migration, shipped raster art, a CI axe-core run, real field CWV
+traffic, or a run Lighthouse audit exists.

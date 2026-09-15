@@ -42,3 +42,9 @@ SPEC §3 的 C8a（一个并行构建的同级 cell）会为 SaturnBot 快照添
 ## 后续工作
 
 一个真正接入 model-router 的提供方／模型选择器，以及通过 `firstRun` 暴露的真实主机 `.env` 路径，都只比本 cell 自身 IN 范围内能触及的范围多一小步；详见上文「偏差」部分。
+
+## 后果
+
+`Configuration.tsx` 中原始的 JSON 文本框不再是主要的集成配置界面：它现在收纳在一个嵌套的「高级 JSON」折叠面板里，操作者首先看到的是 `IntegrationConnectForms`。连接表单由 `snapshot.integrationCatalog` 生成，而不是逐个提供方手写而成，因此新增一个适配器时，本包无需任何界面改动就能得到一份可用的表单——唯一要存在的只是目录中的那一条记录。密钥字段永远不会把值回显到界面上；它只展示所需环境变量的名称、一个复制操作，以及一条 `.env` 路径提示，因此运行时自身对环境变量的解析，始终是唯一读取凭据值的地方。
+
+`packages/saturn/saturnbot/src/wizard.ts`——本包在 `contracts.ts` 中本地放宽的运行时约定（`SaturnBotSnapshot` 的 `firstRun` 与 `integrationCatalog`）所对应的那份运行时契约——如今是承重的：引导流程的续接行为、状态提示条的缺口检测，以及每一份生成的连接表单，都读取 `snapshot.firstRun`，因此未来若要改动该运行时契约的形状，必须让本包现有的读取点继续优雅降级（就像它们在字段缺失时已经做到的那样），或者在同一次改动中一并更新它们。本地放宽类型是一座桥梁，不是永久的分叉：一旦 C8a 的 `BotSnapshot` 原生携带 `firstRun` 与 `integrationCatalog`，两种形状就需要被协调统一，而不是任由它们继续分道而行。
