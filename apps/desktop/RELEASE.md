@@ -5,7 +5,7 @@ signing/notarization costs when you're ready for that step.
 
 ## What ships today: unsigned
 
-Pushing a `desktop-v*` tag runs `.github/workflows/desktop-release.yml`:
+Pushing a `desktop-release-v*` tag runs `.github/workflows/desktop-release.yml`:
 it builds macOS (arm64 + x64, `.dmg`/`.zip`) and Windows x64 (`.exe`, nsis)
 with electron-builder, uploads them as workflow artifacts, then attaches
 them (plus a `SHA256SUMS.txt`) to a GitHub release for that tag.
@@ -20,22 +20,38 @@ These builds are **unsigned**:
   `apps/desktop/electron-builder.yml`, macOS silently drops notifications
   from an ad-hoc-signed app. Everything else in the app works.
 
-The `eleazarcheckings-byte/dshcode` GitHub repo is **public**
+The `eleazarcheckings-byte/dshcode` GitHub repo — remote `fork` in this
+checkout (`origin` here is the upstream `whitelonng/dshcode`, a third party;
+`gh repo view eleazarcheckings-byte/dshcode` is what was checked, and that is
+the `fork` remote) — is **public**
 (verified: `gh repo view eleazarcheckings-byte/dshcode` → `visibility: PUBLIC`),
 so these GitHub Actions runner-minutes are **free** — public repos get
 unlimited minutes on standard runners. There is no cost to running or
-re-running this workflow as-is.
+re-running this workflow as-is. This all applies to the `fork` remote only;
+nothing here says anything about `origin` (`whitelonng/dshcode`) or
+`upstream-dsh` (`deepseek-ai/deepseek-harness`).
 
 ## Cutting a release
 
 ```bash
 cd dshcode
-git tag desktop-v1.1.5
-git push origin desktop-v1.1.5   # Gate: pushing tags/publishing is an outward act — do this yourself
+git tag desktop-release-v1.1.5
+git push fork desktop-release-v1.1.5   # Gate: pushing tags/publishing is an outward act — do this yourself
 ```
 
-That push is the only trigger. The workflow does not run on `workflow_dispatch`
-or on ordinary branch pushes.
+Push to the `fork` remote (`eleazarcheckings-byte/dshcode`) — that is the repo
+the free-minutes finding above covers, and where this workflow lives once
+pushed. That push is the only trigger. The workflow does not run on
+`workflow_dispatch` or on ordinary branch pushes.
+
+### Why `desktop-release-v*`, not `desktop-v*`
+
+The pre-existing `.github/workflows/desktop.yml` already triggers on
+`desktop-v*` and runs its own build matrix + `gh release create`. Tagging
+`desktop-v*` would fire both workflows on the same push and race each other
+to create the same GitHub release — one run would fail outright. This lane
+uses the `desktop-release-v*` prefix instead so the two workflows never
+collide; see "Open question" below for the unresolved overlap between them.
 
 ## Building locally (any machine, any OS matching the target)
 
@@ -78,6 +94,19 @@ once the Gatekeeper/SmartScreen warning becomes a support burden.
 **These are Gates** — an actual purchase (Apple Developer membership, a code-signing
 cert) is money spent and needs Eleazar's explicit go-ahead; do not enroll or buy
 either as part of routine release work.
+
+## Open question: two release workflows
+
+`.github/workflows/desktop.yml` (pre-existing, triggers on `desktop-v*`,
+runners `macos-15`/`macos-15-intel`/`windows-2025`, plus Electron directory-picker
+and packaged-startup smoke tests) and this file's `desktop-release.yml`
+(triggers on `desktop-release-v*`, same macOS runners, no smoke tests, adds
+`SHA256SUMS.txt`) now coexist without colliding on a tag, but they are still
+two ways to cut the same kind of release. A maintainer should pick one:
+retire `desktop-release.yml` once `desktop.yml` grows a checksum step, or
+retire the release job in `desktop.yml` and port its smoke-test steps into
+`desktop-release.yml`. Not resolved here — it touches `desktop.yml`, which is
+outside this change's scope.
 
 ## Dry-checking the workflow without pushing
 
