@@ -1,0 +1,15 @@
+node_modules/
+www/js/
+dist/
+.DS_Store
+
+# Capacitor-generated native projects: keep only the customizations we hand-author.
+# (ios/ and android/ are committed once generated; native build outputs stay out.)
+android/app/build/
+android/.gradle/
+android/local.properties
+android/captures/
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+*.xcuserstate

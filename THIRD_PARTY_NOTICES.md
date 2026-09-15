@@ -34,7 +34,17 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@agentclientprotocol/sdk`](https://github.com/agentclientprotocol/typescript-sdk) | Apache-2.0 |
 | [`@anthropic-ai/claude-agent-sdk`](https://github.com/anthropics/claude-agent-sdk-typescript) | SEE LICENSE IN README.md |
 | [`@anthropic-ai/sdk`](https://github.com/anthropics/anthropic-sdk-typescript) | MIT |
+| [`@aparajita/capacitor-biometric-auth`](https://github.com/aparajita/capacitor-biometric-auth) | MIT |
 | [`@babel/code-frame`](https://github.com/babel/babel) | MIT |
+| [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/app`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/camera`](https://github.com/ionic-team/capacitor-camera) | MIT |
+| [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/ios`](https://github.com/ionic-team/capacitor) | MIT |
+| [`@capacitor/local-notifications`](https://github.com/ionic-team/capacitor-local-notifications) | MIT |
+| [`@capacitor/preferences`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/splash-screen`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/status-bar`](https://github.com/ionic-team/capacitor-plugins) | MIT |
 | [`@earendil-works/pi-ai`](https://github.com/earendil-works/pi) | MIT |
 | [`@joplin/turndown-plugin-gfm`](https://github.com/laurent22/joplin-turndown-plugin-gfm) | MIT |
 | [`@jridgewell/gen-mapping`](https://github.com/jridgewell/sourcemaps) | MIT |
@@ -78,6 +88,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`immer`](https://github.com/immerjs/immer) | MIT |
 | [`ipaddr.js`](https://github.com/whitequark/ipaddr.js) | MIT |
 | [`js-yaml`](https://github.com/nodeca/js-yaml) | MIT |
+| [`jsqr`](https://github.com/cozmo/jsQR) | Apache-2.0 |
 | [`katex`](https://github.com/KaTeX/KaTeX) | MIT |
 | [`koffi`](https://github.com/Koromix/koffi) | MIT |
 | [`lexical`](https://github.com/facebook/lexical) | MIT |
@@ -147,6 +158,7 @@ External packages **directly declared** only by repository tooling, test infrast
 | Package | License |
 | --- | --- |
 | [`@braintree/sanitize-url`](https://github.com/braintree/sanitize-url) | MIT |
+| [`@capacitor/cli`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@lexical/headless`](https://github.com/facebook/lexical) | MIT |
 | [`@modelcontextprotocol/server-everything`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
 | [`@modelcontextprotocol/server-filesystem`](https://github.com/modelcontextprotocol/servers) | MIT / Apache-2.0 |
