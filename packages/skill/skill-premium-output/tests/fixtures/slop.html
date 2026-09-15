@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Nova Cloud — AI-Powered Growth Platform</title>
+<style>
+  :root { --accent: #4F46E5; }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: 'Inter', 'Roboto', sans-serif;
+    background: #ffffff;
+    color: #171717;
+  }
+  .hero {
+    background-image: linear-gradient(135deg, #4F46E5 0%, #A855F7 100%);
+    padding: 96px 32px;
+    color: #ffffff;
+    text-align: center;
+    position: relative;
+  }
+  .hero h1 {
+    font-size: 48px;
+    font-weight: 800;
+  }
+  .hero .headline-gradient {
+    background-image: linear-gradient(90deg, #4F46E5, #A855F7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .sparkle-badge {
+    display: inline-block;
+    font-size: 14px;
+  }
+  #particles-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  p.muted {
+    color: #bbbbbb;
+    font-size: 16px;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    padding: 64px 32px;
+  }
+  .card {
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    background: #ffffff;
+    padding: 32px;
+  }
+  .fade-up {
+    animation-name: none;
+  }
+  .badge-pulse {
+    animation: pulseGlow 2s infinite;
+  }
+  @keyframes pulseGlow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .quote-section {
+    background-color: #f5ecdd;
+    padding: 64px 32px;
+  }
+  .quote-section p {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 20px;
+    color: #171717;
+  }
+  .grain-overlay {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+  }
+  a.btn-outline {
+    display: inline-block;
+    padding: 12px 24px;
+    border: 1px solid #4F46E5;
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <span class="sparkle-badge" aria-label="sparkle">&#10022; AI-native</span>
+    <h1 class="headline-gradient">Supercharge your growth</h1>
+    <p class="badge-pulse">The future of work, today.</p>
+    <canvas id="particles-bg" width="1200" height="600"></canvas>
+    <div class="grain-overlay"></div>
+  </header>
+
+  <main>
+    <section class="cards">
+      <div class="card fade-up">
+        <h3>Automate</h3>
+        <p class="muted">Let the agents handle the busywork while you focus on strategy.</p>
+      </div>
+      <div class="card fade-up">
+        <h3>Accelerate</h3>
+        <p class="muted">Ship features ten times faster with our AI-powered pipeline.</p>
+      </div>
+      <div class="card fade-up">
+        <h3>Scale</h3>
+        <p class="muted">Grow from ten to ten thousand users without touching infrastructure.</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="fade-up"><p class="muted">Trusted by fast-moving teams everywhere.</p></div>
+      <div class="fade-up"><p class="muted">Loved by builders and operators alike.</p></div>
+      <div class="fade-up"><p class="muted">The platform that scales with you.</p></div>
+    </section>
+
+    <section class="quote-section">
+      <p>&ldquo;Nova Cloud changed the way our whole team ships product.&rdquo;</p>
+    </section>
+
+    <section style="padding:64px 32px; text-align:center;">
+      <a href="#" class="btn-outline">Learn more</a>
+    </section>
+  </main>
+</body>
+</html>

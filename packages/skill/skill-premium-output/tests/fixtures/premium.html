@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Field Notes — a quiet publishing tool for research teams</title>
+<style>
+  :root {
+    --font-display: 'Zinc Display', 'Helvetica Neue', sans-serif;
+    --font-body: 'Zinc Text', 'Helvetica Neue', sans-serif;
+    --ink: #17171b;
+    --bg: #fafafa;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--ink);
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 650;
+  }
+  header.hero {
+    padding: 96px 32px 64px;
+  }
+  header.hero h1 {
+    font-size: 56px;
+    max-width: 16ch;
+  }
+  header.hero p {
+    max-width: 60ch;
+    font-size: 18px;
+    padding-top: 16px;
+    color: #3a3a42;
+  }
+  .cta-row { padding-top: 32px; }
+  a.btn {
+    display: inline-block;
+    padding: 16px 32px;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .features {
+    list-style: none;
+    padding: 48px 32px;
+    border-top: 1px solid #e2e2e6;
+  }
+  .features li {
+    display: flex;
+    gap: 24px;
+    padding: 24px 0;
+    border-bottom: 1px solid #e2e2e6;
+  }
+  .features li p {
+    padding-top: 8px;
+    color: #3a3a42;
+  }
+  .reveal {
+    animation-name: rise;
+    animation-timeline: view();
+    animation-range: entry 0% cover 30%;
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { animation: none; }
+  }
+  figure.plate {
+    padding: 48px 32px;
+  }
+  figure.plate img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  figure.plate figcaption {
+    padding-top: 16px;
+    color: #3a3a42;
+    font-size: 14px;
+  }
+  section.close {
+    padding: 64px 32px 96px;
+    border-top: 1px solid #e2e2e6;
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <h1>Write once. Publish everywhere your lab reads.</h1>
+    <p>Field Notes turns a running research log into a versioned, citable record — without asking anyone to leave their editor.</p>
+    <div class="cta-row">
+      <a class="btn" href="/start">Start a workspace</a>
+    </div>
+  </header>
+
+  <main>
+    <ul class="features">
+      <li class="reveal">
+        <h3>Version everything</h3>
+        <p>Every entry keeps its full history, so a retracted claim never quietly disappears.</p>
+      </li>
+      <li class="reveal">
+        <h3>Cite by reference</h3>
+        <p>Link a finding straight to the entry and revision that produced it.</p>
+      </li>
+      <li>
+        <h3>Read offline</h3>
+        <p>The whole log syncs to a single file your team can open without a connection.</p>
+      </li>
+    </ul>
+
+    <figure class="plate">
+      <img src="/assets/lab-desk.jpg" alt="A researcher's desk with an open notebook and a monitor showing a running log" width="1200" height="720" />
+      <figcaption>A live log, mid-session.</figcaption>
+    </figure>
+
+    <section class="close">
+      <h2>See it on your own log</h2>
+      <p>Import an existing folder of notes and Field Notes will version what's already there.</p>
+      <div class="cta-row">
+        <a class="btn" href="/import">Import a folder</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
