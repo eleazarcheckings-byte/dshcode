@@ -32,8 +32,11 @@ import {
   DESKTOP_NOTIFICATION_CHANNEL,
   DESKTOP_NOTIFICATION_CLICK_CHANNEL,
   DESKTOP_SHOW_MENU_CHANNEL,
+  DESKTOP_RESTORE_SATURNBOT_CHANNEL,
   ensureMainModuleArgument,
   navigationDisposition,
+  isSaturnBotWindowUrl,
+  restoreSaturnBotWindow,
   trayIconFile,
   windowCloseDisposition,
   type QuitCoordinator,
@@ -55,16 +58,17 @@ import {
 const PRODUCT_NAME = 'Saturn AI'
 const APP_ID = 'tools.saturnai.desktop'
 /**
- * Window chrome colors, authored to the Saturn AI design ladder's darkest two
- * rungs: `void` (the app background) and `ink` (the window-control symbols).
+ * Window chrome colors match the Saturn AI monochrome palette:
+ * `void` (the app background) and `ink` (the window-control symbols).
  * The renderer's skin resolves the same two values, so the title-bar overlay
  * and the OS-drawn window frame sit on one continuous surface with no seam.
  */
-const CHROME_VOID = '#0a0a0c'
-const CHROME_INK = '#e8e8ee'
+const CHROME_VOID = '#0a0a0a'
+const CHROME_INK = '#efefef'
 /** Absolute directory of the bundled main module (Contents/Resources/app/lib). */
 const mainDir = fileURLToPath(new URL('.', import.meta.url))
 let mainWindow: BrowserWindow | undefined
+let saturnBotWindow: BrowserWindow | undefined
 let applicationUrl: string | undefined
 let quitCoordinator: QuitCoordinator | undefined
 let nativeExitAllowed = false
@@ -85,7 +89,7 @@ function openExternal(rawUrl: string): void {
   void shell.openExternal(rawUrl).catch(reportExternalOpenFailure)
 }
 
-function installRendererPolicy(window: BrowserWindow, origin: string): void {
+function installRendererPolicy(window: BrowserWindow, origin: string, allowSaturnBot = true): void {
   window.webContents.on('will-navigate', (event, rawUrl) => {
     const disposition = navigationDisposition(rawUrl, origin)
     if (disposition === 'application') return
@@ -93,9 +97,40 @@ function installRendererPolicy(window: BrowserWindow, origin: string): void {
     if (disposition === 'external') openExternal(rawUrl)
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
+    if (allowSaturnBot && isSaturnBotWindowUrl(url, origin)) {
+      if (restoreSaturnBotWindow(saturnBotWindow)) return { action: 'deny' }
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          title: 'SaturnBot', width: 1380, height: 900, minWidth: 760, minHeight: 600,
+          backgroundColor: CHROME_VOID, autoHideMenuBar: true, skipTaskbar: true,
+          webPreferences: {
+            contextIsolation: true, nodeIntegration: false, sandbox: true,
+            webSecurity: true, allowRunningInsecureContent: false, webviewTag: false,
+            navigateOnDragDrop: false, preload: join(mainDir, 'preload.cjs'),
+            additionalArguments: desktopLaunchArguments('SaturnBot', app.getVersion()),
+          },
+        },
+      }
+    }
     if (navigationDisposition(url, origin) === 'external') openExternal(url)
     return { action: 'deny' }
   })
+  if (allowSaturnBot) {
+    window.webContents.on('did-create-window', (child, details) => {
+      if (!isSaturnBotWindowUrl(details.url, origin)) { child.close(); return }
+      saturnBotWindow = child
+      installRendererPolicy(child, origin, false)
+      crashMonitor?.attachWindow(child)
+      child.on('minimize', () => {
+        if (quitArmed || nativeExitAllowed) return
+        child.hide()
+        showMainWindow()
+      })
+      child.on('page-title-updated', (event) => { event.preventDefault(); child.setTitle('SaturnBot') })
+      child.on('closed', () => { if (saturnBotWindow === child) saturnBotWindow = undefined })
+    })
+  }
 }
 
 /**
@@ -553,6 +588,12 @@ async function startDesktop(): Promise<void> {
         requestQuit(0)
       },
     })).popup({ window: mainWindow })
+  })
+  ipcMain.handle(DESKTOP_RESTORE_SATURNBOT_CHANNEL, (event) => {
+    if (mainWindow === undefined || applicationUrl === undefined) return false
+    if (event.sender !== mainWindow.webContents) return false
+    if (!desktopIpcSenderIsApplication(event.senderFrame?.url, new URL(applicationUrl).origin)) return false
+    return restoreSaturnBotWindow(saturnBotWindow)
   })
   // The plugin-management surface restarts the whole application in place so
   // profile and patch changes take effect (packaged Electron cannot hot-apply

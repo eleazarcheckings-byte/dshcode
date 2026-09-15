@@ -1,85 +1,74 @@
-/**
- * The Design brain probe must earn "Connected": every failure path stays
- * `unreachable`, so the setup step can never report a connection it did not
- * make. A probe that guessed success would be a lie the user carries into
- * every later session.
- */
+/** Host-backed connection state must come from real registered tools, never browser fetch success. */
+import { expect, it, vi } from 'vitest'
+import type { DesignBrainStatus } from '@saturnai/dsh-design-brain/client'
+import { DesignBrainController, type DesignBrainRemote } from '../src/client/design-brain.ts'
+import { en } from '../src/client/locales.ts'
 
-import { describe, expect, it } from 'vitest'
-import { DESIGN_BRAIN_ENDPOINT, verifyDesignBrain } from '../src/client/design-brain.ts'
-
-/** One JSON-RPC reply body. */
-function rpc(result: unknown): Response {
-  return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
-}
-
-/** A fetch stub answering the queued replies in order, recording each body. */
-function scriptedFetch(...replies: (() => Response | Promise<Response>)[]): {
-  fetchImpl: typeof fetch
-  bodies: string[]
-} {
-  const bodies: string[] = []
-  const queue = [...replies]
-  const fetchImpl = async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    bodies.push(typeof init?.body === 'string' ? init.body : '')
-    const next = queue.shift()
-    if (next === undefined) throw new Error('unexpected fetch call')
-    return next()
+const off: DesignBrainStatus = { state: 'disabled', enabled: false, source: 'managed', tools: [], endpoint: 'https://saturnai.tools/api/mcp', issue: 'none' }
+const ready: DesignBrainStatus = { ...off, state: 'connected', enabled: true, tools: ['mcp__saturnai__compose', 'mcp__saturnai__review'] }
+function bench() {
+  const remote = {
+    status: vi.fn<DesignBrainRemote['status']>(async () => ({ ok: true, value: off })),
+    connect: vi.fn<DesignBrainRemote['connect']>(async () => ({ ok: true, value: ready })),
+    disconnect: vi.fn<DesignBrainRemote['disconnect']>(async () => ({ ok: true, value: off })),
   }
-  return { fetchImpl, bodies }
+  const controller = new DesignBrainController(remote, key => en[key])
+  return { controller, remote }
 }
+it('connects through the Host, projects returned tools, and removes stale success after a failed refresh', async () => {
+  const { controller, remote } = bench()
+  expect(await controller.verify()).toEqual({ kind: 'verified', tools: ready.tools })
+  expect(remote.connect).toHaveBeenCalledOnce()
+  remote.status.mockRejectedValueOnce(new Error('connection reset'))
+  await controller.refresh()
+  expect(controller.state.getSnapshot()).toEqual({ snapshot: null, busy: false, error: true })
+})
+it('keeps missing core tools and profile-owned disabled rows explicit', async () => {
+  const { controller, remote } = bench()
+  remote.connect.mockResolvedValueOnce({ ok: true, value: { ...off, state: 'unavailable', issue: 'incomplete-tools', tools: ['mcp__saturnai__compose'] } })
+  expect(await controller.verify()).toEqual({ kind: 'unreachable', message: en.designBrainPartial })
+  remote.connect.mockResolvedValueOnce({ ok: true, value: { ...off, state: 'unavailable', source: 'profile', issue: 'profile-disabled' } })
+  expect(await controller.verify()).toEqual({ kind: 'unreachable', message: en.designBrainProfile })
+})
+it('serializes a connect behind an in-flight status read without losing the user command', async () => {
+  const { controller, remote } = bench()
+  const read = Promise.withResolvers<Awaited<ReturnType<DesignBrainRemote['status']>>>()
+  remote.status.mockReturnValueOnce(read.promise)
+  const refreshing = controller.refresh()
+  const connecting = controller.verify()
+  await Promise.resolve()
+  expect(remote.connect).not.toHaveBeenCalled()
+  read.resolve({ ok: true, value: off })
+  await refreshing
+  expect(await connecting).toEqual({ kind: 'verified', tools: ready.tools })
+})
+it('declining persists opt-out but leaves independent profile rows untouched', async () => {
+  const { controller, remote } = bench()
+  expect(await controller.decline()).toBe(true)
+  expect(remote.disconnect).toHaveBeenCalledOnce()
+  remote.status.mockResolvedValueOnce({ ok: true, value: { ...ready, source: 'profile' } })
+  expect(await controller.decline()).toBe(true)
+  expect(remote.disconnect).toHaveBeenCalledOnce()
+  remote.status.mockRejectedValueOnce(new Error('offline'))
+  expect(await controller.decline()).toBe(false)
+})
+it('does not publish or launch queued work after its owner is disposed', async () => {
+  const { controller, remote } = bench()
+  controller.dispose()
+  await controller.connect()
+  expect(remote.connect).not.toHaveBeenCalled()
+  expect(controller.state.getSnapshot().snapshot).toBeNull()
+})
 
-describe('verifyDesignBrain', () => {
-  it('points at the public brain endpoint by default', () => {
-    expect(DESIGN_BRAIN_ENDPOINT).toBe('https://saturnai.tools/api/mcp')
-  })
-
-  it('verifies only after a real handshake names the offered tools', async () => {
-    const { fetchImpl, bodies } = scriptedFetch(
-      () => rpc({ protocolVersion: '2025-06-18', capabilities: {} }),
-      () => rpc({
-        tools: [
-          { name: 'intake', description: 'lock context' },
-          { name: 'compose' },
-          { name: 'review' },
-        ],
-      }),
-    )
-    await expect(verifyDesignBrain('https://brain.test/mcp', fetchImpl))
-      .resolves.toEqual({ kind: 'verified', tools: ['intake', 'compose', 'review'] })
-    // The two bodies are the initialize then the tools/list of one handshake.
-    expect(JSON.parse(bodies[1]!)).toMatchObject({ method: 'tools/list' })
-  })
-
-  it.each([
-    ['a non-2xx handshake answer', () => Promise.resolve(new Response('nope', { status: 503 }))],
-    ['a transport failure', () => Promise.reject(new Error('fetch failed'))],
-  ])('reports %s as unreachable instead of guessing', async (_label, answer) => {
-    const { fetchImpl } = scriptedFetch(answer)
-    const outcome = await verifyDesignBrain('https://brain.test/mcp', fetchImpl)
-    expect(outcome.kind).toBe('unreachable')
-    if (outcome.kind === 'unreachable') expect(outcome.message.length).toBeGreaterThan(0)
-  })
-
-  it('reports a handshake body that is not a JSON-RPC result', async () => {
-    const { fetchImpl } = scriptedFetch(() => new Response('"hello"', { status: 200 }))
-    await expect(verifyDesignBrain('https://brain.test/mcp', fetchImpl))
-      .resolves.toEqual({ kind: 'unreachable', message: 'the endpoint did not answer a handshake' })
-  })
-
-  it('reports a refused or empty tools listing', async () => {
-    for (const [answer, message] of [
-      [() => new Response('{}', { status: 500 }), 'the endpoint answered 500'],
-      [() => rpc({ tools: 'many' }), 'the endpoint listed no tools'],
-      [() => rpc({ tools: [] }), 'the endpoint listed no tools'],
-      [() => rpc({ tools: [{ name: '' }, { description: 'x' }] }), 'the endpoint listed no tools'],
-    ] as const) {
-      const { fetchImpl } = scriptedFetch(() => rpc({ capabilities: {} }), answer)
-      await expect(verifyDesignBrain('https://brain.test/mcp', fetchImpl))
-        .resolves.toEqual({ kind: 'unreachable', message })
-    }
-  })
+it('does not publish a late Host reply after disposal', async () => {
+  const { controller, remote } = bench()
+  const response: PromiseWithResolvers<Awaited<ReturnType<DesignBrainRemote['connect']>>> = Promise.withResolvers()
+  remote.connect.mockReturnValueOnce(response.promise)
+  const connecting = controller.connect()
+  await Promise.resolve()
+  const last = controller.state.getSnapshot()
+  controller.dispose()
+  response.resolve({ ok: true, value: ready })
+  await connecting
+  expect(controller.state.getSnapshot()).toBe(last)
 })

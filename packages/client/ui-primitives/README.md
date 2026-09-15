@@ -29,7 +29,13 @@ Compose feature UI from these atoms whenever the web client needs a standard con
 
 ### Controls and icons
 
+Buttons use short color transitions and a restrained pressed response. Modals reveal their
+backdrop and content with a brief entrance that preserves the focus lifecycle. These motion
+effects honor the operating system's reduced-motion preference.
+
 `Button`, `Pill`, `Input`, `Menu`, `Modal`, `Tooltip`, `DisclosureRow`, `StateDot`, `HoverCard`, `Toast`, `ConnectionIndicator`, `RiskConfirmation`, and the `OnboardingSurface` first-run takeover cover the common interaction shapes. The `ic_ds_*` icon set and the `SaturnLogo` mark fill brand and inline-icon slots. `ConnectionIndicator` renders a warning-colored disconnected action, a connecting label whose one-to-three dots advance every 500ms independently of retry timing, or a success-colored recovered status. Every state reserves the widest supplied label and uses fixed icon and text columns, so copy changes do not move or resize the control. Its owner supplies visibility, the recovery hold, localized labels, and the immediate-reconnect callback; the primitive uses no native title tooltip. `useAnchoredPosition` and `useAnchoredMaxHeight` keep floating panels and bottom-anchored overlays clamped to the viewport and following their anchor. `HoverCard` keeps its portaled preview reachable across the anchor gap and can expose a copy button through the `copyText` prop. `Toast` holds for the window its owner names through `holdMs`, because how long a banner has to stay depends on how much there is to read; the same value drives its unmount timer and the stylesheet's fade delay, so the two cannot disagree.
+
+`ContextMenu` renders its card in a portal and contains click and context-menu events there. Selecting a menu action invokes its callback without also activating or reopening an invoking row through React event bubbling.
 
 ### Rendering agent output
 

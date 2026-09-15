@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {
   TeamTaskId, TeamTaskView as TeamTask, TeamView,
 } from '@saturnai/dsh-agent-team/client'
@@ -14,7 +15,8 @@ import {
 } from '../src/client/TeamAction.tsx'
 import { zh } from '../src/client/locales.ts'
 
-afterEach(cleanup)
+beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) })
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 const SESSION = 'lead' as SessionId
 const TASK_1 = 'task-1' as TeamTaskId
@@ -71,6 +73,7 @@ function remoteFailure(message: string): TeamActionResult<never> {
 function props(actions: TeamActionInjected, sessionId: SessionId = SESSION): TeamActionProps {
   return {
     sessionId,
+    useSessions: <T,>(select: (state: SessionListState) => T): T => select({ byId: {} } as SessionListState),
     ...actions,
     t: makeTranslate(zh, commonZh),
   } as unknown as TeamActionProps
@@ -90,6 +93,57 @@ function actions(overrides: Partial<TeamActionInjected> = {}): TeamActionInjecte
 }
 
 describe('TeamAction', () => {
+  it('shows exact completion and filters actionable work without changing the board', async () => {
+    const finished = { ...task, id: TASK_2, subject: 'Finished task', status: 'completed' as const, writeScopeWarnings: [] }
+    const ready = { ...task, id: 'ready' as TeamTaskId, subject: 'Ready task', status: 'pending' as const, ready: true, writeScopeWarnings: [] }
+    render(
+      <TeamAction
+        {...props(actions({ load: () => Promise.resolve({ ok: true, value: { ...view, tasks: [task, finished, ready] } }) }))}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
+    await screen.findByText('Finished task')
+    expect(screen.getByRole<HTMLProgressElement>('progressbar', { name: zh['overview.progress'] }).value).toBe(1)
+    expect(screen.getByRole<HTMLProgressElement>('progressbar', { name: zh['overview.progress'] }).max).toBe(3)
+    fireEvent.click(screen.getByRole('button', { name: `${zh['filter.attention']}1` }))
+    expect(screen.getByText('Implement runtime')).toBeTruthy()
+    expect(screen.queryByText('Finished task')).toBeNull()
+    expect(screen.queryByText('Ready task')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: `${zh['filter.completed']}1` }))
+    expect(screen.getByText('Finished task')).toBeTruthy()
+    expect(screen.queryByText('Implement runtime')).toBeNull()
+  })
+
+  it('keeps keyboard focus inside mission control and restores the trigger after Escape', async () => {
+    render(<TeamAction {...props(actions())} />)
+    const trigger = screen.getByRole('button', { name: /Agent Team/u })
+    fireEvent.click(trigger)
+    await screen.findByText('Implement runtime')
+    const refresh = screen.getByRole('button', { name: zh.refresh })
+    expect(document.activeElement).toBe(refresh)
+    fireEvent.keyDown(refresh, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /删除/u }))
+    fireEvent.keyDown(document.activeElement!, { key: 'Tab' })
+    expect(document.activeElement).toBe(refresh)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('reloads on window return while leaving a hidden window quiet', async () => {
+    const load = vi.fn(() => Promise.resolve({ ok: true as const, value: view }))
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    render(<TeamAction {...props(actions({ load }))} />)
+    fireEvent.click(screen.getByRole('button', { name: /Agent Team/u }))
+    await screen.findByText('Implement runtime')
+    hidden.mockReturnValue(true)
+    fireEvent(document, new Event('visibilitychange'))
+    expect(load).toHaveBeenCalledTimes(1)
+    hidden.mockReturnValue(false)
+    fireEvent(window, new Event('focus'))
+    await waitFor(() => { expect(load).toHaveBeenCalledTimes(2) })
+  })
+
   it('ignores a stale Team load after the conversation switches sessions', async () => {
     const nextSession = 'next-lead' as SessionId
     const firstLoad = Promise.withResolvers<{ ok: true; value: TeamView }>()

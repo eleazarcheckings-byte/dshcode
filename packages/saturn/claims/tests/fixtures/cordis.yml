@@ -1,0 +1,22 @@
+- id: sessions
+  name: cordis:claim-test-sessions
+- id: system-prompt
+  name: cordis:claim-test-system-prompt
+- id: tools
+  name: cordis:claim-test-tools
+- id: llm
+  name: cordis:claim-test-llm
+- id: agents
+  name: cordis:claim-test-agents
+- id: projections
+  name: cordis:claim-test-projections
+- id: agent-loop
+  name: cordis:claim-test-agent-loop
+  config:
+    agents: []
+- id: fs
+  name: cordis:claim-test-fs
+- id: claims
+  name: cordis:claim-test-claims
+- id: tool-fs
+  name: cordis:claim-test-tool-fs

@@ -40,6 +40,14 @@ target package 通过 declaration merge 扩展 snapshot 与 Location data map，
 
 View 选择规则固定：有效且已注册的持久化选择优先，其次是已注册的 `chat`，否则不渲染 View；绝不选择第一个已注册 View。Shell phase 只组合 Session lifecycle 与 active-target set，不读取任何 target-specific snapshot。
 
+主应用通过 `shell.background` 共用一个覆盖整个窗口的 canvas，位于各应用栏后方。切换会话或 Hero 状态时，星空保持挂载。Hero 提供土星的布局锚点；锚点存在时土星跟随其位置，锚点消失后星空继续保留。独立 SaturnBot 窗口保留自己的执行画布，不显示此装饰星空。
+
+单色星点和流星路线分布在窗口上、中、下部及左右两侧。淡淡的星座分布在上部和下部。中性光照和星点亮度缓慢变化，在流星间歇期间提供环境氛围，星点位置保持不变。同一时刻最多出现一颗流星。鼠标靠近时，星座连线柔和显现，场景本身不移动。简短的入场淡入遵循动态效果偏好；较小的绘制区域降低密度，同时保留窗口下部的星点和星座。
+
+空 composer 获得焦点时，环境动画减速；存在文字或图片草稿、正在编辑其他文本字段、页面隐藏或图形离开视口时，动画停止。暂停会保持当前土星环的角度和反射光位置，焦点变化也不会重置它们。右下角的全局动态效果控制与星空共享同一个偏好，并将其保存在浏览器存储中；操作系统的减少动态效果偏好始终优先。全窗口渲染采用四百万后备位图像素预算，显示密度上限为 2，绘制速率不超过每秒 30 帧。没有 canvas 后端或有效显示尺寸时使用静态 SVG。
+
+本地化的构建、探索和审查入口仅填入空草稿，不提交轮次，也不替换已有草稿。价格提示使用常亮状态指示灯。
+
 Session 首次绑定或缓存的 Session 成为 current 时，shell 会在渲染前读取持久化 View 偏好，激活已注册的偏好 View 或 Chat fallback，并在后续 tab 或 focus 选择写入 store 前先激活对应 target。blank Session 仍不渲染 `conversation.view` slot；未选中的 target 不会激活。
 
 常驻 composer 在无 Session 与有 Session 之间保持挂载。无 Session 时，同一个编辑器表面保持 inert，Workspace picker 连接 blank Session。该表面是 shell 所有的 Lexical 编辑器：引用 chip 是携带 owner 序列化身份的原子 decorator 节点（提交时经 owner codec 展开），已认领的 slash command 保持为带样式的行首文本，文件夹文本引用以图标前缀携带文件夹图形，草稿的剪贴板投影镜像到逐 Session Conversation store。Queue 操作通过 scoped `ctx.conversation` service 寻址准确的 queue occurrence；queue 预览经 `ui-primitives` 的共享行内引用投影渲染已发送文本（wire 会话形式折叠为其标签），并把本地图片预览或持久化图片部分显示为缩略图，编辑态则展示字面发送文本。持久化缩略图通过会话图片 URL 缓存解析。繁忙时 Enter 行为保存在 Host-backed `ui-conversation` settings namespace。

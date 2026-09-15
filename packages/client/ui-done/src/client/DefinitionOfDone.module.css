@@ -9,9 +9,9 @@
    fixed 36px band present in every state, so a path arriving mid-turn moves
    nothing either; only the reader's own toggle grows the card.
 
-   Gold is the only saturated accent and it is spent on exactly two marks — the
-   ring and the status chip — because those two carry the doctrine. Everything
-   else is the quiet surface, hairline, and label ladder the neighbours use. */
+   The ring and status chip use the monochrome accent. Their hollow and filled
+   states distinguish intent from proof; the surrounding rows use the shared
+   surface, border, and label tokens. */
 
 .dock {
   box-sizing: border-box;
@@ -59,28 +59,28 @@
   box-sizing: border-box;
   width: 12px;
   height: 12px;
-  border: 1.5px solid var(--dsw-static-amber-500, #dda43a);
+  border: 1.5px solid var(--saturn-accent, #f5f5f5);
   border-radius: 50%;
-  color: var(--dsw-static-neutral-bluish-1000, #07070a);
+  corner-shape: round;
+  color: #000;
   transition: background-color 160ms ease;
 }
 
 .marker[data-status='proven'] {
-  background: var(--dsw-static-amber-500, #dda43a);
+  background: var(--saturn-accent, #f5f5f5);
 }
 
-/* The status word, not only the colour: STATED and PROVEN are the doctrine's
-   own verbs. Proven is the filled chip — the gold has to be earned. */
+/* STATED and PROVEN label the status explicitly; only proof fills the chip. */
 .chip {
   display: inline-flex;
   align-items: center;
   flex: none;
   height: 18px;
   padding: 0 7px;
-  border: 1px solid color-mix(in oklab, var(--dsw-static-amber-500, #dda43a) 45%, transparent);
+  border: 1px solid color-mix(in oklab, var(--saturn-accent, #f5f5f5) 45%, transparent);
   border-radius: 999px;
   corner-shape: round;
-  color: var(--dsw-static-amber-500, #dda43a);
+  color: var(--saturn-accent, #f5f5f5);
   font: var(--dsw-font-xxxs-strong-11);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -89,8 +89,8 @@
 }
 
 .chip[data-status='proven'] {
-  background: var(--dsw-static-amber-500, #dda43a);
-  color: var(--dsw-static-neutral-bluish-1000, #07070a);
+  background: var(--saturn-accent, #f5f5f5);
+  color: #000;
 }
 
 /* Reserved for two 13/20 lines and centred, so a one-line contract sits in the
@@ -108,8 +108,7 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* The separator is the gold again: it marks where the contract stops and the
-   evidence that met it begins. */
+/* The accented separator divides the statement from its supporting evidence. */
 .evidence {
   color: var(--dsw-alias-label-primary-dimmed);
 }
@@ -117,7 +116,7 @@
 .evidence::before {
   content: '·';
   margin: 0 8px;
-  color: var(--dsw-static-amber-500, #dda43a);
+  color: var(--saturn-accent, #f5f5f5);
 }
 
 .error {
@@ -132,7 +131,7 @@
 
 /* ---- Inline editor (statement or evidence) ---- */
 
-/* No `outline: none`: the skin draws the gold focus ring globally and this
+/* No `outline: none`: the skin draws the focus ring globally and this
    field must keep it. Only the offset is pulled in, so the ring fits the bar. */
 .input {
   flex: 1;

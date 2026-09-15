@@ -1,29 +1,49 @@
-- button "Agent Team" [expanded]:
-  - img
-  - text: Agent Team
 - dialog "Agent Team":
-  - strong: Agent Team
+  - text: SATURNAI / TEAM
+  - heading "Mission control" [level=2]
+  - paragraph: See who is doing what, and what needs to happen next.
   - button "Refresh Team":
     - img
   - button "Close":
     - img
-  - heading "Members" [level=3]
-  - 'button "lead Idle · Model: deepseek-v4-flash" [disabled]'
-  - heading "Shared tasks" [level=3]
-  - button "New task":
-    - img
-    - text: New task
-  - article:
-    - strong: Browser task
-    - text: Pending
-    - paragraph: Created through the assembled browser
-    - text: "task-1 Ready Write scopes: src/web Owner"
-    - combobox "Owner":
-      - option "Unowned" [selected]
-      - option "lead"
-    - button "Edit":
+  - region "Members":
+    - heading "Members" [level=3]
+    - text: "1"
+    - paragraph: Numbers show open tasks. Dashed links show dependencies between teammates.
+    - paragraph: Delegated teammates appear here when your work calls for them.
+    - 'button "lead Lead Idle · Model: deepseek-v4-flash" [disabled]':
+      - text: lead
+      - emphasis: Lead
+      - text: "Idle · Model: deepseek-v4-flash"
+  - region "Shared tasks":
+    - strong: "0"
+    - text: Agents working
+    - strong: 0 / 1
+    - text: Tasks completed
+    - strong: "0"
+    - text: Tasks need attention
+    - progressbar "Completed shared tasks"
+    - heading "Shared tasks" [level=3]
+    - button "New task":
       - img
-      - text: Edit
-    - button "Delete":
-      - img
-      - text: Delete
+      - text: New task
+    - group "Filter shared tasks":
+      - button "All tasks 1" [pressed]
+      - button "Open 1"
+      - button "Attention 0"
+      - button "Finished 0"
+    - article:
+      - strong: Browser task
+      - text: Pending
+      - paragraph: Created through the assembled browser
+      - text: "task-1 Ready Write scopes: src/web Owner"
+      - combobox "Owner":
+        - option "Unowned" [selected]
+        - option "lead"
+      - button "Edit":
+        - img
+        - text: Edit
+      - button "Delete":
+        - img
+        - text: Delete
+  - text: Updates with team activity. Refresh to check the latest tasks.

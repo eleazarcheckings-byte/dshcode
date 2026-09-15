@@ -6,9 +6,8 @@
    marks where the contract stops and the receipt begins. It is drawn in both
    states, so disclosing the panel moves no pixel of the card above it.
 
-   Gold stays spent on the two marks that carry the doctrine (the ring and the
-   status chip) one row up; the verdict here is a quiet stamp whose meaning is
-   in its word — PROVEN or NOT_ASSESSED — never in its colour. */
+   The ring and status chip one row up retain the strongest contrast. This
+   row labels its verdict explicitly: PROVEN or NOT_ASSESSED. */
 
 .receipt {
   /* Direct child of the card, so the hairline runs border to border and the
@@ -36,7 +35,7 @@
   cursor: pointer;
 }
 
-/* The skin draws the gold focus ring globally and this row keeps it; only the
+/* The skin draws the focus ring globally and this row keeps it; only the
    offset is pulled in, so the ring fits inside the card's hairline. */
 .header:focus-visible {
   outline-offset: -2px;
@@ -75,7 +74,7 @@
   flex: none;
   height: 18px;
   padding: 0 7px;
-  border: 1px solid var(--dsw-alias-border-l4);
+  border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: 999px;
   corner-shape: round;
   color: var(--dsw-alias-label-tertiary);

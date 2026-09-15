@@ -3652,4 +3652,3 @@ export interface Config {
 - `@deepseek-ai/dsh-util-workspace-path`（[`packages/util/workspace-path/src/index.ts`](../packages/util/workspace-path/src/index.ts)）
 - `@deepseek-ai/dsh-win32-process`（[`packages/subprocess/win32-process/src/index.ts`](../packages/subprocess/win32-process/src/index.ts)）
 - `@saturnai/dsh-agent-team-profile`（[`packages/bundle/agent-team-profile/src/index.ts`](../packages/bundle/agent-team-profile/src/index.ts)）
-- `@saturnai/dsh-agent-team-web-profile`（[`packages/bundle/agent-team-web-profile/src/index.ts`](../packages/bundle/agent-team-web-profile/src/index.ts)）

@@ -24,8 +24,10 @@ import { en, zh } from '../src/client/locales.ts'
 import { ConversationRoot } from '../src/client/skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 import { conversationPhase } from '../src/client/contract/snapshot.ts'
-import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
+import { HeroShell, HeroStarters } from '../src/client/skeleton/EmptyHero.tsx'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
+import { AmbientMotionControl } from '../src/client/skeleton/AmbientSky.tsx'
+import { createAmbientMotion } from '../src/client/skeleton/ambient-motion.ts'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import type {
@@ -313,11 +315,44 @@ function mount(
 }
 
 describe('Hero chrome', () => {
+  it('persists the ambient motion preference without touching the composer', () => {
+    const controlProps = () => {
+      const preference = createAmbientMotion()
+      return {
+        t: makeTranslate(en, commonEn),
+        useAmbientMotion: bindSnapshotSelector(preference.hooks.ambientMotion),
+        setAmbientMotion: preference.setAmbientMotion,
+      }
+    }
+    const view = render(<AmbientMotionControl {...controlProps()} />)
+    const motion = view.getByRole('button', { name: 'Ambient motion preference' })
+    expect(motion.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(motion)
+    expect(motion.getAttribute('aria-pressed')).toBe('false')
+    view.unmount()
+    expect(localStorage.getItem('saturn.hero.motion.v1')).toBe('off')
+    const restored = render(<AmbientMotionControl {...controlProps()} />)
+    expect(restored.getByRole('button', { name: 'Ambient motion preference' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('offers localized draft starters and makes them unavailable while a draft exists', () => {
+    const onChoose = vi.fn()
+    const view = render(<HeroStarters t={makeTranslate(en, commonEn)} hidden={false} onChoose={onChoose} />)
+    fireEvent.click(view.getByRole('button', { name: /Explore the codebase/ }))
+    expect(onChoose).toHaveBeenCalledWith(en['hero.starter.explore.prompt'])
+    view.rerender(<HeroStarters t={makeTranslate(en, commonEn)} hidden onChoose={onChoose} />)
+    expect(view.queryByRole('button')).toBeNull()
+    expect([...view.container.querySelectorAll('button')].every(button => button.disabled)).toBe(true)
+  })
+
   it('renders the English preview badge through the hero locale seat', () => {
     const renderSlot = vi.fn<HeroShellProps['renderSlot']>(() => null)
     const view = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={renderSlot} />)
     expect(view.getByText('Build something extraordinary.')).toBeTruthy()
     expect(view.getByText('Saturn')).toBeTruthy()
+    expect(view.container.querySelector('[data-saturn-anchor]')).not.toBeNull()
+    expect(view.container.querySelector('canvas')).toBeNull()
+    expect(view.queryByRole('button', { name: 'Ambient motion preference' })).toBeNull()
     expect(renderSlot).toHaveBeenCalledOnce()
     expect(renderSlot.mock.calls[0]?.[0]).toBe('conversation.hero.brand.mark')
     const brandMarkOwner = renderSlot.mock.calls[0]?.[1]

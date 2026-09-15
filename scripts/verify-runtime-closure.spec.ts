@@ -36,6 +36,29 @@ afterEach(() => {
 })
 
 describe('verifyRuntimeClosure', () => {
+  it('traverses an app dependency into its bundled plugins before accepting a desktop release', async () => {
+    const root = fixture({
+      'apps/desktop/package.json': { name: 'desktop', dependencies: { '@scope/cli': 'workspace:^' } },
+      'apps/cli/package.json': { name: '@scope/cli', dependencies: { '@scope/bundle': 'workspace:^' } },
+      'python/sdk-runtime/platforms.json': platforms,
+      'packages/preset/agent-presets/presets/minimal/agent.cordis.yml': '[]\n',
+    })
+    workspace(root, '@scope/bundle', { dependencies: { '@scope/plugin': 'workspace:^' } })
+    workspace(root, '@scope/plugin', { peerDependencies: { '@scope/service': 'workspace:^' } })
+    workspace(root, '@scope/service', {})
+
+    const missing = await verifyRuntimeClosure(root, 'apps/desktop/package.json')
+    expect(missing.workspacePackageCount).toBe(3)
+    expect(missing.failures).toEqual(['desktop -> @scope/cli -> @scope/bundle -> @scope/plugin -> @scope/service'])
+
+    writeFileSync(join(root, 'apps/desktop/package.json'), JSON.stringify({
+      name: 'desktop', dependencies: { '@scope/cli': 'workspace:^', '@scope/service': 'workspace:^' },
+    }))
+    const closed = await verifyRuntimeClosure(root, 'apps/desktop/package.json')
+    expect(closed.workspacePackageCount).toBe(4)
+    expect(closed.failures).toEqual([])
+  })
+
   it('requires only plugins active for each published target', async () => {
     const root = fixture({
       'python/sdk-runtime/package.json': { name: 'runtime', dependencies: { '@scope/shared': 'workspace:^' } },

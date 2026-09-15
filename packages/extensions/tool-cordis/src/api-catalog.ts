@@ -1343,6 +1343,79 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'saturnbot',
+    summary: 'Persistent scheduled automation with one engine and one authenticated RPC namespace per host.',
+    description: 'Persistent scheduled automation with one engine and one authenticated RPC namespace per host.',
+    methods: [
+      {
+        signature: '@Remote async snapshot(): Promise<BotSnapshot>',
+        description: 'Read current configuration, cycles, approvals, messages, and reports.',
+        parameters: [],
+        returns: 'The authoritative bounded dashboard projection.',
+      },
+      {
+        signature: '@Remote async configure(patch: Partial<BotConfig>): Promise<BotSnapshot>',
+        description: 'Persist validated settings; changes never bypass role ceilings or existing approvals.',
+        parameters: [{ name: 'patch', description: 'User-selected configuration changes.' }],
+        returns: 'The saved configuration and current dashboard state.',
+      },
+      {
+        signature: '@Remote async runNow(): Promise<BotSnapshot>',
+        description: 'Start one background cycle; returns as soon as its durable ownership is established.',
+        parameters: [],
+        returns: 'The durably accepted running cycle.',
+      },
+      {
+        signature: '@Remote async pause(): Promise<BotSnapshot>',
+        description: 'Pause future scheduled cycles without discarding active work.',
+        parameters: [],
+        returns: 'The current state with automatic scheduling disabled.',
+      },
+      {
+        signature: '@Remote async cancel(): Promise<BotSnapshot>',
+        description: 'Cancel the current cycle and wait for its owned work to settle.',
+        parameters: [],
+        returns: 'The settled state after cancellation.',
+      },
+      {
+        signature: '@Remote async approve(id: BotId, allowed: boolean): Promise<BotSnapshot>',
+        description: 'Decide one exact pending action; duplicate or stale approvals are rejected.',
+        parameters: [{ name: 'id', description: 'Exact pending approval identity.' }, { name: 'allowed', description: 'Whether the operator authorizes the recorded action.' }],
+        returns: 'The saved decision and resumed or interrupted branch state.',
+      },
+      {
+        signature: '@Remote async message(role: BotRole, content: string): Promise<BotSnapshot>',
+        description: 'Send a persisted instruction to the selected role without changing the standing business goal.',
+        parameters: [{ name: 'role', description: 'The selected specialist or orchestrator.' }, { name: 'content', description: 'The operator\'s instruction, limited to 8000 characters.' }],
+        returns: 'The accepted message and newly started cycle.',
+      },
+      {
+        signature: '@Remote async events(cursor: number): Promise<BotEventPage>',
+        description: 'Read one bounded trace page after the supplied durable sequence number.',
+        parameters: [{ name: 'cursor', description: 'Last event sequence already received, or zero for the start.' }],
+        returns: 'The next bounded page of observable events.',
+      },
+      {
+        signature: '@Remote async memory(query: string): Promise<BotMemoryRecord[]>',
+        description: 'Read durable long-term memory without triggering a model or tool invocation.',
+        parameters: [{ name: 'query', description: 'Literal substring to match against keys and values.' }],
+        returns: 'At most 100 matching memory records, newest first.',
+      },
+      {
+        signature: '@Remote async webhooks(): Promise<BotWebhookRecord[]>',
+        description: 'Read the latest authenticated delivery receipts.',
+        parameters: [],
+        returns: 'At most 50 signed webhook receipts, newest first.',
+      },
+      {
+        signature: '@Remote async tickets(): Promise<BotTicketRecord[]>',
+        description: 'Read the open support tickets owned by this SaturnBot instance.',
+        parameters: [],
+        returns: 'At most 20 open tickets, newest first.',
+      },
+    ],
+  },
+  {
     key: 'sessionController',
     summary: 'Host service backing the generated `ctx.remote.session` namespace.',
     description: 'Host service backing the generated `ctx.remote.session` namespace.',
@@ -2047,6 +2120,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'agentPreset', description: 'preset id resolved against Host-owned roots.' }, { name: 'signal', description: 'caller lifetime; abort terminates the native command.' }],
         returns: 'an opened confirmation or the resolved directory for text display.',
         throws: ['RemoteError when the preset is missing, read-only, invalid, or cannot be opened.'],
+      },
+      {
+        signature: '@Remote(\'writeProfileMemory\') async writeProfileMemory(facts: ProfileMemoryFacts): Promise<ProfileMemoryWriteValue>',
+        description: 'Remember the setup profile as agent memory in the user-global instruction file, which is what the model actually reads. A Host path on purpose: the browser never writes a file, and the block is delimited so replaying setup replaces it instead of appending a second copy. Nothing secret is rendered.',
+        parameters: [{ name: 'facts', description: 'identity and voice preferences the user chose.' }],
+        returns: 'the memory file that now holds the block.',
+        throws: ['RemoteError when the request is malformed, the deployment keeps no local document to sit beside, or the file cannot be written.'],
       },
     ],
   },
@@ -3687,6 +3767,86 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type BorrowedSessionSource = Disposable & ({\n    readonly source: \'prepared\';\n    readonly inspection: SessionInspection;\n    readonly revision: SessionPersistenceRevision;\n    readonly preparedSession: Session;\n} | {\n    readonly source: \'live\';\n    readonly inspection: SessionInspection;\n});',
   },
   {
+    name: 'BotAlert',
+    declaration: 'export interface BotAlert {\n    id: BotId;\n    cycleId: BotId | null;\n    branchId: BotId | null;\n    message: string;\n    createdAt: string;\n}',
+  },
+  {
+    name: 'BotApproval',
+    declaration: 'export interface BotApproval {\n    id: BotId;\n    cycleId: BotId;\n    branchId: BotId;\n    actionIndex: number;\n    tool: string;\n    input: Record<string, BotJson>;\n    stage: BotStage | null;\n    status: \'pending\' | \'approved\' | \'rejected\' | \'consumed\' | \'interrupted\';\n    createdAt: string;\n    decidedAt: string | null;\n}',
+  },
+  {
+    name: 'BotBranch',
+    declaration: 'export interface BotBranch {\n    id: BotId;\n    task: BotTask;\n    status: \'planning\' | \'running\' | \'awaiting-approval\' | \'completed\' | \'failed\' | \'interrupted\';\n    summary: string;\n    actions: ToolProposal[];\n    nextAction: number;\n    continue: boolean;\n    rounds: number;\n    stage: BotStage | null;\n    validatedRevision: string | null;\n    error: string | null;\n}',
+  },
+  {
+    name: 'BotConfig',
+    declaration: 'export interface BotConfig {\n    version: 1;\n    enabled: boolean;\n    goal: string;\n    workspace: string;\n    intervalMinutes: number;\n    provider: string;\n    model: string;\n    maxTasks: number;\n    maxActionsPerTask: number;\n    toolTimeoutMs: number;\n    modelTimeoutMs: number;\n    maxInputBytes: number;\n    maxOutputTokens: number;\n    requirePrApproval: boolean;\n    autoDispatchEmail: boolean;\n    requireDeployApproval: boolean;\n    requireWriteApproval: boolean;\n    allowedTools: string[];\n    roles: Record<BotRole, {\n        enabled: boolean;\n        instructions: string;\n        tools: string[];\n    }>;\n    validationCommands: string[][];\n    integrations: Record<string, {\n        endpoint?: string;\n        credentialEnv?: string;\n        resource?: string;\n    }>;\n    reportChannel: string;\n}',
+  },
+  {
+    name: 'BotCycle',
+    declaration: 'export interface BotCycle {\n    id: BotId;\n    startedAt: string;\n    finishedAt: string | null;\n    status: \'running\' | \'awaiting-approval\' | \'completed\' | \'failed\' | \'interrupted\';\n    plan: string;\n    branches: BotBranch[];\n}',
+  },
+  {
+    name: 'BotEvent',
+    declaration: 'export type BotEvent = BotEventData & {\n    version: 1;\n    seq: number;\n    at: string;\n};',
+  },
+  {
+    name: 'BotEventData',
+    declaration: 'export type BotEventData = {\n    type: \'configured\';\n    config: BotConfig;\n} | {\n    type: \'cycle\';\n    cycle: BotCycle;\n} | {\n    type: \'approval\';\n    approval: BotApproval;\n} | {\n    type: \'trace\';\n    trace: BotTrace;\n} | {\n    type: \'alert\';\n    alert: BotAlert;\n} | {\n    type: \'report\';\n    report: BotReport;\n} | {\n    type: \'message\';\n    message: BotMessage;\n};',
+  },
+  {
+    name: 'BotEventPage',
+    declaration: 'export interface BotEventPage {\n    events: BotEvent[];\n    cursor: number;\n    hasMore: boolean;\n}',
+  },
+  {
+    name: 'BotId',
+    declaration: 'export type BotId = Branded<\'SaturnBotId\'>;',
+  },
+  {
+    name: 'BotJson',
+    declaration: 'export type BotJson = null | boolean | number | string | BotJson[] | {\n    [key: string]: BotJson;\n};',
+  },
+  {
+    name: 'BotMemoryRecord',
+    declaration: 'export interface BotMemoryRecord {\n    key: string;\n    value: string;\n    updatedAt: string;\n}',
+  },
+  {
+    name: 'BotMessage',
+    declaration: 'export interface BotMessage {\n    id: BotId;\n    role: BotRole;\n    sender: \'user\' | \'agent\' | \'system\';\n    content: string;\n    at: string;\n    cycleId: BotId | null;\n}',
+  },
+  {
+    name: 'BotReport',
+    declaration: 'export interface BotReport {\n    id: BotId;\n    cycleId: BotId;\n    date: string;\n    title: string;\n    markdown: string;\n    channel: string;\n}',
+  },
+  {
+    name: 'BotRole',
+    declaration: 'export type BotRole = \'orchestrator\' | \'developer\' | \'growth\' | \'operations\' | \'finance\';',
+  },
+  {
+    name: 'BotSnapshot',
+    declaration: 'export interface BotSnapshot {\n    config: BotConfig;\n    status: \'needs-setup\' | \'disabled\' | \'idle\' | \'running\' | \'awaiting-approval\';\n    activeCycle: BotCycle | null;\n    cycles: BotCycle[];\n    approvals: BotApproval[];\n    reports: BotReport[];\n    alerts: BotAlert[];\n    cursor: number;\n    nextRunAt: string | null;\n    tools: {\n        name: string;\n        description: string;\n        roles: BotRole[];\n        effect: string;\n        enabled: boolean;\n    }[];\n    connections: {\n        id: string;\n        status: \'configured\' | \'unconfigured\';\n        detail: string;\n    }[];\n    messages: BotMessage[];\n}',
+  },
+  {
+    name: 'BotStage',
+    declaration: 'export interface BotStage {\n    path: string;\n    revision: string;\n}',
+  },
+  {
+    name: 'BotTask',
+    declaration: 'export interface BotTask {\n    id: BotId;\n    role: Exclude<BotRole, \'orchestrator\'>;\n    title: string;\n    instruction: string;\n}',
+  },
+  {
+    name: 'BotTicketRecord',
+    declaration: 'export interface BotTicketRecord {\n    id: string;\n    subject: string;\n    body: string;\n    status: \'open\' | \'pending\' | \'closed\';\n    updatedAt: string;\n}',
+  },
+  {
+    name: 'BotTrace',
+    declaration: 'export interface BotTrace {\n    cycleId: BotId;\n    branchId: BotId | null;\n    kind: \'plan\' | \'proposal\' | \'tool-start\' | \'tool-result\' | \'tool-error\' | \'decision\';\n    tool?: string;\n    attempt?: number;\n    summary: string;\n    data?: BotJson;\n}',
+  },
+  {
+    name: 'BotWebhookRecord',
+    declaration: 'export interface BotWebhookRecord {\n    deliveryId: string;\n    source: string;\n    payload: BotJson;\n    receivedAt: string;\n}',
+  },
+  {
     name: 'Branded',
     declaration: 'export type Branded<B extends string> = string & {\n    readonly [BRAND]: B;\n};',
   },
@@ -4673,6 +4833,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PreToolDecision',
     declaration: 'export type PreToolDecision = {\n    kind: \'allow\';\n} | {\n    kind: \'deny\';\n    reason: string;\n} | {\n    kind: \'ask\';\n    reason?: string;\n};',
+  },
+  {
+    name: 'ProfileMemoryFacts',
+    declaration: 'export interface ProfileMemoryFacts {\n    readonly name: string;\n    readonly building: string;\n    readonly language: string;\n    readonly tone: string;\n    readonly consultDesignBrain: boolean;\n}',
+  },
+  {
+    name: 'ProfileMemoryWriteValue',
+    declaration: 'export interface ProfileMemoryWriteValue {\n    readonly path: string;\n}',
   },
   {
     name: 'ProjectionChangeListener',
@@ -5917,6 +6085,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ToolPresentationMode',
     declaration: 'export type ToolPresentationMode = \'native\' | \'ptc\' | \'both\';',
+  },
+  {
+    name: 'ToolProposal',
+    declaration: 'export interface ToolProposal {\n    tool: string;\n    input: Record<string, BotJson>;\n}',
   },
   {
     name: 'ToolProviderResult',

@@ -53,9 +53,12 @@ describe('theme bootstrap row', () => {
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(dark)
   })
 
-  it('defaults to system and falls back to light when matchMedia is unavailable', () => {
+  it('defaults to dark and keeps an explicit system fallback when matchMedia is unavailable', () => {
     vi.stubGlobal('matchMedia', undefined)
     executeBootstrap()
+    expect(document.documentElement.style.colorScheme).toBe('dark')
+    expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(true)
+    executeBootstrap('system')
     expect(document.documentElement.style.colorScheme).toBe('light')
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(false)
   })

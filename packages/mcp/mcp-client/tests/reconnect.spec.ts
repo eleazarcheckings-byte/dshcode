@@ -58,7 +58,7 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
 
 // vi.mock is hoisted above static imports, so the modules under test see the
 // mocked SDK even through a static import.
-import { apply } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
+import { apply, isServerConnected } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
 import { RECONNECT_DEFAULTS, resolveReconnectPolicy, startConnection } from '@deepseek-ai/dsh-mcp-client/src/connection.ts'
 
 // ---- Helpers ----
@@ -142,15 +142,18 @@ describe('reconnect supervisor', () => {
     await apply(ctx, stdioConfig({ initialDelayMs: 5, maxDelayMs: 40, maxAttempts: 5 }))
     await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
     expect(instances).toHaveLength(1)
+    expect(isServerConnected(ctx, 'srv')).toBe(true)
 
     // The recovered server advertises a different list: the swap must neither
     // duplicate nor leak the pre-crash generation.
     mockListTools.mockResolvedValue(listing('revived'))
     instances[0]!.onclose?.()
+    expect(isServerConnected(ctx, 'srv')).toBe(false)
 
     await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__revived')).toBeDefined() })
     expect(ctx.tools.get('mcp__srv__remote')).toBeUndefined()
     expect(instances).toHaveLength(2)
+    expect(isServerConnected(ctx, 'srv')).toBe(true)
     expect(mockConnect).toHaveBeenCalledTimes(2)
 
     // Post-recovery calls execute through the re-registered definition.

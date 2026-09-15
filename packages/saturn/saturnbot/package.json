@@ -1,0 +1,49 @@
+{
+  "name": "@saturnai/dsh-saturnbot",
+  "version": "0.1.0",
+  "description": "Persistent role-bound SaturnBot execution cycles, approvals, and typed business tools",
+  "type": "module",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
+    "./client": { "types": "./lib/types/client.d.ts", "default": "./lib/types/client.js" },
+    "./types": { "types": "./lib/types/types.d.ts", "default": "./lib/types/types.js" },
+    "./typert": { "types": "./lib/typert.host.d.ts", "default": "./lib/typert.host.js" },
+    "./remote": { "types": "./lib/typert.remote-client.d.ts", "default": "./lib/typert.remote-client.js" },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": ["lib/index.js", "lib/types/**/*.js", "lib/types/**/*.d.ts", "lib/typert.host.js", "lib/typert.host.d.ts", "lib/typert.remote-client.js", "lib/typert.remote-client.d.ts", "config.example.yaml", "README.md", "README.zh.md", "ADAPTERS.md", "ADAPTERS.zh.md"],
+  "dependencies": {
+    "@deepseek-ai/dsh-brand": "workspace:^",
+    "@deepseek-ai/dsh-atomic-write": "workspace:^",
+    "@deepseek-ai/dsh-home-paths": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:^",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-llm": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^",
+    "@deepseek-ai/dsh-session-persistence": "workspace:^",
+    "@deepseek-ai/dsh-subprocess": "workspace:^",
+    "@deepseek-ai/dsh-host-webserver": "workspace:^",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
+    "@deepseek-ai/cordis-plugin-include": "workspace:^",
+    "@deepseek-ai/dsh-llm": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^",
+    "@deepseek-ai/dsh-session-persistence": "workspace:^",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:^",
+    "@deepseek-ai/dsh-subprocess": "workspace:^",
+    "@deepseek-ai/dsh-subprocess-local": "workspace:^",
+    "@deepseek-ai/dsh-host-webserver": "workspace:^",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
+  }
+}

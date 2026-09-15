@@ -11,6 +11,8 @@ import {
   desktopWebArguments,
   ensureMainModuleArgument,
   navigationDisposition,
+  isSaturnBotWindowUrl,
+  restoreSaturnBotWindow,
   trayIconFile,
   windowCloseDisposition,
 } from '../src/lifecycle.ts'
@@ -41,11 +43,41 @@ describe('desktop navigation policy', () => {
     expect(navigationDisposition(`${origin}/settings`, origin)).toBe('application')
   })
 
+  it('opens only the explicit SaturnBot route as a second native window', () => {
+    expect(isSaturnBotWindowUrl(`${origin}/?saturnbot=1`, origin)).toBe(true)
+    for (const url of [
+      `${origin}/`, `${origin}/settings?saturnbot=1`, `${origin}/?saturnbot=0`,
+      `${origin}/?saturnbot=1&token=secret`, `${origin}/?saturnbot=1&saturnbot=1`,
+      `${origin}/?saturnbot=1#other`, 'https://example.com/?saturnbot=1', 'not a url',
+    ]) expect(isSaturnBotWindowUrl(url, origin)).toBe(false)
+  })
+
   it('opens only HTTPS destinations externally', () => {
     expect(navigationDisposition('https://deepseek.com/', origin)).toBe('external')
     expect(navigationDisposition('http://example.com/', origin)).toBe('blocked')
     expect(navigationDisposition('file:///tmp/secret', origin)).toBe('blocked')
     expect(navigationDisposition('not a url', origin)).toBe('blocked')
+  })
+})
+
+describe('SaturnBot restoration', () => {
+  it('restores a retained minimized popup before showing and focusing it', () => {
+    const calls: string[] = []
+    const popup = {
+      isDestroyed: () => false, isMinimized: () => true,
+      restore: () => { calls.push('restore') }, show: () => { calls.push('show') }, focus: () => { calls.push('focus') },
+    }
+    expect(restoreSaturnBotWindow(popup)).toBe(true)
+    expect(calls).toEqual(['restore', 'show', 'focus'])
+    popup.isMinimized = () => false
+    calls.length = 0
+    expect(restoreSaturnBotWindow(popup)).toBe(true)
+    expect(calls).toEqual(['show', 'focus'])
+    popup.isDestroyed = () => true
+    calls.length = 0
+    expect(restoreSaturnBotWindow(popup)).toBe(false)
+    expect(restoreSaturnBotWindow(undefined)).toBe(false)
+    expect(calls).toEqual([])
   })
 })
 

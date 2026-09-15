@@ -97,6 +97,6 @@ describe('Saturn Premium palette polarity', () => {
     expect(contrast(value('neutral-bluish', 50), base), 'primary label').toBeGreaterThanOrEqual(4.5)
     expect(contrast(value('neutral-bluish', 300), base), 'secondary label').toBeGreaterThanOrEqual(4.5)
     expect(contrast(value('neutral-bluish', 600), base), 'caption').toBeGreaterThanOrEqual(4.5)
-    expect(contrast(value('amber', 500), base), 'Saturn gold').toBeGreaterThanOrEqual(4.5)
+    expect(contrast(value('amber', 500), base), 'warning label').toBeGreaterThanOrEqual(4.5)
   })
 })

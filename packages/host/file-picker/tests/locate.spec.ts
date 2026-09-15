@@ -1,10 +1,16 @@
 /** Basename-location walk behavior: exact matches, exclusions, tiers, bounds, and abort. */
 
-import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import * as fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_LOCATE_EXCLUDED_DIRECTORIES, locateByName, validateLocateOptions } from '../src/locate.ts'
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...actual, readdir: vi.fn(actual.readdir) }
+})
 
 async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-file-picker-'))
@@ -99,15 +105,22 @@ describe('locateByName', () => {
 
   it('skips an unreadable directory and keeps matching elsewhere', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-file-picker-locked-'))
-    await mkdir(join(root, 'locked'))
-    await writeFile(join(root, 'locked', 'report.txt'), 'locked')
-    await writeFile(join(root, 'ok.txt'), 'ok')
-    await chmod(join(root, 'locked'), 0o000)
+    const locked = join(root, 'locked')
+    await mkdir(locked)
+    await writeFile(join(locked, 'report.txt'), 'locked')
+    await writeFile(join(root, 'report.txt'), 'readable')
+    const originalReaddir = (await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')).readdir
+    // POSIX mode bits do not make directories unreadable on Windows or for root.
+    const readdir = vi.mocked(fs.readdir).mockImplementation((path, options) => {
+      if (path === locked) return Promise.reject(Object.assign(new Error('permission denied'), { code: 'EACCES' }))
+      return originalReaddir(path, options)
+    })
     try {
       const hits = await locateByName(root, 'report.txt')
-      expect(hits).toEqual([])
+      expect(hits).toEqual([join(root, 'report.txt')])
+      expect(readdir).toHaveBeenCalledWith(locked, { withFileTypes: true })
     } finally {
-      await chmod(join(root, 'locked'), 0o755)
+      readdir.mockImplementation(originalReaddir)
     }
   })
 })

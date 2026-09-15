@@ -1,13 +1,12 @@
 # @saturnai/dsh-client-ui-brand-saturn
 
 Saturn AI brand occupants for the dsh Web client brand slots. A browser-only
-Cordis client plugin occupying three UI slots:
+Cordis client plugin occupying two UI slots:
 
-- `sidebar.brand.mark` — the gold-ringed Saturn glyph, drawn inline in SVG with
-  `currentColor` so it adapts to the active theme.
+- `sidebar.brand.mark` — the monochrome Saturn glyph, drawn inline in SVG with `currentColor` and the skin's `--saturn-accent` token.
 - `sidebar.brand.name` — the "Saturn AI" text wordmark (no artwork asset).
-- `conversation.hero.brand.mark` — the same glyph as the conversation hero mark,
-  replacing the declaring package's animated fallback.
+
+The conversation hero retains its declaring package's animated mark. The wordmark uses the same accent, with the semantic label color as its fallback.
 
 ## Use
 

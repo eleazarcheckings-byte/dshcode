@@ -19,7 +19,7 @@ import { ZH_BROWSER_LOCALE, saveFailureShot } from './support.ts'
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/onboarding-usable-provider', import.meta.url))
 const DISMISSED_EXPECTED = join(SNAPSHOT_DIR, 'dismissed.expected.md')
 const MODE = webSnapshotMode()
-const CREDENTIAL_STEP = '添加一个 API Key 开始使用'
+const CREDENTIAL_STEP = '选择模型提供方'
 
 describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-run onboarding', () => {
   let scaffold: WebScaffold
@@ -29,6 +29,10 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ deepSeekMissingCredential: true })
+    // This scenario owns the later provider prompt; full First Light is tested separately.
+    await scaffold.ctx.settings.mutate('ui-first-light', [{
+      op: 'set', path: ['complete'], value: '2026-09-14.1',
+    }])
     browser = await chromium.launch()
     // The scenario asserts the shipped Chinese copy, so the browser asks for it.
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: ZH_BROWSER_LOCALE })
@@ -46,15 +50,12 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     onTestFailed(() => saveFailureShot(page, 'web-e2e-onboarding-setup-card-cancel'))
     const credentialStep = page.getByRole('dialog', { name: CREDENTIAL_STEP })
     await credentialStep.waitFor({ timeout: 15_000 })
-    await credentialStep.getByRole('button', { name: '稍后配置' }).click()
+    await credentialStep.getByRole('button', { name: '使用其他提供方' }).click()
     await credentialStep.waitFor({ state: 'detached', timeout: 15_000 })
 
-    await page.getByRole('button', { name: '设置', exact: true }).click()
     const settings = page.getByRole('dialog', { name: '设置' })
     await settings.waitFor({ timeout: 10_000 })
-    // Dismissing the onboarding step leaves Settings closed, so enter the
-    // Models section explicitly before exercising its normal cards.
-    await settings.getByRole('button', { name: '模型' }).click()
+    // Provider choice transfers directly to Models without changing credentials.
     const setupKey = settings.getByRole('textbox', { name: 'API 密钥', exact: true })
     await setupKey.waitFor({ timeout: 10_000 })
 

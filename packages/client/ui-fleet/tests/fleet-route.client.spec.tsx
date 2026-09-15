@@ -72,6 +72,18 @@ function props(input: {
 }
 
 describe('fleet route surface', () => {
+  it('summarizes attention and expands a larger roster without hiding its first routes', () => {
+    const sessions = Array.from({ length: 5 }, (_, index) => summary({ id: `child-${index}` as SessionId, parentId: ROOT, origin: 'subagent', running: true }))
+    render(<FleetRoute {...props({ sessions: [summary({ id: ROOT }), ...sessions], pending: [[sessions[0]!.id, { kind: 'approval' }]] })} />)
+    expect(screen.getByText(zh['summary.attention'].replace('{count}', '1'))).toBeTruthy()
+    expect(screen.getByText(zh['summary.running'].replace('{count}', '4'))).toBeTruthy()
+    expect(screen.getAllByRole('button')).toHaveLength(4)
+    fireEvent.click(screen.getByRole('button', { name: zh.expand.replace('{count}', '2') }))
+    expect(screen.getAllByRole('button')).toHaveLength(6)
+    fireEvent.click(screen.getByRole('button', { name: zh.collapse }))
+    expect(screen.getAllByRole('button')).toHaveLength(4)
+  })
+
   it('reads as designed when nothing is delegated', () => {
     const { container } = render(<FleetRoute {...props({ sessions: [summary({ id: ROOT })] })} />)
     expect(container.querySelector('[data-fleet="empty"]')).not.toBeNull()

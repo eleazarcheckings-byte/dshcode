@@ -29,6 +29,8 @@ import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
 import { ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
 import { InputBar } from './skeleton/InputBar.tsx'
+import { AmbientSky, AmbientMotionControl } from './skeleton/AmbientSky.tsx'
+import { createAmbientMotion } from './skeleton/ambient-motion.ts'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { resolveActiveView } from './view-selection.ts'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
@@ -193,6 +195,19 @@ export function apply(ctx: Context): void {
       }
     },
   })
+
+  const ambientMotion = createAmbientMotion()
+  ctx.slots.inject('shell.background', () => ctx.slots.register({
+    name: 'shell.background',
+    inject: () => ambientMotion,
+  }, AmbientSky))
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'ambient-motion',
+    order: 100,
+    locale: NS,
+    inject: () => ambientMotion,
+  }, AmbientMotionControl))
 
   const registerConversationRoot = () => slots.register({
     name: 'conversation',

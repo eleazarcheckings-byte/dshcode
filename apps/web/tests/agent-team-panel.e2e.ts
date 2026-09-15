@@ -3,10 +3,10 @@
 //
 // The three Team rows (`agent-team`, `tool-agent-team`, `ui-agent-team`) ship
 // once, in `packages/bundle/web-app/cordis.patch.yml` — the single home for a
-// product's feature rows. The base-backed opt-in layers
-// (`@saturnai/dsh-agent-team-profile` / `@saturnai/dsh-agent-team-web-profile`)
-// are therefore NOT stacked here: composing them over the shipped Web bundle
-// would declare those ids a second time, and the Loader rejects a repeated
+// product's feature rows. The base-backed opt-in layer
+// (`@saturnai/dsh-agent-team-profile`) is therefore NOT stacked here: composing
+// it over the shipped Web bundle would declare those ids a second time, and the
+// Loader rejects a repeated
 // explicit id with `TypeError: duplicate loader entry id`, which fails the
 // whole plugin tree.
 import { fileURLToPath } from 'node:url'
@@ -74,6 +74,9 @@ describe('web e2e: Agent Teams panel', () => {
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold()
+    // This scenario starts after setup. Mirror the Client-owned receipt from
+    // ui-settings-models/src/onboarding-copy.ts without importing its browser graph.
+    await scaffold.ctx.settings.mutate('ui-first-light', [{ op: 'set', path: ['complete'], value: '2026-09-14.1' }])
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
@@ -112,18 +115,33 @@ describe('web e2e: Agent Teams panel', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-team-panel'))
     const action = page.locator('[data-team-action]')
     await action.getByRole('button', { name: /Agent Team/iu }).click()
-    await action.getByText('No shared tasks yet').waitFor()
-    await action.getByText('lead').waitFor()
+    const panel = page.getByRole('dialog', { name: 'Agent Team' })
+    await panel.getByRole('heading', { name: 'Mission control' }).waitFor()
+    await panel.getByText('No shared tasks yet').waitFor()
+    await panel.getByRole('button', { name: /^lead/iu }).waitFor()
 
-    await action.getByRole('button', { name: 'New task' }).click()
-    await action.getByPlaceholder('Task subject').fill('Browser task')
-    await action.getByPlaceholder('Task description').fill('Created through the assembled browser')
-    await action.getByPlaceholder(/Write scopes/iu).fill('src/web')
-    await action.getByRole('button', { name: 'Save' }).click()
-    await action.getByText('Browser task').waitFor()
+    await panel.getByRole('button', { name: 'New task' }).click()
+    await panel.getByRole('textbox', { name: 'Task subject', exact: true }).fill('Browser task')
+    await panel.getByRole('textbox', { name: 'Task description', exact: true }).fill('Created through the assembled browser')
+    await panel.getByRole('textbox', { name: /Write scopes/iu }).fill('src/web')
+    await panel.getByRole('button', { name: 'Save' }).click()
+    await panel.getByText('Browser task').waitFor()
+    expect(await panel.getByRole('progressbar', { name: 'Completed shared tasks' }).getAttribute('value')).toBe('0')
+    expect(await panel.getByRole('progressbar', { name: 'Completed shared tasks' }).getAttribute('max')).toBe('1')
 
-    const snapshot = await captureStableAria(page, '[data-team-action]', scaffold.workspaceCwd)
+    await panel.getByRole('button', { name: 'Finished 0' }).click()
+    await panel.getByText('No tasks in this view.').waitFor()
+    expect(await panel.getByText('Browser task').count()).toBe(0)
+    await panel.getByRole('button', { name: 'All tasks 1' }).click()
+    await panel.getByText('Browser task').waitFor()
+
+    const snapshot = await captureStableAria(page, '[role="dialog"][aria-label="Agent Team"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(PANEL_EXPECTED, snapshot, MODE)
+    const screenshot = process.env['DSH_TEAM_SCREENSHOT']
+    if (screenshot !== undefined) await page.screenshot({ path: screenshot, fullPage: true })
+    await page.keyboard.press('Escape')
+    expect(await panel.count()).toBe(0)
+    expect(await action.getByRole('button', { name: /Agent Team/iu }).evaluate(element => element === document.activeElement)).toBe(true)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
   }, 60_000)

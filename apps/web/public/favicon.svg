@@ -1,14 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Saturn AI - application icon, 20 px-and-under optical variant.
+
+  The mark of saturn-mark-small.svg (ring minor axis 12, stroke 6) on a tile
+  scaled up to fill the frame: the master's 6.25% inset costs a whole pixel of
+  a 16 px raster, so the tile grows to 1% inset and the mark to 15.6x (master:
+  12x). Radii, tilt, planet size and the y = 33 split are untouched.
+
+  Used for the 16 and 20 px .ico entries and the 16 px PNG. Nothing at 24 px or
+  above uses it - see saturn-icon.svg.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" role="img" aria-label="Saturn AI">
+  <title>Saturn AI</title>
   <defs>
-    <clipPath id="front">
+    <linearGradient id="saturn-tile-small" x1="98.24" y1="74.24" x2="925.76" y2="949.76" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#141414" />
+      <stop offset="1" stop-color="#0a0a0a" />
+    </linearGradient>
+    <clipPath id="saturn-ring-near-icon-small" clipPathUnits="userSpaceOnUse">
       <rect x="0" y="33" width="64" height="31" />
     </clipPath>
   </defs>
-  <g stroke="#DDA43A" stroke-width="4.5" stroke-linecap="round">
-    <ellipse cx="32" cy="32" rx="27" ry="9.5" transform="rotate(-18 32 32)" />
-  </g>
-  <circle cx="32" cy="32" r="15" fill="#DDA43A" />
-  <g stroke="#DDA43A" stroke-width="4.5" stroke-linecap="round" clip-path="url(#front)">
-    <ellipse cx="32" cy="32" rx="27" ry="9.5" transform="rotate(-18 32 32)" />
+  <rect x="10.24" y="10.24" width="1003.52" height="1003.52" rx="220.16" fill="url(#saturn-tile-small)" />
+  <g transform="translate(512 512) scale(15.6) translate(-32 -32)">
+    <ellipse cx="32" cy="32" rx="27" ry="12" transform="rotate(-18 32 32)" stroke="#F5F5F5" stroke-width="6" />
+    <circle cx="32" cy="32" r="15" fill="#F5F5F5" />
+    <g clip-path="url(#saturn-ring-near-icon-small)">
+      <ellipse cx="32" cy="32" rx="27" ry="12" transform="rotate(-18 32 32)" stroke="#F5F5F5" stroke-width="6" />
+    </g>
   </g>
 </svg>

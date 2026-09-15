@@ -161,9 +161,11 @@
   config:
     - id: tool-subagent-control
       name: '@deepseek-ai/dsh-tool-subagent-control'
+      disabled: !!js ctx.get('agentTeams') !== undefined
 
     - id: tool-subagent-list-agents
       name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+      disabled: !!js ctx.get('agentTeams') !== undefined
 
     - id: tool-subagent
       name: '@deepseek-ai/dsh-tool-subagent'
@@ -171,18 +173,18 @@
         provider: spawn
         toolName: subagent
         modelSelectionSettings: true
-        backgroundMode: continuable
+        backgroundMode: !!js "ctx.get('agentTeams') === undefined ? 'continuable' : 'one-shot'"
 
     # Fork omits model selection so provider/model stay equal to the parent and
     # the inherited history remains eligible for KV Cache reuse. This preset
-    # keeps fork continuable; parent and child inherit the same messaging tool,
+    # keeps fork continuable without Teams; Team-enabled hosts use one-shot jobs,
     # while the parent id and return guidance follow the inherited history.
     - id: tool-subagent-fork
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: fork
         toolName: subagent_fork
-        backgroundMode: continuable
+        backgroundMode: !!js "ctx.get('agentTeams') === undefined ? 'continuable' : 'one-shot'"
 
     # Production dsh does not install these optional providers. Install the
     # matching Bundle in this Profile and restart the Host, then copy this

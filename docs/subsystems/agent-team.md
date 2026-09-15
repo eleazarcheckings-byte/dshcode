@@ -6,6 +6,12 @@ Types shared by the experimental implicit-root Team domain, model tools, and hos
 
 ## Identity and roster
 
+SaturnBot adds a separate role-bound operating team through `ctx.saturnbot`: an orchestrator,
+developer, growth, operations, and finance role. Its [package reference](../../packages/saturn/saturnbot/README.md)
+owns scheduled cycles, isolated Git stages, typed tools, approvals, and the append-only execution journal.
+The top-right SaturnBot launcher opens its management window. The Team types below describe the
+shared interactive coding team; SaturnBot's business-cycle types are owned by its package.
+
 `TeamId` is the root `SessionId` under a distinct [brand](core.md#branded-ids). `TeamTaskId` is Team-local and monotonically allocated as `task-<n>`; `TeamMessageId` is globally random. A teammate's Session id remains its persistent identity, while `name` is an immutable model/UI label.
 
 ```ts type-equiv
@@ -203,4 +209,78 @@ tryMembership(agent: Agent): TeamMembership | undefined
 Types: [Agent](core.md)
 
 Source: [`packages/saturn/agent-team/src/index.ts`](../../packages/saturn/agent-team/src/index.ts)
+
+<a id="ctxsaturnbot--saturnbotservice"></a>
+
+### `ctx.saturnbot` — `SaturnBotService`
+
+Persistent scheduled automation with one engine and one authenticated RPC namespace per host.
+
+```ts cordis-catalog
+/** Read current configuration, cycles, approvals, messages, and reports.
+ * @returns The authoritative bounded dashboard projection.
+ */
+@Remote async snapshot(): Promise<BotSnapshot>
+
+/** Persist validated settings; changes never bypass role ceilings or existing approvals.
+ * @param patch User-selected configuration changes.
+ * @returns The saved configuration and current dashboard state.
+ */
+@Remote async configure(patch: Partial<BotConfig>): Promise<BotSnapshot>
+
+/** Start one background cycle; returns as soon as its durable ownership is established.
+ * @returns The durably accepted running cycle.
+ */
+@Remote async runNow(): Promise<BotSnapshot>
+
+/** Pause future scheduled cycles without discarding active work.
+ * @returns The current state with automatic scheduling disabled.
+ */
+@Remote async pause(): Promise<BotSnapshot>
+
+/** Cancel the current cycle and wait for its owned work to settle.
+ * @returns The settled state after cancellation.
+ */
+@Remote async cancel(): Promise<BotSnapshot>
+
+/** Decide one exact pending action; duplicate or stale approvals are rejected.
+ * @param id Exact pending approval identity.
+ * @param allowed Whether the operator authorizes the recorded action.
+ * @returns The saved decision and resumed or interrupted branch state.
+ */
+@Remote async approve(id: BotId, allowed: boolean): Promise<BotSnapshot>
+
+/** Send a persisted instruction to the selected role without changing the standing business goal.
+ * @param role The selected specialist or orchestrator.
+ * @param content The operator's instruction, limited to 8000 characters.
+ * @returns The accepted message and newly started cycle.
+ */
+@Remote async message(role: BotRole, content: string): Promise<BotSnapshot>
+
+/** Read one bounded trace page after the supplied durable sequence number.
+ * @param cursor Last event sequence already received, or zero for the start.
+ * @returns The next bounded page of observable events.
+ */
+@Remote async events(cursor: number): Promise<BotEventPage>
+
+/** Read durable long-term memory without triggering a model or tool invocation.
+ * @param query Literal substring to match against keys and values.
+ * @returns At most 100 matching memory records, newest first.
+ */
+@Remote async memory(query: string): Promise<BotMemoryRecord[]>
+
+/** Read the latest authenticated delivery receipts.
+ * @returns At most 50 signed webhook receipts, newest first.
+ */
+@Remote async webhooks(): Promise<BotWebhookRecord[]>
+
+/** Read the open support tickets owned by this SaturnBot instance.
+ * @returns At most 20 open tickets, newest first.
+ */
+@Remote async tickets(): Promise<BotTicketRecord[]>
+```
+
+Types: [BotConfig](../../packages/saturn/saturnbot/README.md) · [BotEventPage](../../packages/saturn/saturnbot/README.md) · [BotId](../../packages/saturn/saturnbot/README.md) · [BotMemoryRecord](../../packages/saturn/saturnbot/README.md) · [BotRole](../../packages/saturn/saturnbot/README.md) · [BotSnapshot](../../packages/saturn/saturnbot/README.md) · [BotTicketRecord](../../packages/saturn/saturnbot/README.md) · [BotWebhookRecord](../../packages/saturn/saturnbot/README.md)
+
+Source: [`packages/saturn/saturnbot/src/index.ts`](../../packages/saturn/saturnbot/src/index.ts)
 <!-- END GENERATED cordis-surface -->

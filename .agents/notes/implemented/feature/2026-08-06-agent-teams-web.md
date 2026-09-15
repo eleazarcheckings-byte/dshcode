@@ -4,6 +4,8 @@ Status: implemented
 
 English | [中文](2026-08-06-agent-teams-web.zh.md)
 
+> Packaging update (2026-09-15): the Agent Teams Web profile layer this record describes was deleted. The `ui-agent-team` row ships in `@deepseek-ai/dsh-web-app`, so a Web composition includes the panel automatically and there is no separate Web profile layer to add.
+
 ## Problem
 
 The durable Agent Teams runtime owns roster, mailbox, and task state but exposes only model tools and Host service methods. Web users need to inspect teammate activity, manage shared tasks with the same compare-and-set rules, and open a teammate conversation. Agent Teams is still experimental, so these capabilities must not add Team-specific contracts or dependencies to the stable API Proxy, Session Controller, Client UI packages, or Web bundle.
@@ -16,9 +18,9 @@ The private `ctx.agentTeams` service owns generated `agentTeams/view`, `agentTea
 
 Teammate navigation uses the existing `{ parentSessionId, childSessionId, mode: 'continuable' }` Subagent address without a Team tag. The UI refreshes the direct-child catalog, rechecks the selected Session, and opens the addressed conversation. History and later human prompts follow the stable Subagent path; the Team mailbox remains reserved for Team peer delivery from Team tools.
 
-`@saturnai/dsh-agent-team-web-profile` inserts only the UI, and `@saturnai/dsh-agent-team-profile` inserts the domain, the Remote contribution, and the model tools; a base-backed profile mounts both. The shipped `@deepseek-ai/dsh-web-app` bundle carries the same three rows and their dependencies itself, so a stock Web composition needs neither layer and must not stack one over it — a repeated explicit `id:` makes the Loader throw `duplicate loader entry id`.
+A private Web profile layer used to insert only the UI, and `@saturnai/dsh-agent-team-profile` inserts the domain, the Remote contribution, and the model tools; a base-backed profile mounts the Host layer, while a Web composition takes the UI from the shipped bundle. The shipped `@deepseek-ai/dsh-web-app` bundle carries all three rows and their dependencies itself, so a Web composition needs no extra layer and must not stack one over it — a repeated explicit `id:` makes the Loader throw `duplicate loader entry id`.
 
-Stable Web presets still register continuable Subagent controls inside their preset scope. Top-level compositions patch only their own entry list, so those in-preset registrations cannot be disabled from the Host patch, and a Web session may expose both the Team delegation tools and the legacy child controls. A Team-aware Web preset is deferred; the [Web profile README](../../../../packages/bundle/agent-team-web-profile/README.md#known-limitations-and-deferred-work) owns the current limitation.
+Stable Web presets still register continuable Subagent controls inside their preset scope. Top-level compositions patch only their own entry list, so those in-preset registrations cannot be disabled from the Host patch, and a Web session may expose both the Team delegation tools and the legacy child controls. A Team-aware Web preset is deferred; the shipped [`dsh-web-app` bundle patch](../../../../packages/bundle/web-app/cordis.patch.yml) owns the current row placement.
 
 ## Boundaries
 
@@ -40,4 +42,4 @@ Team-service unit tests, generation, and a plain-Node built-artifact smoke verif
 
 ## Consequences
 
-The Team service is the single Cordis owner for both domain state and the Remote operations that expose selected Team values. The stable API Proxy, Session Controller, and stable Client UI packages take on no Team contract — no Team wire method, type, or slot enters them; only the delivered Web bundle's composition mounts the Team rows. The promoted `@deepseek-ai/dsh-web-app` bundle mounts all three rows, so a stock Web profile gets Agent Teams without adding a layer, while a base-backed profile adds the two ordered `@saturnai` layers instead. Promotion renames the npm packages but does not require a new generated namespace.
+The Team service is the single Cordis owner for both domain state and the Remote operations that expose selected Team values. The stable API Proxy, Session Controller, and stable Client UI packages take on no Team contract — no Team wire method, type, or slot enters them; only the delivered Web bundle's composition mounts the Team rows. The promoted `@deepseek-ai/dsh-web-app` bundle mounts all three rows, so a stock Web profile gets Agent Teams without adding a layer, while a base-backed profile adds the ordered `@saturnai` Host layer instead. Promotion renames the npm packages but does not require a new generated namespace.

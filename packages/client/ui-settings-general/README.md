@@ -29,6 +29,8 @@ When the built-in `archive` section is registered, navigation hides the communit
 
 Users reach the shell through the sidebar's bottom Settings control; feature plugins contribute their pages and onboarding steps through the slot ledgers this shell projects. After a Host connection failure, a pale-yellow **Disconnected** action appears to the right of Settings. Automatic recovery shows **Connecting** with one to three dots advancing every 500ms. Hover or keyboard focus changes either yellow label to **Reconnect now** without changing its background; press feedback stays within the warning palette, and selecting it starts retry 1 immediately. Recovery changes the region to pale-green **Connected** for two seconds before it disappears. The icon, left-aligned text origin, height, and width remain fixed across every visible state. Initial startup and uninterrupted healthy operation remain silent. The shell renders the modal panel, the navigation built from `settings.section` entries, and exactly one mounted onboarding step at a time.
 
+The collapsed Settings control retains visually hidden localized text so its accessible name remains available in the narrow sidebar.
+
 ### The General section
 
 The General section holds rows registered into `settings.general.item` by feature packages — it has no built-in rows. Feature plugins own the row copy and behavior; the shell only provides the section and its slot. The Appearance row, for example, lives in ui-theme.
@@ -39,7 +41,11 @@ On a loopback browser, the shell renders **Open configuration file** only when t
 
 ### Onboarding steps
 
+Settings focuses its close control on open, wraps Tab and Shift+Tab among its available controls, and restores the trigger focus on close. Nested dialogs retain their own keyboard handling.
+
 The onboarding ledger projects in ascending order and mounts exactly one step at a time. Registrants own durable completion, capability readiness, copy, mutations, and their visible wrapper, so independently registered flows cannot stack and the shell does not become a second configuration fact source. Visible steps own their dialog chrome and app-root `inert` lifecycle.
+
+Opening Settings temporarily unmounts onboarding so its overlay and `inert` ownership cannot block the selected settings page. Closing Settings resumes the next incomplete step without marking any provider ready. A step that opens Settings must save or complete its own draft before calling `openSection` when that draft must survive unmounting.
 
 -----
 

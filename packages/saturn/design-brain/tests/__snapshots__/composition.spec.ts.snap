@@ -1,0 +1,8 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`keeps fresh profiles offline, connects real tools, dispatches, persists opt-in across reboot, and removes tools on opt-out 1`] = `
+{
+  "name": "saturn:design-brain",
+  "text": "SaturnAI design and brand tools are available through the mcp__saturnai__ namespace. For relevant design work, use the available tools according to their schemas and the user’s brief. Reuse supplied context for focused edits; ask only for decisions that materially affect the result. These tools provide guidance and evaluate the evidence you supply; they do not automatically inspect a rendered website. Render and inspect the actual output, provide observed evidence for review, and report tool failures honestly. If a tool becomes unavailable, continue with the bundled premium-output guidance and the tools still available.",
+}
+`;

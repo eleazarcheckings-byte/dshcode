@@ -1,18 +1,10 @@
 # @saturnai/dsh-client-ui-skin-saturn
 
-Saturn Premium skin for the dsh web GUI: a Grok-grade premium palette —
-near-black monochrome surfaces with hairline strokes in dark mode and a quiet
-paper-white light mode, a restrained steel-blue action color, and Saturn gold
-reserved for brand accents and selection. The skin remaps the complete
-`--dsw-static-*` token set (73 tokens, both themes) under
-`body[data-dsh-saturn]`, plus a gold Saturn favicon.
+Saturn Premium is the dark application skin: neutral black surfaces, white text, fine gray borders, and white accents for brand, focus, and primary actions. The complete static token scales remain ordered from light to dark so upstream semantic aliases keep their meaning. Status colors retain their own aliases.
 
 ## Use
 
-Mount as a `dsh.client` row in a web profile; the skin applies its body
-attribute and stylesheet at load and retracts both through its effect
-disposer. It is a palette skin (no backdrop art), so it composes with the
-stock light/dark/system appearance preference.
+Mount as a `dsh.client` row in a web profile. The effect holds the upstream dark-theme attribute and browser color scheme while the skin is mounted, applies the Saturn body attribute and favicon, and restores those values when disposed. The scoped stylesheet remains inert without the Saturn attribute.
 
 ```yaml
 - insert:
@@ -20,17 +12,25 @@ stock light/dark/system appearance preference.
       name: '@saturnai/dsh-client-ui-skin-saturn'
 ```
 
-`skin.json` is the skin-center manifest (`id: saturn-premium`, accent
-`#dda43a`). The skin ships as a workspace package; it is not staged into the
-skin-center extras tree, so it does not appear in the skin-center picker.
+`skin.json` identifies `saturn-premium`. The skin ships as a workspace package and is not staged into the skin-center picker.
 
-## Layout
+## Application tokens
 
-| File | Purpose |
-|---|---|
-| `lib/index.js` | Empty host-side loader seat. |
-| `lib/client.js` | Browser half: token remap stylesheet, favicon, apply/dispose effect. |
-| `skin.json` | Skin manifest consumed by the skin center. |
+The body scope publishes `--saturn-void`, `--saturn-surface`, `--saturn-surface-raised`, `--saturn-surface-hover`, `--saturn-stroke`, `--saturn-stroke-strong`, `--saturn-ink`, `--saturn-muted`, `--saturn-accent`, `--saturn-accent-dim`, and `--saturn-accent-secondary`. Motion uses `--saturn-ease` and `--saturn-duration`. Components consume these with upstream alias fallbacks. The skin owns no canvas or animation clock; components own their visual state, visibility checks, and cleanup. The reduced-motion media rule suppresses CSS transitions and repeating animations.
+
+## Model Experience
+
+None. This package only changes browser presentation.
+
+#### KV Cache effect
+
+None. The skin does not construct model requests.
+
+## Known Limitations and Deferred Work
+
+The skin enforces dark appearance while mounted. Light appearance requires a complete alternate palette and theme policy.
+
+**Runtime invariant:** No companion is published. Token polarity and contrast are verified by the package's palette tests, and the skin owns no independent runtime data views.
 
 ## License
 

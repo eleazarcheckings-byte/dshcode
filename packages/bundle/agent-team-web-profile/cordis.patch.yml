@@ -1,9 +1,0 @@
-# Agent Teams Web layer for a Web composition that does not already mount the
-# shipped dsh-web-app Team rows. The `ui-agent-team` row ships in
-# packages/bundle/web-app/cordis.patch.yml, so a stock Web profile must NOT also
-# add this layer: a repeated explicit `id:` makes the Loader throw
-# `duplicate loader entry id` and the whole plugin tree fails to load.
-
-- insert:
-    - id: ui-agent-team
-      name: '@saturnai/dsh-client-ui-agent-team'

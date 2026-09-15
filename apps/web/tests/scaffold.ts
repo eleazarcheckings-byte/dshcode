@@ -80,9 +80,10 @@ import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { REPO_ROOT, requireDist } from './support.ts'
 
 // Host-side web e2e cannot import a browser package: doing so would pull that
-// package's complete TS project into this graph. Mirrored from
-// packages/client/ui-settings-models/src/onboarding-copy.ts; drift makes the
-// default pre-acknowledgement stop suppressing the notice and fails loudly.
+// package's complete TS project into this graph. Mirrored from the welcome
+// locale block in packages/client/ui-settings-models/src/client/locales.ts;
+// drift makes the default pre-acknowledgement stop suppressing the notice and
+// fails loudly.
 // import {
 //   WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_SETTINGS_NAMESPACE,
 //   WELCOME_NOTICE_VERSION, WELCOME_NOTICE_COPY,
@@ -92,8 +93,8 @@ export const WELCOME_NOTICE_ACK_FIELD = 'welcomeNoticeVersion'
 export const WELCOME_NOTICE_VERSION = '2026-08-13.1'
 export const WELCOME_NOTICE_COPY = {
   zh: {
-    title: '内测声明',
-    body: 'Saturn AI 仍处于测试阶段，还有许多地方需要持续改进和打磨，希望听取广大开发者的反馈建议。预计 Saturn AI 的核心插件以及基础 API 都会在接下来的一段时间内快速迭代、持续演化。\n\n我们期待与全球开发者一起，在开源、开放、可复用、可组合的基础设施之上，共同探索智能上限。欢迎全球插件开发者加入 Saturn AI 生态。',
+    title: '欢迎使用 Saturn AI',
+    body: 'Saturn AI 已准备好。\n\n打开项目，选择模型，开始构建。',
     continueLabel: '继续',
   },
 } as const

@@ -14,6 +14,13 @@
   color: var(--dsw-alias-label-primary);
   background: transparent;
   padding: 0 14px;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms var(--saturn-ease, ease);
+}
+
+.button:active:not(:disabled) { transform: scale(.975); }
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+  .button:active:not(:disabled) { transform: none; }
 }
 
 .button:disabled {

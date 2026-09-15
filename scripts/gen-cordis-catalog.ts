@@ -112,6 +112,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   jobs: 'jobs.md',
   sessionTelemetry: 'session-telemetry.md',
   agentTeams: 'agent-team.md',
+  saturnbot: 'agent-team.md',
   tokenMeter: 'token-meter.md',
   toolResultPruner: 'compaction.md',
   tools: 'tools.md',
@@ -239,6 +240,16 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  * appear on more than one page.
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
+  BotSnapshot: '../../packages/saturn/saturnbot/README.md',
+  BotConfig: '../../packages/saturn/saturnbot/README.md',
+  BotId: '../../packages/saturn/saturnbot/README.md',
+  BotRole: '../../packages/saturn/saturnbot/README.md',
+  BotEventPage: '../../packages/saturn/saturnbot/README.md',
+  BotMemoryRecord: '../../packages/saturn/saturnbot/README.md',
+  BotWebhookRecord: '../../packages/saturn/saturnbot/README.md',
+  BotTicketRecord: '../../packages/saturn/saturnbot/README.md',
+  ProfileMemoryFacts: 'settings.md',
+  ProfileMemoryWriteValue: 'settings.md',
   Agent: 'core.md',
   AgentCancelCause: 'core.md',
   AgentFactory: 'core.md',

@@ -16,6 +16,7 @@
   inset: 0;
   background: var(--dsw-alias-bg-mask-1);
   backdrop-filter: var(--dsw-mask-blur);
+  animation: veil-in 160ms ease-out;
 }
 
 /* Dialog card: r24, elevation-prominent, layer-2 fill, pb 24. */
@@ -32,6 +33,7 @@
   border-radius: 24px;
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-elevation-prominent);
+  animation: dialog-in 220ms var(--saturn-ease, cubic-bezier(.22, 1, .36, 1));
 }
 
 .content {
@@ -70,6 +72,7 @@
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-secondary);
+  transition: background-color 140ms ease, color 140ms ease;
 }
 
 .close:hover {
@@ -100,4 +103,14 @@
   justify-content: flex-end;
   gap: 8px;
   padding: 0 24px;
+}
+
+@keyframes veil-in { from { opacity: 0; } }
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(7px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mask, .dialog { animation: none; }
+  .close { transition: none; }
 }

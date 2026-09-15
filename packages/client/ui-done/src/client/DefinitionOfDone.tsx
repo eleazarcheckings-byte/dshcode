@@ -1,8 +1,8 @@
 /**
  * Definition of done: the contract strip docked at the head of the composer
- * context stack. A stated contract shows the gold ring, the STATED chip, and
+ * context stack. A stated contract shows the hollow ring, the STATED chip, and
  * the one- or two-sentence statement; a proven one fills the ring, flips the
- * chip to PROVEN, and appends the evidence that met it after a gold middot —
+ * chip to PROVEN, and appends the evidence that met it after an accented middot —
  * the visible form of the doctrine "'done' means proven". Capability absence
  * (undefined) and no contract (null) render no contract row at all, so an
  * untouched composer looks exactly as it did.

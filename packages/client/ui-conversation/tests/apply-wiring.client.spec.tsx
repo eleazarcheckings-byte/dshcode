@@ -7,6 +7,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { apply, inject, type ViewTab } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { AmbientMotionInjected } from '../src/client/skeleton/ambient-motion.ts'
 
 usePinnedBrowserLanguages('zh-CN')
 
@@ -23,6 +24,8 @@ async function bench(options: { declareConversation?: boolean } = {}) {
     await runtime.root.declare({
       'conversation': { kind: 'single', scope: 'session-maybe' },
       'settings.general.item': { kind: 'list', scope: 'root' },
+      'shell.background': { kind: 'single', scope: 'session-maybe' },
+      'shell.overlay': { kind: 'list', scope: 'root' },
     }, (_props: { renderSlot?: unknown }) => null)
   }
   const feature = await runtime.mount({ inject: [...inject], apply })
@@ -44,6 +47,8 @@ describe('target-neutral Conversation apply wiring', () => {
     await b.runtime.root.declare({
       'conversation': { kind: 'single', scope: 'session-maybe' },
       'settings.general.item': { kind: 'list', scope: 'root' },
+      'shell.background': { kind: 'single', scope: 'session-maybe' },
+      'shell.overlay': { kind: 'list', scope: 'root' },
     }, (_props: { renderSlot?: unknown }) => null)
 
     expect(b.runtime.slots.entries('conversation')).toHaveLength(1)
@@ -72,6 +77,12 @@ describe('target-neutral Conversation apply wiring', () => {
       .toEqual({ kind: 'chain', scope: 'session' })
     expect(b.runtime.slots.entries('settings.general.item').map(row => row.options.id))
       .toEqual(['composer-enter'])
+    expect(b.runtime.slots.entries('shell.background')).toHaveLength(1)
+    expect(b.runtime.slots.entries('shell.overlay').map(row => row.options.id)).toEqual(['ambient-motion'])
+    const sky = b.runtime.slots.entries('shell.background')[0]?.inject?.() as unknown as AmbientMotionInjected
+    const control = b.runtime.slots.entries('shell.overlay')[0]?.inject?.() as unknown as AmbientMotionInjected
+    expect(sky.hooks.ambientMotion).toBe(control.hooks.ambientMotion)
+    expect(sky.setAmbientMotion).toBe(control.setAmbientMotion)
     await b.runtime.dispose()
   })
 
@@ -111,6 +122,8 @@ describe('target-neutral Conversation apply wiring', () => {
     expect(b.runtime.ctx.get('conversation')).toBeUndefined()
     expect(b.runtime.ctx.get('uiConversation')).toBeUndefined()
     expect(b.runtime.slots.entries('conversation')).toHaveLength(0)
+    expect(b.runtime.slots.entries('shell.background')).toHaveLength(0)
+    expect(b.runtime.slots.entries('shell.overlay')).toHaveLength(0)
     expect(b.runtime.slots.spec('conversation.view')).toBeUndefined()
     await b.runtime.dispose()
   })

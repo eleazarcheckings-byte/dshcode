@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import Loader from '@deepseek-ai/cordis-plugin-loader'
+import Loader, { interpolate } from '@deepseek-ai/cordis-plugin-loader'
 import Include, { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as yaml from 'js-yaml'
@@ -146,6 +146,23 @@ describe('the shipped preset root', () => {
 
     for (const id of ['standard', 'cordis']) {
       expect(findEntry(await shippedEntries(id), 'tool-workflow')?.disabled, id).not.toBe(true)
+    }
+  })
+
+  it('selects one-shot delegation without legacy controls when Teams owns the names', async () => {
+    for (const id of ['standard', 'cordis', 'ptc']) {
+      const entries = await shippedEntries(id)
+      for (const teamsMounted of [true, false]) {
+        const loaderContext = { get: (name: string) => name === 'agentTeams' && teamsMounted ? {} : undefined }
+        for (const control of ['tool-subagent-control', 'tool-subagent-list-agents']) {
+          expect(interpolate(loaderContext, findEntry(entries, control)?.disabled), `${id}: ${control}`)
+            .toBe(teamsMounted)
+        }
+        for (const launcher of ['tool-subagent', 'tool-subagent-fork']) {
+          expect(interpolate(loaderContext, findEntry(entries, launcher)?.config), `${id}: ${launcher}`)
+            .toMatchObject({ backgroundMode: teamsMounted ? 'one-shot' : 'continuable' })
+        }
+      }
     }
   })
 })

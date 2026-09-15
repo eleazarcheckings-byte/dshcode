@@ -1,5 +1,5 @@
 ---
-description: "Ten tools that let the model create, message, and coordinate teammates, for compositions mounting the Team plugins."
+description: "Ten tools that let the model create, message, and coordinate teammates, for compositions mounting the Saturn Team plugins."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`@saturnai/dsh-tool-agent-team` gives the model a team toolset on top of the team domain package: create named teammates, send them messages or follow-up work, see who is available, wait for progress, interrupt a stuck teammate, and manage a shared task board — ten tools in total. A short policy section in every member's prompt teaches the model when to form a team (only when you ask for one) and how to coordinate on a shared workspace. Mounting it replaces legacy subagent controls with the same tool names, so a composition must disable the legacy definitions. It creates teammates only when you explicitly ask for a team.
+`@saturnai/dsh-tool-agent-team` gives each Team member ten tools for named teammates, durable messages, follow-up work, progress, interruption, and a shared task board. Its prompt follows the session's multi-task setting: ON delegates substantial independent work proactively; OFF keeps work in one thread unless the user requests delegation. Built-in presets omit colliding legacy controls when the Team runtime is mounted.
 
 ## Table of Contents
 
@@ -29,7 +29,7 @@ Add this package on top of `@saturnai/dsh-agent-team` when the model should run 
 
 ### When to choose it
 
-Choose it when the model should create and coordinate teammates by itself rather than a human driving subagent controls. Avoid it when the legacy global subagent tools with the same names must stay available: the team tools replace them for team members, so a composition that wants both must disable the legacy definitions. The fixed policy creates teammates only when you explicitly ask for a team or teammates, so ordinary tasks never trigger delegation on their own.
+Choose it for work needing ongoing coordination, shared tasks, or follow-up. Keep one-shot subagents for bounded independent work. Disable legacy controls with the same names in custom compositions. Without a multi-task policy, the model can delegate when parallel work benefits the task or the user requests it.
 
 ### Smallest working example
 
@@ -125,7 +125,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 #### What the model sees
 
-One stable policy section states the exact Team role/name/id, the explicit-delegation requirement, shared-cwd behavior, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, quiet versus waking delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. The ten Team schemas from `spawn_teammate` through `team_task_update` appear only in Team member scopes.
+One stable policy section states the exact Team role/name/id, the session multi-task policy, shared-cwd behavior, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, quiet versus waking delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. The ten Team schemas from `spawn_teammate` through `team_task_update` appear only in Team member scopes.
 
 #### Token effect
 
@@ -143,9 +143,10 @@ Prefix-stable while the Team plugin generation, configuration, member role/name,
 These limits describe what the policy and tools cannot guarantee for a team. They are current package constraints, not a comparison with other collaboration surfaces.
 
 - **Prompt policy is coordination, not confinement** — it cannot stop Bash or external processes from writing overlapping files.
-- **No autonomous team creation** — ordinary tasks do not trigger delegation unless the user explicitly requests it.
+- **Guidance follows session intent** — the multi-task switch changes prompt guidance without unregistering tools. First-party file tools enforce ownership when the claims plugin is mounted.
 - **No Web controls** — browser roster and task-board presentation is outside this runtime package.
-- **Legacy controls must be displaced, not shared** — the Team tools reuse the legacy subagent tool names, so a composition that keeps the global continuable-child rows enabled presents two competing surfaces.
+- **Legacy controls require replacement** — Team tools reuse legacy subagent tool names. Custom compositions must disable colliding global continuable-child controls; built-in presets handle this when Team is mounted.
+- **Pre-release schemas** — Team tool schemas may evolve with the Saturn runtime.
 
 <a id="dev-note"></a>
 ### Dev Note

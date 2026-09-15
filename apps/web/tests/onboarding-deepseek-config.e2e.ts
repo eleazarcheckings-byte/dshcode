@@ -32,6 +32,10 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ deepSeekMissingCredential: true, welcomeNoticePending: true })
+    // This scenario owns the later credential step; full First Light is tested separately.
+    await scaffold.ctx.settings.mutate('ui-first-light', [{
+      op: 'set', path: ['complete'], value: '2026-09-14.1',
+    }])
     browser = await chromium.launch()
     // The scenario asserts the shipped Chinese copy, so the browser asks for it.
     page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: ZH_BROWSER_LOCALE })
@@ -70,7 +74,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }).click()
     await welcome.waitFor({ state: 'detached', timeout: 15_000 })
 
-    const credentialStep = page.getByRole('dialog', { name: '添加一个 API Key 开始使用' })
+    const credentialStep = page.getByRole('dialog', { name: '选择模型提供方' })
     await credentialStep.waitFor({ timeout: 15_000 })
     const keyInput = credentialStep.getByLabel('API 密钥', { exact: true })
     await keyInput.waitFor({ timeout: 10_000 })
@@ -113,7 +117,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     acknowledgeReloadConnectionLoss(tripwire, secondReloadWarnings)
     await page.waitForSelector('[class*="frame"]', { timeout: 15_000 })
     expect(await page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title }).count()).toBe(0)
-    expect(await page.getByRole('dialog', { name: '添加一个 API Key 开始使用' }).count()).toBe(0)
+    expect(await page.getByRole('dialog', { name: '选择模型提供方' }).count()).toBe(0)
 
     // An old acknowledgement means materially revised copy: welcome returns,
     // while the already-configured provider step remains complete.
@@ -126,7 +130,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await welcome.waitFor({ timeout: 15_000 })
     await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }).click()
     await welcome.waitFor({ state: 'detached', timeout: 15_000 })
-    expect(await page.getByRole('dialog', { name: '添加一个 API Key 开始使用' }).count()).toBe(0)
+    expect(await page.getByRole('dialog', { name: '选择模型提供方' }).count()).toBe(0)
 
     expect((await page.content()).includes(secret)).toBe(false)
     expect((await page.locator('body').ariaSnapshot()).includes(secret)).toBe(false)
@@ -153,8 +157,8 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
       ;(window as unknown as { __takeoverSightings: string[] }).__takeoverSightings = sightings
       setInterval(() => {
         if (document.querySelector(
-          '[role="dialog"][aria-label="内测声明"], '
-          + '[role="dialog"][aria-label="添加一个 API Key 开始使用"]',
+          '[role="dialog"][aria-label="欢迎使用 Saturn AI"], '
+          + '[role="dialog"][aria-label="选择模型提供方"]',
         ) !== null) {
           sightings.push('chrome')
         }
@@ -186,7 +190,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     expect(await page.evaluate(() =>
       (window as unknown as { __takeoverSightings: string[] }).__takeoverSightings)).toEqual([])
     expect(await page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title }).count()).toBe(0)
-    expect(await page.getByRole('dialog', { name: '添加一个 API Key 开始使用' }).count()).toBe(0)
+    expect(await page.getByRole('dialog', { name: '选择模型提供方' }).count()).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 

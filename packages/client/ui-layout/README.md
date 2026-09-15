@@ -27,6 +27,14 @@ This package provides the shell layout of the Web GUI: a three-column AppFrame w
 
 Mount this plugin at the root slot; it then renders the app frame around whatever occupies the sidebar, conversation, and details columns. Users resize the sidebar by dragging its invisible hit strip and the details panel by dragging its floating pill; when the window narrows, only details shrinks, then auto-closes. A closed sidebar retains a 56px control rail; details closes to zero width.
 
+The center column supplies the page's `main` landmark, keeping sidebar controls outside the primary conversation content.
+
+### Shared background
+
+The `shell.background` single slot fills the frame beneath all three columns. Its `session-maybe` scope supplies current Session hooks while preserving the mounted occupant across selection changes. The background wrapper is marked `data-shell-background`, excludes pointer input and assistive technology, and belongs directly to `data-shell-frame`; interactive controls belong outside it.
+
+An occupied background sets `--dsh-shell-content-background` to transparent and `--dsh-shell-sidebar-background` to a 40% sidebar fill. Structural content surfaces can consume these variables while retaining their ordinary fills as fallbacks. An empty background leaves those fallbacks intact. Content columns, resize handles, and overlays remain above the background.
+
 ### Theme presentation
 
 The presenter consumes resolved theme snapshots and projects them onto the document: `html { color-scheme }` for native UA chrome, `body[data-ds-dark-theme]` from the active color scheme, the theme's alias tokens and `--dsh-content-font-size` as inline variables on body, and one owned `<meta name="theme-color">` whose content follows the computed body background. Disposing the presenter removes its metadata node with its other global writes.
@@ -39,7 +47,7 @@ The presenter consumes resolved theme snapshots and projects them onto the docum
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-One `register()` call contributes `AppFrame` into the runtime's built-in `'root'` slot and, in the same breath, declares the four child slots (`sidebar`, `conversation`, `details`, `shell.overlay`), seats the layout store (panel geometry), and wires the `ctx.layout` panel-action service. The transient layout store starts the sidebar at its default width and details closed, and never reads or writes `localStorage`. AppFrame always mounts the conversation and details columns; a connected Session renders through `SessionProvider`. It projects the selected Session title over the build-configured product title or the localized `common.brand.localBuild` fallback, so locale revisions update document metadata with the root entry. The theme presenter is a second effect: pure DOM writes from resolved snapshots — initial state through the getter once, then event-driven only, with no React path. It applies palette, font-size, and token variables before measuring the rendered background as the single color authority.
+One `register()` call contributes `AppFrame` into the runtime's built-in `'root'` slot and, in the same breath, declares the five child slots (`sidebar`, `conversation`, `details`, `shell.background`, `shell.overlay`), seats the layout store (panel geometry), and wires the `ctx.layout` panel-action service. The transient layout store starts the sidebar at its default width and details closed, and never reads or writes `localStorage`. AppFrame always mounts the conversation and details columns; a connected Session renders through `SessionProvider`. It projects the selected Session title over the build-configured product title or the localized `common.brand.localBuild` fallback, so locale revisions update document metadata with the root entry. The theme presenter is a second effect: pure DOM writes from resolved snapshots — initial state through the getter once, then event-driven only, with no React path. It applies palette, font-size, and token variables before measuring the rendered background as the single color authority.
 
 </details>
 

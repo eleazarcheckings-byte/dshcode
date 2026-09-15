@@ -689,6 +689,43 @@ Source: [`packages/core/session/src/types.ts:338`](../packages/core/session/src/
 
 Source: [`packages/sandbox/sandbox-policy/src/session-mode.ts:33`](../packages/sandbox/sandbox-policy/src/session-mode.ts)
 
+### `saturnbot/*`
+
+<a id="saturnbotmodel-error--log-only"></a>
+
+#### `saturnbot/model-error` — log-only
+
+```ts persistence-catalog
+/** Terminal model outcome without provider credentials or request headers. */
+'saturnbot/model-error': { message: string }
+```
+
+Source: [`packages/saturn/saturnbot/src/model.ts:28`](../packages/saturn/saturnbot/src/model.ts)
+
+<a id="saturnbotmodel-request--log-only"></a>
+
+#### `saturnbot/model-request` — log-only
+
+```ts persistence-catalog
+/** Exact SaturnBot request, including all model-visible state and tool descriptions. */
+'saturnbot/model-request': BotModelRequest
+```
+
+Source: [`packages/saturn/saturnbot/src/model.ts:24`](../packages/saturn/saturnbot/src/model.ts)
+
+<a id="saturnbotmodel-result--log-only"></a>
+
+#### `saturnbot/model-result` — log-only
+
+```ts persistence-catalog
+/** Visible structured response and usage; private reasoning blocks are not retained. */
+'saturnbot/model-result': { text: string; usage: TokenUsage | null }
+```
+
+Types: [TokenUsage](subsystems/llm-streaming.md)
+
+Source: [`packages/saturn/saturnbot/src/model.ts:26`](../packages/saturn/saturnbot/src/model.ts)
+
 ### `schedule/*`
 
 <a id="schedulechange--log-only"></a>

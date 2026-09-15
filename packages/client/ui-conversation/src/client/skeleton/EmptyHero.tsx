@@ -1,7 +1,7 @@
 // The composer remains in ConversationRoot so switching out of the blank-draft
 // phase does not remount its textarea.
 
-import type { ReactNode, RefObject } from 'react'
+import { type ReactNode, type RefObject } from 'react'
 import {
   SaturnLogo, IconChevronDownOutline14, IconFolderClose16, IconFolderOpen16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -77,7 +77,7 @@ export interface HeroShellProps {
 }
 
 /**
- * Render the hero chrome (headline only; no composer, no workspace row).
+ * Reserve the global canvas planet's layout area and render the welcome headline.
  * @param props - see {@link HeroShellProps}.
  * @returns the centered hero element tree.
  */
@@ -85,33 +85,60 @@ export function HeroShell({ t, renderSlot, profile, children }: HeroShellProps) 
   return (
     <div className={css.root}>
       <div className={css.stack}>
-        <div className={css.headline}>
-          {/*
-            figma 34:10412: brand mark 34 leading the headline, gap 10.
-            The hero mark is the Saturn planet (34px), static at rest; the
-            hitbox hover tilts it gently (CSS, on the hitbox) — decorative,
-            hidden from the accessibility tree, and reduced motion keeps it
-            still. css.fish carries the headline ink, keeps the mark
-            unclipped, and anchors the tilt; a slot occupant receives the
-            same class.
-          */}
-          <span className={css.fishHitbox}>
+        <div className={css.planetAnchor} data-saturn-anchor="" aria-hidden="true" />
+        <div className={css.eyebrow}>
+          <span className={css.brandMark} aria-hidden="true">
             {renderSlot('conversation.hero.brand.mark', { size: 34, className: css.fish }, {
               fallback: <SaturnLogo size={34} className={css.fish} />,
             })}
           </span>
-          <span className={css.headlineText}>
-            {profile !== undefined && profile.name.trim() !== ''
-              ? t('hero.headlineFor', { name: profile.name, building: profile.building })
-              : t('hero.headline')}
-          </span>
           <span className={css.previewBadge}>{t('hero.preview')}</span>
+          <span className={css.eyebrowRule} aria-hidden="true" />
+          <span>{t('hero.workspace')}</span>
         </div>
-        <div className={css.body}>
-          {/* The composer remains mounted outside this component. */}
-        </div>
+        <h1 className={css.headline}>
+          {profile !== undefined && profile.name.trim() !== ''
+            ? t('hero.headlineFor', { name: profile.name, building: profile.building })
+            : t('hero.headline')}
+        </h1>
+        <p className={css.description}>{t('hero.description')}</p>
       </div>
       {children}
+    </div>
+  )
+}
+
+/**
+ * Render draft starters beneath the resident composer. Selecting one never submits a turn.
+ * @param props - Localized copy, draft availability, and the owner's guarded draft write.
+ * @returns A compact row of keyboard-accessible starter actions.
+ */
+export function HeroStarters({ t, hidden, onChoose }: {
+  t: HeroTranslate
+  hidden: boolean
+  onChoose: (text: string) => void
+}) {
+  const starters = ['build', 'explore', 'review'] as const
+  return (
+    <div className={css.starters} data-hidden={hidden || undefined} aria-hidden={hidden || undefined}>
+      {starters.map((starter, index) => (
+        <button
+          key={starter}
+          type="button"
+          className={css.starter}
+          disabled={hidden}
+          onClick={() => { onChoose(t(`hero.starter.${starter}.prompt`)) }}
+        >
+          <span className={css.starterNumber} aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+          <span className={css.starterCopy}>
+            <span className={css.starterTitle}>{t(`hero.starter.${starter}.title`)}</span>
+            <span className={css.starterDetail}>{t(`hero.starter.${starter}.detail`)}</span>
+          </span>
+          <svg className={css.starterArrow} viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+            <path d="M4 12 12 4M4.5 4H12v7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      ))}
     </div>
   )
 }

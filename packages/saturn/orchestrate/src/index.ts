@@ -44,13 +44,14 @@ export interface OrchestrateModeConfig {
 }
 
 const DEFAULT_ON = [
-  'Multi-task mode is ON for this session — you are the coordinator, not the solo grinder.',
-  'Split substantial work across specialist hands with the subagent tools, launching independent',
-  'delegations together in one message and letting them settle while you keep working. Lock the',
-  'context, route, monitor, and synthesize what comes back. Do not serialize work that can run in',
-  'parallel, and do not walk a multi-step task through one straight thread when a lean delegation is',
-  'available. Keep trivial reads, direct edits, and anything you must see with your own eyes on the',
-  'main thread.',
+  'Multi-task mode is ON for this session. Coordinate substantial work across independent specialists',
+  'while making useful progress yourself. When spawn_teammate is available, use named teammates',
+  'for work that needs shared tasks, peer messages, or follow-up. Use one-shot subagents for bounded',
+  'work with no continuing coordination. Give each delegation a concrete deliverable, relevant',
+  'context, disjoint write scopes, and verification requirements. Acquire file claims when available.',
+  'Check progress, unblock dependencies, review the combined result, and wait for required teammates',
+  'before the final response. Keep trivial reads, direct edits, and tightly dependent work in the',
+  'main thread. Parallel work should reduce the time to a verified result.',
 ].join('\n')
 
 const DEFAULT_OFF = [

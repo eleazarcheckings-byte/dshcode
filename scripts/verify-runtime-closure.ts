@@ -106,7 +106,7 @@ if (import.meta.main) {
   })
   const result = await verifyRuntimeClosure(root, values.manifest)
   if (result.failures.length > 0) {
-    console.error('verify-runtime-closure: preset plugins or required workspace peers are missing from python/sdk-runtime dependencies:')
+    console.error(`verify-runtime-closure: preset plugins or required workspace peers are missing from ${values.manifest ?? 'python/sdk-runtime/package.json'} dependencies:`)
     for (const failure of result.failures) console.error(`  ${failure}`)
     process.exitCode = 1
   } else {
@@ -199,7 +199,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function loadWorkspacePackages(root: string): Promise<Map<string, WorkspacePackage>> {
-  const paths = globSync(['packages/*/*/package.json', 'vendor/*/package.json'], { cwd: root })
+  const paths = globSync(['apps/*/package.json', 'packages/*/*/package.json', 'vendor/*/package.json'], { cwd: root })
     .sort()
     .map(relative => resolve(root, relative))
   const result = new Map<string, WorkspacePackage>()

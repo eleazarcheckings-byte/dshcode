@@ -86,6 +86,8 @@
     "apps/web/tests/turn-tail-actions.e2e.ts",
     "apps/web/tests/goal-multi-turn-actions.e2e.ts",
     "apps/web/tests/agent-team-panel.e2e.ts",
+    "apps/web/tests/ambient-canvas.e2e.ts",
+    "apps/web/tests/saturnbot.e2e.ts",
     "apps/web/tests/chat-scroll-fixture.ts",
     "apps/web/tests/chat-scroll-contract.e2e.ts",
     "apps/web/tests/chat-long-interactions.e2e.ts",
@@ -210,6 +212,7 @@
     { "path": "./packages/core/agent-tool-presentation" },
     { "path": "./packages/skill/skill" },
     { "path": "./packages/skill/skill-badge" },
+    { "path": "./packages/skill/skill-premium-output" },
     { "path": "./packages/skill/skill-filesystem" },
     { "path": "./packages/skill/tool-skill" },
     { "path": "./packages/interaction/tool-ask-user" },
@@ -273,6 +276,8 @@
     { "path": "./packages/bundle/acp-app" },
     { "path": "./packages/bundle/base" },
     { "path": "./packages/saturn/checkpoints" },
+    { "path": "./packages/saturn/done" },
+    { "path": "./packages/saturn/orchestrate" },
     { "path": "./packages/saturn/claims" },
     { "path": "./packages/bundle/headless" },
     { "path": "./packages/bundle/sdk-app" },
@@ -304,7 +309,6 @@
     { "path": "./packages/saturn/agent-team" },
     { "path": "./packages/bundle/agent-team-profile" },
     { "path": "./packages/saturn/tool-agent-team" },
-    { "path": "./packages/bundle/agent-team-web-profile" },
     { "path": "./packages/workflow/workflow" },
     { "path": "./packages/workflow/workflow-worker-thread" },
     { "path": "./packages/workflow/tool-workflow" },
@@ -340,6 +344,8 @@
     { "path": "./packages/lsp/lsp-stdio" },
     { "path": "./packages/lsp/tool-lsp" },
     { "path": "./apps/cli" },
-    { "path": "./apps/desktop" }
+    { "path": "./apps/desktop" },
+    { "path": "./packages/saturn/saturnbot" },
+    { "path": "./packages/saturn/design-brain" }
   ]
 }

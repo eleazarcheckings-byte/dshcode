@@ -12,7 +12,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
 import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import { SIDEBAR_COLLAPSED } from '@deepseek-ai/dsh-client-ui-layout/src/client/columns.ts'
@@ -54,12 +54,13 @@ function hookOf<T>(inst: { subscribe: (fn: () => void) => () => void; getSnapsho
   return function useSelector<S>(sel: (s: T) => S): S { return sel(useSyncExternalStore(inst.subscribe, inst.getSnapshot)) }
 }
 
-function mountFrame() {
+function mountFrame(background: ReactNode = null) {
   window.innerWidth = frameWidth // first-render viewport source before the observer fires
   const instance = createLayoutStore().create()
   const slotCalls: { key: string; props: unknown }[] = []
   const renderSlot = ((key: string, owner: object) => {
     slotCalls.push({ key, props: owner })
+    if (key === 'shell.background') return background
     if (key === 'sidebar') return <div data-testid="sidebar-content" />
     if (key === 'conversation') return <div data-testid="center-content" />
     if (key === 'details') return <div data-testid="details-content" />
@@ -153,6 +154,30 @@ afterEach(() => {
 })
 
 describe('AppFrame', () => {
+  it('keeps an unoccupied background layer empty without changing the content tracks', () => {
+    const { frame } = mountFrame()
+    expect(frame.hasAttribute('data-shell-frame')).toBe(true)
+    expect(frame.querySelector('[data-shell-background]')?.childNodes).toHaveLength(0)
+    expect(tracks(frame)).toEqual([280, 0])
+  })
+
+  it('keeps one decorative background outside the columns across Session changes', () => {
+    const { frame, getByTestId, rerenderFrame } = mountFrame(<canvas data-testid="ambient-canvas" />)
+    const canvas = getByTestId('ambient-canvas')
+    const layer = frame.querySelector('[data-shell-background]')
+    expect(layer?.parentElement).toBe(frame)
+    expect(layer?.getAttribute('aria-hidden')).toBe('true')
+    expect(layer?.contains(canvas)).toBe(true)
+    expect(frame.querySelector('main')?.contains(canvas)).toBe(false)
+    expect(frame.firstElementChild).toBe(layer)
+    selectedSession.current = undefined
+    act(() => { rerenderFrame() })
+    selectedSession.current = 'another-session' as SessionId
+    act(() => { rerenderFrame() })
+    expect(getByTestId('ambient-canvas')).toBe(canvas)
+    expect(frame.querySelectorAll('canvas')).toHaveLength(1)
+  })
+
   it('localizes the product title when the build does not supply one', () => {
     mountFrame()
     expect(document.title).toBe('DSH Local Build')
@@ -179,8 +204,9 @@ describe('AppFrame', () => {
   })
 
   it('renders the session pair with empty owner shares (sessionId is framework-standard)', () => {
-    const { slotCalls, getByTestId } = mountFrame()
+    const { slotCalls, getByTestId, getByRole } = mountFrame()
     expect(getByTestId('center-content')).toBeTruthy()
+    expect(getByRole('main').contains(getByTestId('center-content'))).toBe(true)
     expect(getByTestId('details-content')).toBeTruthy()
     const keys = slotCalls.map(c => c.key)
     expect(keys).toContain('conversation')

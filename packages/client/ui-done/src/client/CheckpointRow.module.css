@@ -7,9 +7,8 @@
    header row is a fixed 36px and the restore verb is a text button, not an
    icon: an action that overwrites files is named, never implied.
 
-   No accent colour is spent here. The card's gold stays on the two marks that
-   carry the doctrine, and a restore is an ordinary, deliberate action —
-   distinguished by the confirm it arms, not by decoration. */
+   Restore uses the ordinary action treatment and an explicit confirmation.
+   The contract ring and status chip retain the card's strongest contrast. */
 
 .row {
   display: flex;
@@ -101,7 +100,7 @@
 .entryRestore {
   height: 22px;
   padding: 0 9px;
-  border: 1px solid var(--dsw-alias-border-l4);
+  border: 0.5px solid var(--dsw-alias-border-l4);
   background: transparent;
   color: var(--dsw-alias-label-secondary);
 }
@@ -150,7 +149,7 @@
 .confirmBtn {
   height: 22px;
   padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l4);
+  border: 0.5px solid var(--dsw-alias-border-l4);
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
 }

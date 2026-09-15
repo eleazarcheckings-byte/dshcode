@@ -31,8 +31,10 @@ async function bench() {
   runtime.releaseWorkspaceSource()
   const directoryPicker = {}
   const remote = new TestRemote(runtime.ctx)
-  Object.assign(remote, { directoryPicker })
+  const remoteSession = { openWorkspacePath: vi.fn() }
+  Object.assign(remote, { directoryPicker, session: remoteSession })
   runtime.ctx.provide('remote.directoryPicker', directoryPicker as never)
+  runtime.ctx.provide('remote.session', remoteSession as never)
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)

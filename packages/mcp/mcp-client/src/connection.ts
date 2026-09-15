@@ -97,6 +97,8 @@ export interface ConnectionOutcome {
 
 /** Handle for one plugin instance's supervised connection. */
 export interface ConnectionHandle {
+  /** Whether the current generation completed connection and initial tool synchronization. */
+  readonly connected: boolean
   /**
    * Settles when the first connection attempt completes (success or failure).
    * The supervisor enters its reconnect loop regardless; the caller decides
@@ -122,6 +124,10 @@ export interface ConnectionHandle {
  */
 export function startConnection(ctx: Context, config: Config, policy: ResolvedReconnectPolicy): ConnectionHandle {
   const label = `mcp-client(${config.serverName})`
+  const timeout = config.connectTimeoutMs
+  if (timeout !== undefined && (!Number.isInteger(timeout) || timeout < 1 || timeout > MAX_TIMER_DELAY_MS)) {
+    throw new Error(`${label}: connectTimeoutMs must be a positive bounded integer`)
+  }
   const opts: ToolBridgeOptions = {
     registrationFailure: 'contain',
     serverName: config.serverName,
@@ -268,6 +274,14 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
         }
       },
     )
+    // Bound the whole handshake, including notifications/initialized and initial
+    // tools/list. SDK request timeouts alone do not bound transport.send().
+    const deadline = config.connectTimeoutMs === undefined ? undefined : setTimeout(() => {
+      if (!isCurrent(generation)) return
+      firstAttemptError ??= new Error(`${label}: connection deadline exceeded`)
+      void generation.close().catch(() => { /* The attempt owns close diagnostics. */ })
+    }, config.connectTimeoutMs)
+    deadline?.unref()
     try {
       await generation.connect(createTransport(config))
       if (hasClosed()) {
@@ -293,6 +307,8 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       }
       generationDown(generation)
       return
+    } finally {
+      clearTimeout(deadline)
     }
     attemptSettled = true
     if (hasClosed()) {
@@ -323,6 +339,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
   })
 
   return {
+    get connected() { return !disposed && client !== undefined && connectedAt !== undefined },
     ready,
     async dispose(): Promise<void> {
       disposed = true

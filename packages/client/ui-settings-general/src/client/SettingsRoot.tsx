@@ -66,7 +66,36 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
   return (
     <div className={css.overlay} role="presentation">
       <div className={css.mask} aria-hidden="true" onClick={onClose} />
-      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div
+        className={css.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={(event) => {
+          const panel = event.currentTarget
+          if (event.key !== 'Tab' || event.defaultPrevented
+            || !(event.target instanceof Element)
+            || event.target.closest('[role="dialog"]') !== panel) return
+          // Portaled subdialogs own their keyboard events; the shell wraps only
+          // its visible, enabled controls at the ends of normal tab order.
+          const targets = [...panel.querySelectorAll<HTMLElement>(
+            'button, a[href], input, textarea, select, summary, [tabindex]',
+          )].filter(target => target.tabIndex >= 0 && !target.matches(':disabled')
+            && target.closest('[role="dialog"]') === panel
+            && target.closest('[hidden], [inert]') === null
+            && getComputedStyle(target).visibility !== 'hidden'
+            && (typeof target.checkVisibility !== 'function' || target.checkVisibility()))
+          const first = targets[0]
+          const last = targets[targets.length - 1]
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault()
+            last?.focus()
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault()
+            first?.focus()
+          }
+        }}
+      >
         <nav className={css.nav}>
           <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
           <div className={css.navList}>
@@ -214,7 +243,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
       {/* Dialog chrome and `#root` inert ownership live inside each step's
           visible branch. A step still deciding (private facts loading)
           renders null, so nothing paints or blocks while it decides. */}
-      {onboardingStep !== undefined && renderSlot('settings.onboarding', {
+      {!open && onboardingStep !== undefined && renderSlot('settings.onboarding', {
         stepId: onboardingStep.id,
         complete: () => { completeOnboardingStep(onboardingStep.id) },
         openSection,

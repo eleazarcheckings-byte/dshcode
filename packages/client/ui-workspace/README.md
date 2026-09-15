@@ -33,7 +33,14 @@ View options combine grouping with one browser-persisted Session order per accou
 
 ### Search
 
+The session search field has a localized accessible name independent of its placeholder.
+
 Collapsed search is one header action beside the view and add actions: activating it expands the field across the header. A non-blank query replaces either browsing mode with one flat result list — case-insensitive title and Workspace substring matches appear immediately, while a 250 ms debounced Host request adds ranked current-conversation content matches and snippets. Each new query aborts the preceding request; a failed content search leaves metadata matches visible with a warning. The list is capped at 20 and opens the selected Session without clearing the query.
+
+<a id="quick-switch"></a>
+### Quick switch
+
+Press **Ctrl+K** on Windows/Linux or **Cmd+K** on macOS, or use the sidebar launcher, to search conversation titles and workspace names or paths. Matching uses the current browser metadata, excludes archived and blank conversations, and shows at most 30 destinations plus the **Start a new task** action when it matches. Search sends no remote request or model prompt. Use the arrow keys to select, Enter to open, and Escape to dismiss; closing restores the invoking control's focus. Selecting a workspace starts a conversation there. Other open modal workflows retain their keyboard shortcuts.
 
 ### Managing sessions
 

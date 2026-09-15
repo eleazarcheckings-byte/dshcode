@@ -38,7 +38,7 @@ async function bundleFile(content: string): Promise<string> {
 describe('bundlePatchPath', () => {
   it('resolves the declared dsh.bundle.patch against the installed directory', () => {
     const manifest = { name: '@scope/demo', dsh: { bundle: { patch: './cordis.patch.yml' } } }
-    expect(bundlePatchPath(manifest, '/installed/@scope/demo')).toBe('/installed/@scope/demo/cordis.patch.yml')
+    expect(bundlePatchPath(manifest, '/installed/@scope/demo')).toBe(join('/installed/@scope/demo', 'cordis.patch.yml'))
   })
 
   it('returns undefined for plain plugins and malformed declarations', () => {

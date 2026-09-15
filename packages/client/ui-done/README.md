@@ -19,10 +19,10 @@ with evidence at the end.
 
 | state | ring | chip | text |
 | --- | --- | --- | --- |
-| `stated` | hollow gold | `STATED` (gold outline) | the statement |
-| `proven` | filled gold | `PROVEN` (gold fill) | the statement · the evidence |
+| `stated` | hollow white | `STATED` (white outline) | the statement |
+| `proven` | filled white | `PROVEN` (white fill, black text) | the statement · the evidence |
 
-Gold is earned: the filled chip and ring exist only for a proven contract.
+The ring and chip use `--saturn-accent`, with a neutral white fallback. Only a proven contract fills them; their labels and geometry keep the distinction readable without color.
 
 ## Composition
 

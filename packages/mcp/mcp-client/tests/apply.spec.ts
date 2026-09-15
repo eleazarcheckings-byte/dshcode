@@ -55,7 +55,7 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
 
 // vi.mock is hoisted above static imports, so the module under test sees the
 // mocked SDK even through a static import.
-import { apply, name, inject, Config as ConfigSchema } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
+import { apply, isServerConnected, name, inject, Config as ConfigSchema } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
 
 // ---- Helpers ----
 
@@ -216,7 +216,11 @@ describe('apply (plugin lifecycle)', () => {
     await Promise.all([apply(first.ctx, stdioConfig), apply(second.ctx, stdioConfig)])
 
     expect(mockConnect).toHaveBeenCalledTimes(2)
+    expect(isServerConnected(ctx, 'srv')).toBe(false)
+    expect(isServerConnected(first.ctx, 'srv')).toBe(true)
+    expect(isServerConnected(second.ctx, 'srv')).toBe(true)
     await Promise.all([first.dispose(), second.dispose()])
+    expect(isServerConnected(first.ctx, 'srv')).toBe(false)
   })
 
   it('releases the serverName reservation on dispose', async () => {

@@ -46,6 +46,7 @@ import {
 } from './ledger.ts'
 import type { Claim, ClaimBaseline, ClaimLedger, ClaimView, ScopeConflict } from './types.ts'
 import { claimStore, statIdentity, type ClaimStore } from './store.ts'
+import { canonicalConflicts, installWriteGuard } from './write-guard.ts'
 
 export type { Claim, ClaimBaseline, ClaimLedger, ClaimView, DriftFinding, ScopeConflict } from './types.ts'
 export { DEFAULT_TTL_MS, MAX_TTL_MS, MIN_TTL_MS, ROOT_SCOPE } from './ledger.ts'
@@ -81,7 +82,7 @@ const POLICY = [
   '2. IMMEDIATELY BEFORE EACH WRITE BURST, call claim_check on your claim. If it reports a file as moved, that file changed since the ledger last observed it: re-read it and rebase before writing. Never write a buffer you read minutes ago.',
   '3. RELEASE YOUR CLAIM with release_scope the moment your unit verifies. Claims also lapse on their own when the lease expires (two hours by default), so an abandoned lane frees itself without a human.',
   '4. ONE WRITER PER SURFACE. If you and another agent both need a file, the second should ask the first to hand the surface over. There is no shared write, and a scope you did not claim is not yours.',
-  '5. COMMIT THE MOMENT A UNIT VERIFIES. Git is the only thing that survives another hand\'s clobber.',
+  '5. First-party write, edit, and str_replace_editor calls cannot modify another session\'s active claimed scope. Shell commands, formatters, code generators, and external editors need explicit coordination; never use them to bypass a denied write. Preserve the user\'s commit and review preferences.',
 ].join('\n')
 
 /** One canonical output schema with compact model-facing JSON. */
@@ -129,6 +130,7 @@ const DRIFT_SCHEMA = {
 /** Mount enforced workspace claims: the ledger tools and the standing policy. */
 export function apply(ctx: Context): void {
   const store = claimStore()
+  installWriteGuard(ctx, store)
 
   ctx.systemPrompt.section({
     name: CLAIMS_SECTION,
@@ -183,13 +185,17 @@ export function apply(ctx: Context): void {
       // itself stays a short read-modify-write.
       const baseline = await baselineFor(workspace, scopes)
 
-      return await store.mutate(workspace, (raw): { ledger: ClaimLedger; result: { claim: ClaimView; expired: ClaimView[] } } => {
+      return await store.mutate(workspace, async (raw): Promise<ClaimMutation> => {
         const swept = expireClaims(raw, now)
         const ledger = swept.ledger
         // A holder re-claiming its own lane extends that lease instead of
         // colliding with it, so a repeated call can never self-deadlock.
         const own = ledger.claims.find(claim => claim.sessionId === sessionId && claim.lane === lane)
-        const conflicts = findConflicts(ledger.claims, scopes, now, own?.id)
+        const fs = ctx.get('fs')
+        const conflicts = fs === undefined
+          ? findConflicts(ledger.claims, scopes, now, own?.id)
+          : await canonicalConflicts(fs, workspace, ledger.claims.filter(claim => claim.id !== own?.id),
+            await Promise.all(scopes.map(scope => fs.resolve(scope, { cwd: workspace, signal: exec.signal }))), now, exec.signal)
         if (conflicts.length > 0) throw new ScopeConflictError(conflicts)
 
         const expired = swept.released.map(claim => viewOf(claim, now))
@@ -222,6 +228,7 @@ export function apply(ctx: Context): void {
         if (claim === undefined) {
           throw new Error(`release_scope: no live claim "${id}" (it may have lapsed, or belong to a workspace you are not in)`)
         }
+        if (claim.sessionId !== sessionIdOf(exec)) throw new Error(`release_scope: claim "${id}" belongs to another session; ask its holder to release it`)
         return {
           ledger: { ...swept.ledger, claims: swept.ledger.claims.filter(candidate => candidate.id !== id) },
           result: { released: viewOf(claim, now) },
@@ -296,6 +303,7 @@ export function apply(ctx: Context): void {
         if (claim === undefined) {
           throw new Error(`claim_check: no live claim "${id}" — it lapsed (leases auto-release) or was released; take it again with claim_scope`)
         }
+        if (claim.sessionId !== sessionIdOf(exec)) throw new Error(`claim_check: claim "${id}" belongs to another session; only its holder may rebase it`)
         const paths = requested === null ? claim.scopes : requested.scopes
         const findings: DriftFindingWire[] = []
         const baseline: Record<string, { mtimeMs: number; size: number } | null> = { ...claim.baseline }
@@ -357,6 +365,12 @@ interface DriftFindingWire {
   readonly path: string
   /** What changed since the ledger last observed the path. */
   readonly kind: 'moved' | 'created' | 'removed' | 'added'
+}
+
+/** What one claim_scope call hands back to its caller. */
+interface ClaimMutation {
+  readonly ledger: ClaimLedger
+  readonly result: { readonly claim: ClaimView; readonly expired: ClaimView[] }
 }
 
 /** A claim with an id equal to one the ledger already assigned, or a fresh one. */

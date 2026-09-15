@@ -1,0 +1,67 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SaturnBot messenger > pauses only the visualization while live execution context continues to update > pause visualization action 1`] = `
+<button
+  aria-label="Pause visualization"
+  class="iconButton"
+  title="Pause visualization. Agent work and live updates continue."
+  type="button"
+>
+  <svg
+    aria-hidden="true"
+    data-content="f74820e0"
+    fill="none"
+    height="18"
+    viewBox="0 0 20 20"
+    width="18"
+  />
+</button>
+`;
+
+exports[`SaturnBot messenger > pauses only the visualization while live execution context continues to update > resume visualization action 1`] = `
+<button
+  aria-label="Resume visualization"
+  class="iconButton"
+  title="Resume visualization. System reduced-motion settings still apply."
+  type="button"
+>
+  <svg
+    aria-hidden="true"
+    data-content="fea7c0a2"
+    fill="none"
+    height="18"
+    viewBox="0 0 20 20"
+    width="18"
+  />
+</button>
+`;
+
+exports[`SaturnBot messenger > shows only the selected role timeline and disables dispatch during an active cycle 1`] = `
+<div
+  aria-label="Conversation with Developer"
+  aria-live="polite"
+  class="timeline"
+  role="log"
+>
+  <article
+    class="message"
+    data-sender="agent"
+  >
+    <div
+      class="messageMeta"
+    >
+      Developer
+      <time
+        datetime="2026-09-14T12:00:00.000Z"
+      >
+        2026-09-14T12:00:00.000Z
+      </time>
+    </div>
+    <div
+      class="messageBubble"
+    >
+      Navigation inspected.
+    </div>
+  </article>
+</div>
+`;

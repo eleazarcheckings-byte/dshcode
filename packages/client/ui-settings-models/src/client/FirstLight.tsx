@@ -5,11 +5,10 @@
  * versioned testing notice and the DeepSeek prompt stay registered behind it
  * and resume their old roles once setup is sealed.
  *
- * The sequence is a hard gate: every required step reaches Continue only on
- * its own evidence, and the two optional connections (the Design brain and
- * Connectors) may be declined explicitly, never silently skipped. A connection
- * toggled On must verify green before the receipt can seal. The seal is written
- * last and read back, so a run that did not persist can never complete.
+ * DeepSeek can be verified here, or model configuration can be deferred to
+ * Models after the remaining setup steps. Deferral never verifies a provider.
+ * Optional connections may be declined explicitly. The seal is written last
+ * and read back, so a run that did not persist can never complete.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -19,7 +18,6 @@ import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FirstLightState, FirstLightStore } from './first-light-store.ts'
 import type { DesignBrainOutcome } from './design-brain.ts'
-import { DESIGN_BRAIN_ENDPOINT } from './design-brain.ts'
 import type { ModelsSettingsState, ModelsSettingsStore } from './store.ts'
 import { onboardingReadiness } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
@@ -100,8 +98,10 @@ export interface FirstLightInjected {
   operations: ModelsOperations
   /** Settings schema and immutable path callbacks. */
   schema: SettingsSchemaOperations
-  /** Verify the Design brain endpoint; never faked. */
+  /** Persist opt-in and verify that the Host registered the required tools. */
   verifyDesignBrain: () => Promise<DesignBrainOutcome>
+  /** Skip optional guidance and remove any setup-owned saved opt-in. Profile rows remain independent. */
+  declineDesignBrain: () => Promise<boolean>
   /**
    * Open the native folder picker and report the one outcome: the chosen path,
    * the user's cancel, or a named failure. A picker that cannot open is
@@ -146,8 +146,8 @@ const TONES = ['direct', 'warm', 'detailed'] as const
  */
 export function FirstLight(props: FirstLightProps): ReactNode {
   const {
-    complete, controller, useFirstLight, useModels, modelsController, operations, schema,
-    verifyDesignBrain, pickWorkspace, registerWorkspace, writeAgentMemory, t,
+    complete, openSection, controller, useFirstLight, useModels, modelsController, operations, schema,
+    verifyDesignBrain, declineDesignBrain, pickWorkspace, registerWorkspace, writeAgentMemory, t,
   } = props
   const state = useFirstLight(snapshot => snapshot)
   const models = useModels(snapshot => snapshot)
@@ -157,6 +157,7 @@ export function FirstLight(props: FirstLightProps): ReactNode {
   const [building, setBuilding] = useState('')
   const [language, setLanguage] = useState<string>('en')
   const [modelStatus, setModelStatus] = useState<VerifyStatus>('idle')
+  const [modelDeferred, setModelDeferred] = useState(false)
   const [modelError, setModelError] = useState<string | null>(null)
   const [brainStatus, setBrainStatus] = useState<VerifyStatus>('idle')
   const [brainError, setBrainError] = useState<string | null>(null)
@@ -177,11 +178,12 @@ export function FirstLight(props: FirstLightProps): ReactNode {
     if (next !== undefined) setStep(next)
   }
 
-  const readiness = onboardingReadiness(models)
   const row = models.rows.find(candidate =>
     candidate.entry.provider === 'deepseek-official'
     && candidate.entry.settingsNs === 'llm-deepseek'
     && candidate.entry.settingsPath.length === 0)
+  // Another provider's credential cannot authorize an automatic DeepSeek probe.
+  const readiness = onboardingReadiness({ ...models, rows: row === undefined ? [] : [row] })
   const namespace = models.namespaces.get('llm-deepseek')
   /** The DeepSeek route exists and is live, so its gate is the live probe below. */
   const deepSeekLane = row !== undefined && row.entry.active
@@ -211,6 +213,7 @@ export function FirstLight(props: FirstLightProps): ReactNode {
     if (finished.current) return
     finished.current = true
     complete()
+    if (modelDeferred) openSection('models')
   }
 
   useEffect(() => {
@@ -249,6 +252,7 @@ export function FirstLight(props: FirstLightProps): ReactNode {
   }
 
   const verifyBrain = async (): Promise<void> => {
+    setBrainDeclined(false)
     setBrainStatus('checking')
     setBrainError(null)
     const outcome = await verifyDesignBrain()
@@ -319,7 +323,7 @@ export function FirstLight(props: FirstLightProps): ReactNode {
     let memoryError: string | null = null
     if (profileSaved && voiceSaved) {
       const memory = await writeAgentMemory({
-        name, building, language, tone, consultDesignBrain: !brainDeclined,
+        name, building, language, tone, consultDesignBrain: brainStatus === 'verified' && !brainDeclined,
       })
       if (memory.kind === 'failed') memoryError = memory.message
     }
@@ -412,16 +416,18 @@ export function FirstLight(props: FirstLightProps): ReactNode {
           </>
         )
       case 'model': {
-        // The DeepSeek route is absent or inactive in this build: no key can be
-        // collected and no request can be made, so the step is informational.
-        // This is the only ungated model path, and it is a deployment fact, not
-        // a user choice — everything with a live route must probe green.
+        const chooseProviderLater = (): void => {
+          setModelDeferred(true)
+          advance()
+        }
         if (!deepSeekLane) {
           return (
             <>
               <p className={css.copy}>{t('firstLightModelUnavailable')}</p>
               <div className={css.actions}>
-                <Button variant="primary" onClick={advance}>{t('firstLightContinue')}</Button>
+                <Button variant="primary" onClick={chooseProviderLater}>
+                  {t('onboardingOtherProvider')}
+                </Button>
               </div>
             </>
           )
@@ -466,6 +472,9 @@ export function FirstLight(props: FirstLightProps): ReactNode {
               : null}
             {modelStatus === 'verified' ? <p className={css.status}>{t('firstLightModelVerified')}</p> : null}
             <div className={css.actions}>
+              <button type="button" className={css.secondary} onClick={chooseProviderLater}>
+                {t('onboardingOtherProvider')}
+              </button>
               <button
                 type="button"
                 className={css.secondary}
@@ -482,6 +491,7 @@ export function FirstLight(props: FirstLightProps): ReactNode {
                 {t('firstLightContinue')}
               </Button>
             </div>
+            <p className={css.note}>{t('firstLightOtherProviderDetail')}</p>
           </>
         )
       }
@@ -489,7 +499,7 @@ export function FirstLight(props: FirstLightProps): ReactNode {
         return (
           <>
             <p className={css.copy}>{t('firstLightBrainBody')}</p>
-            <p className={css.note}>{DESIGN_BRAIN_ENDPOINT}</p>
+            <p className={css.note}>{t('designBrainEndpointNotice')}</p>
             {brainStatus === 'checking' ? <p className={css.note}>{t('firstLightChecking')}</p> : null}
             {brainStatus === 'verified'
               ? (
@@ -506,17 +516,25 @@ export function FirstLight(props: FirstLightProps): ReactNode {
               <button
                 type="button"
                 className={css.secondary}
-                onClick={() => { setBrainDeclined(true); setBrainStatus('idle'); setBrainError(null) }}
+                disabled={brainStatus === 'checking' || brainStatus === 'verified'}
+                onClick={() => {
+                  setBrainStatus('checking')
+                  void declineDesignBrain().then((declined) => {
+                    setBrainDeclined(declined)
+                    setBrainStatus(declined ? 'idle' : 'failed')
+                    setBrainError(declined ? null : t('designBrainUnavailable'))
+                  })
+                }}
               >
                 {t('firstLightNotNow')}
               </button>
               <button
                 type="button"
                 className={css.secondary}
-                disabled={brainStatus === 'checking'}
+                disabled={brainStatus === 'checking' || brainStatus === 'verified'}
                 onClick={() => { void verifyBrain() }}
               >
-                {t('firstLightVerify')}
+                {t('designBrainConnect')}
               </button>
               <Button
                 variant="primary"
@@ -640,7 +658,9 @@ export function FirstLight(props: FirstLightProps): ReactNode {
               <dd className={css.summaryValue}>{`${name} — ${building}`}</dd>
               <dt className={css.summaryTerm}>{t('firstLightReceiptModel')}</dt>
               <dd className={css.summaryValue}>
-                {modelStatus === 'verified' ? t('firstLightModelVerified') : t('firstLightModelReady')}
+                {modelDeferred || modelStatus !== 'verified'
+                  ? t('firstLightModelDeferred')
+                  : t('firstLightModelVerified')}
               </dd>
               <dt className={css.summaryTerm}>{t('firstLightReceiptBrain')}</dt>
               <dd className={css.summaryValue}>
@@ -672,7 +692,8 @@ export function FirstLight(props: FirstLightProps): ReactNode {
                 {t('firstLightBack')}
               </button>
               <Button variant="primary" disabled={sealing} onClick={() => { void startChatting() }}>
-                {sealing ? t('onboardingSaving') : t('firstLightStart')}
+                {sealing ? t('onboardingSaving')
+                  : modelDeferred ? t('firstLightOpenModels') : t('firstLightStart')}
               </Button>
             </div>
           </>

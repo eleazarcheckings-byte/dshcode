@@ -18,7 +18,7 @@ import z from '@deepseek-ai/schemastery'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { RECONNECT_DEFAULTS, resolveReconnectPolicy, startConnection } from './connection.ts'
-import type { ReconnectConfig } from './connection.ts'
+import type { ConnectionHandle, ReconnectConfig } from './connection.ts'
 // Side-effect type import: declaration-merges `ctx.tools` onto Context.
 import type {} from '@deepseek-ai/dsh-tools'
 
@@ -42,7 +42,18 @@ const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,32}$/
  * servers may reuse a namespace in another Agent, while global instances and
  * duplicates inside one Agent remain mutually exclusive.
  */
-const activeServerNames = new WeakMap<object, Set<string>>()
+const activeServerNames = new WeakMap<object, Map<string, ConnectionHandle | undefined>>()
+
+/**
+ * Read the supervisor's live connection state in the caller's exact registration scope.
+ * Registered tool wrappers may outlive a disconnected transport during reconnect.
+ * @param ctx - Context in the scope that owns the server connection.
+ * @param serverName - Configured MCP namespace, without the mcp__ prefix.
+ * @returns True only after the current generation completed connection and initial tool sync.
+ */
+export function isServerConnected(ctx: Context, serverName: string): boolean {
+  return activeServerNames.get(scopeOf(ctx) ?? ctx.root)?.get(serverName)?.connected ?? false
+}
 
 // ---- Config ----
 
@@ -64,6 +75,8 @@ export interface StdioConfig {
   env: Record<string, string>
   /** Working directory for the child process. */
   cwd: string
+  /** Optional deadline for each connection handshake plus initial tool sync, in milliseconds. */
+  connectTimeoutMs?: number
   /** Per-tool-call timeout in milliseconds. */
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
@@ -86,6 +99,8 @@ export interface StreamableHttpConfig {
   url: string
   /** Additional headers attached to MCP requests. */
   headers: Record<string, string>
+  /** Optional deadline for each connection handshake plus initial tool sync, in milliseconds. */
+  connectTimeoutMs?: number
   /** Per-tool-call timeout in milliseconds. */
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
@@ -118,6 +133,7 @@ export const Config = z.union([
     args: z.array(String).default([]),
     env: z.dict(String).default({}),
     cwd: z.string().default(''),
+    connectTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
     reconnect: Reconnect,
@@ -127,6 +143,7 @@ export const Config = z.union([
     serverName: z.string().required().pattern(SERVER_NAME_PATTERN),
     url: z.string().required(),
     headers: z.dict(String).default({}),
+    connectTimeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
     reconnect: Reconnect,
@@ -155,7 +172,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     const owner = scopeOf(ctx) ?? ctx.root
     let names = activeServerNames.get(owner)
     if (!names) {
-      names = new Set()
+      names = new Map()
       activeServerNames.set(owner, names)
     }
     if (names.has(config.serverName)) {
@@ -163,7 +180,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         `mcp-client: serverName "${config.serverName}" is already in use by another mcp-client instance — pick a unique serverName in cordis.yml`,
       )
     }
-    names.add(config.serverName)
+    names.set(config.serverName, undefined)
     return () => void names.delete(config.serverName)
   }, 'mcp-client.serverName')
 
@@ -171,6 +188,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // loop, and the live tool registrations; disposal stops reconnection,
   // quiesces in-flight work, and unregisters the current generation.
   const connection = startConnection(ctx, config, reconnect)
+  activeServerNames.get(scopeOf(ctx) ?? ctx.root)?.set(config.serverName, connection)
 
   ctx.effect(() => {
     return () => connection.dispose()

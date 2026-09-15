@@ -10,7 +10,7 @@
  * lapses and frees itself, and that two different workspaces never contend.
  */
 
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -19,6 +19,9 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
+import * as StringEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
 import * as ClaimsPlugin from '../src/index.ts'
 import { claimStore } from '../src/store.ts'
 import type { ClaimLedger } from '../src/types.ts'
@@ -69,6 +72,9 @@ async function mount(): Promise<Context> {
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(ClaimsPlugin)
+  await ctx.plugin(LocalFileSystem, { cwd: work })
+  await ctx.plugin(ToolFs)
+  await ctx.plugin(StringEditor)
   return ctx
 }
 
@@ -180,6 +186,19 @@ describe('claim_scope is a lock, not a note', () => {
     expect((await call(ctx, waiter, 'claim_scope', { lane: 'take', scopes: ['src/api'] })).isError).toBe(false)
   })
 
+  it('prevents another session from releasing or rebasing the holder claim', async () => {
+    const ctx = await mount()
+    const holder = agentIn(ctx, 'session-a')
+    const peer = agentIn(ctx, 'session-b')
+    const id = await claim(ctx, holder, 'api', ['src/api'])
+    for (const name of ['release_scope', 'claim_check']) {
+      const denied = await call(ctx, peer, name, { claim_id: id })
+      expect(denied.isError).toBe(true)
+      expect(denied.text).toContain('belongs to another session')
+    }
+    expect((await call(ctx, peer, 'claim_list', {})).text).toContain(id)
+  })
+
   it('releases a lapsed lease and reports it, so an abandoned lane frees itself', async () => {
     const ctx = await mount()
     const abandoned = agentIn(ctx, 'session-a')
@@ -199,6 +218,88 @@ describe('claim_scope is a lock, not a note', () => {
 
     // And the surface is genuinely free again, not just omitted from the view.
     expect((await call(ctx, waiter, 'claim_scope', { lane: 'take', scopes: ['src/api'] })).isError).toBe(false)
+  })
+})
+
+describe('peer leases protect first-party filesystem mutations', () => {
+  it.each([
+    ['write', { file_path: 'src/app.ts', content: 'overwritten' }],
+    ['edit', { file_path: 'src/app.ts', old_string: 'original', new_string: 'overwritten' }],
+    ['str_replace_editor', { command: 'str_replace', old_str: 'original', new_str: 'overwritten' }],
+    ['str_replace_editor', { command: 'insert', insert_line: 0, new_str: 'overwritten' }],
+  ])('denies %s before it changes a peer-owned file', async (name, args) => {
+    const ctx = await mount()
+    const owner = agentIn(ctx, 'owner')
+    const peer = agentIn(ctx, 'peer')
+    await mkdir(join(work, 'src'))
+    await writeFile(join(work, 'src/app.ts'), 'original\n')
+    await claim(ctx, owner, 'app', ['src'])
+    const denied = await call(ctx, peer, name, { ...args, ...(name === 'str_replace_editor' ? { path: join(work, 'src/app.ts') } : {}) })
+    expect(denied.isError).toBe(true)
+    expect(denied.text).toContain('DENIED: another session holds an active workspace claim')
+    expect(await readFile(join(work, 'src/app.ts'), 'utf8')).toBe('original\n')
+  })
+
+  it('allows reads, owner edits and unclaimed work, then grants a peer write after release', async () => {
+    const ctx = await mount()
+    const owner = agentIn(ctx, 'owner')
+    const peer = agentIn(ctx, 'peer')
+    const id = await claim(ctx, owner, 'app', ['src'])
+    const write = { file_path: 'src/app.ts', content: 'original\n' }
+    expect((await call(ctx, owner, 'write', write)).isError).toBe(false)
+    expect((await call(ctx, peer, 'read', { file_path: 'src/app.ts' })).isError).toBe(false)
+    expect((await call(ctx, peer, 'write', { file_path: 'notes.md', content: 'independent' })).isError).toBe(false)
+    await call(ctx, owner, 'release_scope', { claim_id: id })
+    expect((await call(ctx, peer, 'write', { ...write, content: 'handoff\n' })).isError).toBe(false)
+    expect(await readFile(join(work, 'src/app.ts'), 'utf8')).toBe('handoff\n')
+  })
+
+  it('blocks editor create in an owned directory and admits it after lease expiry', async () => {
+    const ctx = await mount()
+    const owner = agentIn(ctx, 'owner')
+    const peer = agentIn(ctx, 'peer')
+    await mkdir(join(work, 'src'))
+    await claim(ctx, owner, 'app', ['src'])
+    const args = { command: 'create', path: join(work, 'src/new.ts'), file_text: 'new file' }
+    expect((await call(ctx, peer, 'str_replace_editor', args)).isError).toBe(true)
+    await editLedger(ledger => ({ ...ledger, claims: ledger.claims.map(claim => ({ ...claim, expiresAt: Date.now() - 1 })) }))
+    expect((await call(ctx, peer, 'str_replace_editor', args)).isError).toBe(false)
+  })
+
+  it('recognizes directory aliases during claim acquisition and writing', async () => {
+    const ctx = await mount()
+    const owner = agentIn(ctx, 'owner')
+    const peer = agentIn(ctx, 'peer')
+    await mkdir(join(work, 'src'))
+    await symlink(join(work, 'src'), join(work, 'alias'), process.platform === 'win32' ? 'junction' : 'dir')
+    await claim(ctx, owner, 'app', ['src'])
+    expect((await call(ctx, peer, 'claim_scope', { lane: 'alias', scopes: ['alias'] })).isError).toBe(true)
+    expect((await call(ctx, peer, 'write', { file_path: 'alias/app.ts', content: 'collision' })).isError).toBe(true)
+  })
+
+  it('keeps a competing claim outside an in-flight write transaction', async () => {
+    const ctx = await mount()
+    const owner = agentIn(ctx, 'owner')
+    const peer = agentIn(ctx, 'peer')
+    let entered!: () => void
+    let finish!: () => void
+    const writing = new Promise<void>((resolve) => { entered = resolve })
+    const releaseWrite = new Promise<void>((resolve) => { finish = resolve })
+    ctx.on('tools/execute', async (exec, next) => {
+      if (exec.name === 'write') {
+        entered()
+        await releaseWrite
+      }
+      return await next()
+    })
+    const pendingWrite = call(ctx, owner, 'write', { file_path: 'app.ts', content: 'completed before claim' })
+    await writing
+    const pendingClaim = call(ctx, peer, 'claim_scope', { lane: 'app', scopes: ['app.ts'] })
+    finish()
+    expect((await pendingWrite).isError).toBe(false)
+    expect((await pendingClaim).isError).toBe(false)
+    expect((await call(ctx, owner, 'write', { file_path: 'app.ts', content: 'must not overwrite' })).isError).toBe(true)
+    expect(await readFile(join(work, 'app.ts'), 'utf8')).toBe('completed before claim')
   })
 })
 

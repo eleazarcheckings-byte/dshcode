@@ -13,7 +13,6 @@
  *   - Colour is reinforcement, never the only channel: the uppercase label
  *     still spells the tier, which is what carries for red/green colour
  *     blindness.
- *   - `overflow: hidden` clips the ambient canvas to the capsule bounds.
  */
 
 .chip {
@@ -30,7 +29,6 @@
   font-weight: 500;
   letter-spacing: 0.025em;
   text-transform: uppercase;
-  /* Clip the ambient canvas to the capsule. */
   overflow: hidden;
   cursor: default;
   user-select: none;
@@ -65,7 +63,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  /* Sits above the ambient canvas. */
+  corner-shape: round;
   position: relative;
   z-index: 1;
   transition: background 400ms ease, box-shadow 400ms ease;
@@ -93,8 +91,7 @@
   white-space: nowrap;
 }
 
-/* Reduce-motion: remove transitions and hide canvas (canvas is also hidden
-   via its own CSS @media rule). */
+/* Reduced motion also suppresses the once-per-tier color transition. */
 @media (prefers-reduced-motion: reduce) {
   .chip,
   .dot {

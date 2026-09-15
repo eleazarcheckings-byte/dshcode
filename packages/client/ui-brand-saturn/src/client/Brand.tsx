@@ -1,20 +1,16 @@
 /**
  * Saturn AI brand presentation components. The glyph draws inline with
- * `currentColor`, so it inherits the active theme's text color; the wordmark
+ * `currentColor`, with the skin's monochrome accent; the wordmark
  * stylesheet rides a plugin-tagged style element injected at load.
  */
 import { useId } from 'react'
 import type { HeroBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SidebarBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 
-// The ink is the semantic `--dsw-alias-label-primary`, never a `--dsw-static-*`
-// index. The static scales are mode-independent (index 00 lightest, 1000
-// darkest in every mode), so `--dsw-static-neutral-900` is a near-black in both
-// palettes — reading it here painted the wordmark #191920 on the sidebar's
-// #101016 surface (≈1.1:1) and the name vanished. The alias is the layer that
-// switches per mode; on this dark-only skin it resolves to neutral-bluish-50.
+// The accent owns brand contrast; the semantic label remains the fallback
+// for compositions that provide no Saturn skin.
 const WORDMARK_CSS = [
-  '.saturn-brand-wordmark{display:inline-flex;align-items:baseline;gap:.45em;font-weight:680;letter-spacing:-.02em;font-size:15px;line-height:1;color:var(--dsw-alias-label-primary,currentColor);white-space:nowrap}',
+  '.saturn-brand-wordmark{display:inline-flex;align-items:baseline;gap:.45em;font-weight:680;letter-spacing:-.02em;font-size:15px;line-height:1;color:var(--saturn-accent,var(--dsw-alias-label-primary,currentColor));white-space:nowrap}',
   '.saturn-brand-wordmark .saturn-brand-ai{font-weight:520;opacity:.6;font-size:.9em}',
 ].join('\n')
 
@@ -37,7 +33,7 @@ if (typeof document !== 'undefined' && document.querySelector('style[data-plugin
 export function SaturnGlyph({ size }: SidebarBrandMarkOwnerProps) {
   const clipId = useId()
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" style={{ color: 'var(--saturn-accent, currentColor)' }} aria-hidden="true">
       <defs>
         <clipPath id={clipId}>
           <rect x={0} y={33} width={64} height={31} />

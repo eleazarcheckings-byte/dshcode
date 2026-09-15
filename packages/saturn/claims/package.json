@@ -38,7 +38,8 @@
     "@deepseek-ai/dsh-home-paths": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^"
+    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-fs": "workspace:^"
   },
   "dependencies": {
     "zod": "^4.4.3"
@@ -50,6 +51,15 @@
     "@deepseek-ai/dsh-home-paths": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^"
+    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-fs": "workspace:^",
+    "@deepseek-ai/dsh-fs-local": "workspace:^",
+    "@deepseek-ai/dsh-tool-fs": "workspace:^",
+    "@deepseek-ai/dsh-tool-str-replace-editor": "workspace:^",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:^",
+    "@deepseek-ai/cordis-plugin-include": "workspace:^",
+    "@deepseek-ai/dsh-llm": "workspace:^",
+    "@deepseek-ai/dsh-agent-loop": "workspace:^",
+    "@deepseek-ai/dsh-session-projection": "workspace:^"
   }
 }

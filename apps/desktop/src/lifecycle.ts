@@ -3,7 +3,7 @@
 // Type-only: erased at build, so this module still runs without an Electron
 // global (the sandboxed preload inlines it) while the application-menu roles
 // stay the exact union Electron accepts.
-import type { MenuItemConstructorOptions } from 'electron'
+import type { BrowserWindow, MenuItemConstructorOptions } from 'electron'
 
 /** Result of classifying a renderer navigation target. */
 export type NavigationDisposition = 'application' | 'external' | 'blocked'
@@ -83,6 +83,35 @@ export function navigationDisposition(
   if (destination.origin === applicationOrigin) return 'application'
   if (destination.protocol === 'https:') return 'external'
   return 'blocked'
+}
+
+/**
+ * Accept only the dedicated same-origin SaturnBot window route.
+ * @param rawUrl - Absolute popup destination supplied by Electron.
+ * @param applicationOrigin - Exact origin of this desktop's authenticated server.
+ * @returns Whether a separate application window may load this destination.
+ */
+export function isSaturnBotWindowUrl(rawUrl: string, applicationOrigin: string): boolean {
+  let destination: URL
+  try { destination = new URL(rawUrl) } catch { return false }
+  return destination.origin === applicationOrigin && destination.pathname === '/'
+    && destination.username === '' && destination.password === '' && destination.hash === ''
+    && destination.searchParams.size === 1 && destination.searchParams.get('saturnbot') === '1'
+}
+
+/**
+ * Restore the existing SaturnBot window without navigating or replacing its renderer.
+ * @param window - The desktop-owned popup, when it has been opened.
+ * @returns Whether an existing popup was shown and focused.
+ */
+export function restoreSaturnBotWindow(
+  window: Pick<BrowserWindow, 'isDestroyed' | 'isMinimized' | 'restore' | 'show' | 'focus'> | undefined,
+): boolean {
+  if (window === undefined || window.isDestroyed()) return false
+  if (window.isMinimized()) window.restore()
+  window.show()
+  window.focus()
+  return true
 }
 
 /**
@@ -188,6 +217,9 @@ const DESKTOP_VERSION_ARG_PREFIX = '--dsh-app-version='
 
 /** IPC channel the renderer menu button invokes to pop the window menu. */
 export const DESKTOP_SHOW_MENU_CHANNEL = 'desktop:show-menu'
+
+/** IPC channel through which the main harness restores its retained SaturnBot window. */
+export const DESKTOP_RESTORE_SATURNBOT_CHANNEL = 'desktop:restore-saturnbot'
 
 /** IPC channel the renderer invokes to restart the application in place. */
 export const DESKTOP_RESTART_CHANNEL = 'desktop:restart'

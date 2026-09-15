@@ -1,5 +1,5 @@
 ---
-description: "十个让模型创建、发消息与协调 teammate 的工具，供组合 Team 插件的部署方阅读。"
+description: "十个让模型创建、发消息与协调 teammate 的工具，供组合 Saturn Team 插件的部署方阅读。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`@saturnai/dsh-tool-agent-team` 在团队领域包之上给模型一套团队工具：创建具名 teammate、给它们发消息或后续任务、查看谁在线、等待进展、中断卡住的 teammate，以及管理共享任务板——共十个工具。每个成员的提示词中都有一段简短策略，教模型何时组建团队（只有你要求时）以及如何在共享工作区协作。挂载它会用同名的团队工具取代旧版 subagent 控件，因此组合必须禁用旧定义。只有你明确要求组建团队时才会创建 teammate。
+`@saturnai/dsh-tool-agent-team` 为每个 Team 成员提供十个工具，用于具名 teammate、持久消息、后续任务、进展、中断和共享任务板。提示词遵循会话的多任务设置：ON 会主动委派较大的独立工作；OFF 则在单一线程中工作，除非用户要求委派。挂载 Team 运行时后，内置 preset 会禁用名称冲突的旧控制工具。
 
 ## 目录
 
@@ -29,7 +29,7 @@ kind: "package-reference"
 
 ### 何时选择
 
-当模型应该自行创建与协调 teammate、而不是由人来操作 subagent 控件时，选择它。当同名的旧全局 subagent 工具必须继续可用时，请不要选择：团队工具会为团队成员取代它们，因此想同时使用两者的组合必须禁用旧定义。固定策略只在明确要求团队或 teammate 时创建成员，因此普通任务永远不会自行触发委派。
+需要持续协调、共享任务或后续工作时选择本包。对于有明确范围且无需后续协调的独立工作，使用一次性 subagent。自定义组合必须禁用同名旧控制工具。没有多任务策略时，模型可以在并行工作有益于任务或用户要求时进行委派。
 
 ### 最小工作示例
 
@@ -125,7 +125,7 @@ member scope 上的一个 `team:policy` 段落教每个成员自己的角色与�
 
 #### 模型看到什么
 
-一段稳定策略会说明确切 Team role／name／id、显式 delegation 要求、共享 cwd 行为、文件 stale-version 恢复、Bash／formatter／codegen 风险、task／write-scope 协调、quiet 与 waking 投递区别、mailbox 不重试规则，以及 Lead 必须在回答前等待。`spawn_teammate` 到 `team_task_update` 的十个 Team schema 只出现在 Team member scope。
+一段稳定策略会说明确切 Team role／name／id、会话多任务策略、共享 cwd 行为、文件 stale-version 恢复、Bash／formatter／codegen 风险、task／write-scope 协调、quiet 与 waking 投递区别、mailbox 不重试规则，以及 Lead 必须在回答前等待。`spawn_teammate` 到 `team_task_update` 的十个 Team schema 只出现在 Team member scope。
 
 #### Token 影响
 
@@ -143,9 +143,10 @@ Team 插件 generation、配置、member role／name 与 schema 不变时，前�
 这些限制说明策略与工具无法为一支团队保证什么。它们是当前包约束，不是与其他协作表面的对比。
 
 - **提示词策略只负责协调，不负责 confinement**——它无法阻止 Bash 或外部进程写入重叠文件。
-- **不会自主创建 Team**——除非用户明确要求，普通任务不会触发 delegation。
+- **指导遵循会话意图**——多任务开关改变提示词指导，不会注销工具。挂载 claims 插件后，第一方文件工具会强制执行文件所有权。
 - **没有 Web 控制功能**——浏览器 roster 与任务板呈现不属于该运行时包。
-- **必须让位而非共用旧控件**——Team 工具复用旧版 subagent 的工具名，因此保留全局 continuable-child 行的组合会出现两套相互竞争的表面。
+- **必须替换旧控件**——Team 工具复用旧版 subagent 工具名。自定义组合必须禁用名称冲突的全局 continuable-child 控件；挂载 Team 时，内置 preset 会处理这一点。
+- **预发布 schema**——Team 工具 schema 可能随 Saturn 运行时演进而改变。
 
 <a id="dev-note"></a>
 ### 开发备注

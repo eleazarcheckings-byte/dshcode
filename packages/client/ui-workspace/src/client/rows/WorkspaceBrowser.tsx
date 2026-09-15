@@ -26,6 +26,7 @@ import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from '..
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
+import { QuickSwitch } from '../QuickSwitch.tsx'
 import css from './WorkspaceBrowser.module.css'
 
 /**
@@ -1095,6 +1096,8 @@ export function WorkspaceBrowser({
 
   return (
     <div className={clsx(css.root, !wide && css.rail)}>
+      <QuickSwitch wide={wide} useSessions={useSessions} useWorkspaces={useWorkspaces}
+        useSessionPendingInteraction={useSessionPendingInteraction} startSession={startSession} open={open} t={t} />
       <div className={css.sectionHeader}>
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
@@ -1130,6 +1133,7 @@ export function WorkspaceBrowser({
                 ref={searchInput}
                 className={css.searchInput}
                 type="text"
+                aria-label={t('search.sessions.aria')}
                 placeholder={t('search.placeholder')}
                 maxLength={SEARCH_QUERY_MAX_CODE_UNITS}
                 value={query}

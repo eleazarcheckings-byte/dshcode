@@ -11,6 +11,7 @@ import {
   DESKTOP_NOTIFICATION_CLICK_CHANNEL,
   DESKTOP_RESTART_CHANNEL,
   DESKTOP_SHOW_MENU_CHANNEL,
+  DESKTOP_RESTORE_SATURNBOT_CHANNEL,
   desktopBridgePayload,
 } from './lifecycle.ts'
 
@@ -24,6 +25,7 @@ contextBridge.exposeInMainWorld('dshDesktop', {
   restart: () => {
     void ipcRenderer.invoke(DESKTOP_RESTART_CHANNEL)
   },
+  restoreSaturnBot: (): Promise<boolean> => ipcRenderer.invoke(DESKTOP_RESTORE_SATURNBOT_CHANNEL),
   // Native notifications: the main process owns the Notification instance,
   // and a click focuses the window and echoes the request id back here so
   // the renderer can open the notification's target session.

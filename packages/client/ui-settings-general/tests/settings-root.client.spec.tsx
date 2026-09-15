@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { Modal, OnboardingSurface } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsRootComponentProps } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
 import { en } from '../src/client/locales.ts'
@@ -14,6 +16,7 @@ afterEach(() => {
 
 type Row = { id: string; order: number; label: string }
 type Step = { id: string; order: number }
+type OnboardingOwner = { stepId: string; complete: () => void; openSection: (id: string) => void }
 
 /** Slot-content stand-ins: the shell renders whatever the seats contribute. */
 const SEAT_CONTENT: Record<string, string> = {
@@ -32,6 +35,8 @@ function mount({
   wide = true,
   connectionState = 'connected',
   onboardingActive = true,
+  onboardingContent,
+  sectionContent,
   rows = [
     { id: 'general', order: 0, label: 'General' },
     { id: 'models', order: 10, label: 'Models' },
@@ -45,6 +50,8 @@ function mount({
   wide?: boolean
   connectionState?: ConnectionSnapshot
   onboardingActive?: boolean
+  onboardingContent?: (owner: OnboardingOwner) => ReactNode
+  sectionContent?: () => ReactNode
   rows?: Row[]
   steps?: Step[]
 } = {}) {
@@ -57,7 +64,8 @@ function mount({
   const reconnect = vi.fn()
   const renderSlot = vi.fn(
     ((key: string, _owner: unknown, opts?: { only?: string }) => {
-      if (key === 'settings.section') return <div data-testid={`section-${opts?.only ?? 'all'}`} />
+      if (key === 'settings.section') return <div data-testid={`section-${opts?.only ?? 'all'}`}>{sectionContent?.()}</div>
+      if (key === 'settings.onboarding') return onboardingContent?.(_owner as OnboardingOwner)
       return SEAT_CONTENT[key]
     }) as SettingsRootComponentProps['renderSlot'],
   )
@@ -236,6 +244,74 @@ describe('SettingsPanel close paths', () => {
 })
 
 describe('SettingsPanel navigation', () => {
+  it('wraps Tab and Shift+Tab within Settings without including hidden or disabled controls', () => {
+    mount({ sectionContent: () => (
+      <>
+        <button type="button">Last setting</button>
+        <button type="button" disabled>Disabled setting</button>
+        <div hidden><button type="button">Hidden setting</button></div>
+        <button type="button" tabIndex={-1}>Programmatic setting</button>
+      </>
+    ) })
+    const trigger = openPanel()
+    const first = screen.getByRole('button', { name: 'General' })
+    const last = screen.getByRole('button', { name: 'Last setting' })
+    last.focus()
+    expect(fireEvent.keyDown(last, { key: 'Tab' })).toBe(false)
+    expect(document.activeElement).toBe(first)
+    expect(fireEvent.keyDown(first, { key: 'Tab', shiftKey: true })).toBe(false)
+    expect(document.activeElement).toBe(last)
+    expect(fireEvent.keyDown(last, { key: 'Tab', shiftKey: true })).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(document.activeElement).toBe(trigger)
+    expect(fireEvent.keyDown(trigger, { key: 'Tab' })).toBe(true)
+  })
+
+  it('leaves keyboard events from a nested portaled dialog to that dialog', () => {
+    mount({ sectionContent: () => (
+      <Modal open title="Provider confirmation" headless onClose={() => {}}>
+        <button type="button">Confirm provider</button>
+      </Modal>
+    ) })
+    openPanel()
+    const confirm = screen.getByRole('button', { name: 'Confirm provider' })
+    confirm.focus()
+    expect(fireEvent.keyDown(confirm, { key: 'Tab' })).toBe(true)
+    expect(document.activeElement).toBe(confirm)
+    expect(fireEvent.keyDown(confirm, { key: 'Tab', shiftKey: true })).toBe(true)
+    expect(screen.getByRole('dialog', { name: 'Settings Title' })).toBeTruthy()
+  })
+
+  it('releases onboarding inert ownership while Models is open and resumes the pending step on close', () => {
+    const appRoot = document.createElement('div')
+    appRoot.id = 'root'
+    document.body.append(appRoot)
+    try {
+      mount({ onboardingContent: owner => (
+        <OnboardingSurface>
+          <div role="dialog" aria-label="Provider setup">
+            <span>{owner.stepId}</span>
+            <button type="button" onClick={() => { owner.openSection('models') }}>Choose another provider</button>
+          </div>
+        </OnboardingSurface>
+      ) })
+      expect(appRoot.inert).toBe(true)
+      fireEvent.click(screen.getByRole('button', { name: 'Choose another provider' }))
+      expect(screen.queryByRole('dialog', { name: 'Provider setup' })).toBeNull()
+      expect(screen.getAllByRole('dialog')).toHaveLength(1)
+      expect(screen.getByTestId('section-models')).toBeTruthy()
+      expect(appRoot.inert).toBe(false)
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      expect(screen.getByRole('dialog', { name: 'Provider setup' }).textContent).toContain('welcome')
+      expect(screen.queryByTestId('section-models')).toBeNull()
+      expect(appRoot.inert).toBe(true)
+    } finally {
+      cleanup()
+      expect(appRoot.inert).toBe(false)
+      appRoot.remove()
+    }
+  })
+
   it('projects rows, marks the first active, and renders only that section', () => {
     mount()
     openPanel()

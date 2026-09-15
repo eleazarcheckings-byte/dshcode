@@ -326,11 +326,9 @@
     # the tool row registers the Team-scoped model-facing tools; the client row
     # renders the roster, task board, and teammate navigation. The same-named
     # BASE rows stay disabled below (tool-subagent-control,
-    # tool-subagent-list-agents, and both tool-subagent rows), so the host plane
-    # exposes this one delegation surface. A preset that declares its own rows
-    # in its own scope — the shipped standard/ptc/cordis `delegation` groups do —
-    # is a separate composition no top-level patch can reach; the Agent Teams
-    # Web note records that limitation.
+    # tool-subagent-list-agents, and both tool-subagent rows). Preset rows have
+    # their own scope: the shipped standard/ptc/cordis delegation groups
+    # conditionally omit legacy controls when the Team runtime is mounted.
     - id: agent-team
       name: '@saturnai/dsh-agent-team'
       config:
@@ -348,6 +346,16 @@
 
     - id: ui-agent-team
       name: '@saturnai/dsh-client-ui-agent-team'
+
+    # SaturnBot owns its own durable scheduler. It stays paused until configured.
+    - id: saturnbot
+      name: '@saturnai/dsh-saturnbot'
+
+    - id: saturn-design-brain
+      name: '@saturnai/dsh-design-brain'
+
+    - id: ui-saturnbot
+      name: '@saturnai/dsh-client-ui-saturnbot'
 
     - id: ui-attachment
       name: '@deepseek-ai/dsh-client-ui-attachment'

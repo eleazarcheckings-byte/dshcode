@@ -254,8 +254,10 @@ export function ContextMenu({
       aria-label={label}
       aria-orientation="vertical"
       onKeyDown={onListKeyDown}
+      // React portal clicks must not activate the invoking row behind the card.
+      onClick={(event) => { event.stopPropagation() }}
       // Right-clicking the card itself must not open a menu on the menu.
-      onContextMenu={(event) => { event.preventDefault() }}
+      onContextMenu={(event) => { event.preventDefault(); event.stopPropagation() }}
     >
       <div className={css.viewport} role="presentation">
         {items.map((entry, index) => {

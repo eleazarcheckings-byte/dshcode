@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-client-ui-settings-models` is the Models settings page of the dsh web client: users configure API keys (stored write-only under the profile's credential reference), edit each provider's model list, and hand-declare custom pi-ai routes, with provider rows and one editor card at a time. The page joins the provider directory, the settings document, and the credential descriptions into one shared snapshot, so a row's state stays consistent across all three. It also walks first-run users through two ordered dialogs — a versioned internal-testing notice and the conditional official-DeepSeek credential step.
+`dsh-client-ui-settings-models` lets users configure provider API keys, edit model lists, and declare custom routes. The page joins provider, settings, and credential descriptions into one shared snapshot. First Light collects profile preferences and offers verified DeepSeek setup or an explicit route to configure another provider; the versioned notice and conditional DeepSeek dialog follow it. The Models footer also manages the optional Host-owned SaturnAI design tool connection after onboarding.
 
 ## Table of Contents
 
@@ -41,7 +41,11 @@ The add flow is a card carrying the dormant-directory provider select — a bare
 
 ### First-run dialogs
 
-After the versioned notice step completes, the DeepSeek step projects first-run readiness from the same joined snapshot. ANY provider the user can already reach ends it without rendering; only a user with none is asked for the official DeepSeek key. Configure later completes only this coordinator pass, and an absent adapter, inactive route, failed join, read-only deployment, or unusable capability completes the step without rendering — Models remains the diagnostic surface.
+First Light verifies the official DeepSeek connection or lets the user explicitly defer model setup. The deferred path records model setup as deferred, completes the profile, voice, memory, and setup seal, then opens Settings → Models. The later DeepSeek prompt also offers an explicit other-provider route without writing credentials or model settings. Pending onboarding pauses while Models is open. An already usable provider completes the conditional DeepSeek prompt without rendering it.
+
+### Optional design tools
+
+First Light and the permanent Models footer share the [Host-owned Design brain connector](../../saturn/design-brain/README.md). Connect tools persists opt-in and mounts the actual MCP adapter. Connected means the current supervisor generation is connected and the Host tool registry contains compose and review; a browser-only endpoint probe never unlocks the receipt. Refresh status and Disconnect remain available after setup, while profile-owned rows show their management location. Declining setup clears a managed opt-in; independent profile rows remain unchanged. The copy explains that bundled premium guides work without the service and remote reviews consume the brief and evidence supplied by the agent.
 
 ### Extension slots
 
@@ -118,4 +122,4 @@ None.
 
 </details>
 
-**Runtime invariant:** No companion is published. A nav-entry-only section plugin rendering a fixed empty content column — it emits no cordis events and owns no cross-plugin mutable relation.
+**Runtime invariant:** No companion is published. Provider and design connection state comes from their typed Host APIs; generated Remote and slot registrations are disposed with their owning plugin.

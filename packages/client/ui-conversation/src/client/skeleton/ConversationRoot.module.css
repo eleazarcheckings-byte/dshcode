@@ -4,7 +4,7 @@
   flex-direction: column;
   height: 100%;
   min-width: 0;
-  background: var(--dsw-alias-bg-base);
+  background: var(--dsh-shell-content-background, var(--dsw-alias-bg-base));
 
   /* Shared width axis for the whole column: one content width W
      (--dsh-chat-content-width) for the transcript, the dock cards
@@ -37,7 +37,7 @@
 .header {
   position: relative;
   flex: none;
-  padding: 12px 28px 0 20px;
+  padding: 12px var(--dsh-shell-trailing-inset, 28px) 0 20px;
   border-bottom: 1px solid transparent;
 }
 
@@ -420,7 +420,7 @@
      8 above the card (its margin-top restores 12 under the hero chrome). */
   gap: 8px;
   /* Foot inside the centered box floats the stack a bit above true center. */
-  padding-bottom: 32px;
+  padding: 16px 0 42px;
   /* Card cap + both clearances: the hero input card lands at exactly the same
      width as the docked composer at every viewport. */
   width: min(calc(var(--dsh-composer-card-max-width) + 2 * var(--dsh-composer-side-clearance)), 100%);
@@ -455,8 +455,12 @@
 /* Hero: the composer sits inside the session scroll body; center there so
    the tree seat matches active (sticky footer) without a Root remount. */
 .root[data-phase='hero'] .scrollBody {
-  justify-content: center;
   overflow-y: auto;
+}
+
+/* Auto margins center a fitting composition and collapse to zero on short windows. */
+.root[data-phase='hero'] .composerSeat {
+  margin-block: auto;
 }
 
 /* Settling (session replaying, hero/docked unknown): keep the composer seat

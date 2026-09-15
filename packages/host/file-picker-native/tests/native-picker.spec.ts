@@ -145,9 +145,14 @@ describe('native file picker', () => {
 
   it('uses the current process platform when no override is supplied', async () => {
     const run = vi.fn<FilePickerRunner>(async () => ({ stdout: '/default/x.txt\n', stderr: '' }))
-    await expect(pickNativeFiles(signal(), { multiple: false }, { run })).resolves.toEqual({
-      paths: ['/default/x.txt'],
-    })
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+      await expect(pickNativeFiles(signal(), { multiple: false }, { run })).resolves.toEqual({
+        paths: ['/default/x.txt'],
+      })
+    } else {
+      await expect(pickNativeFiles(signal(), { multiple: false }, { run })).rejects.toThrow(`unsupported on ${process.platform}`)
+      expect(run).not.toHaveBeenCalled()
+    }
   })
 
   it('treats empty Linux Zenity stdout as cancellation', async () => {

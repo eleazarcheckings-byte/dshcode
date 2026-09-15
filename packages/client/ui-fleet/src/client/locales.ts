@@ -15,6 +15,11 @@ export const zh = {
   'need.planReview': '计划待审',
   'need.question': '等待你回答',
   'row.open': '在其父级会话中打开这个子代理',
+  'heading': '团队动态',
+  'summary.running': '{count} 个正在工作',
+  'summary.attention': '{count} 个需要关注',
+  'expand': '显示另外 {count} 个代理',
+  'collapse': '收起团队列表',
 } as const
 
 /** Key domain of the `fleet` namespace (zh is the source of truth). */
@@ -32,4 +37,9 @@ export const en: Record<FleetKey, string> = {
   'need.planReview': 'Plan awaiting review',
   'need.question': 'Waiting for your answer',
   'row.open': 'Opens this worker in its parent context',
+  'heading': 'Team activity',
+  'summary.running': '{count} working',
+  'summary.attention': '{count} need attention',
+  'expand': 'Show {count} more agents',
+  'collapse': 'Show fewer agents',
 }

@@ -4,6 +4,8 @@
 
 `@dshcode/desktop` 是 Electron 外壳，用于把现有 DeepSeek Harness Web UI 打包成可安装的 macOS 和 Windows 应用；它不会 fork 或复制渲染器 UI。
 
+Saturn AI 桌面端包含黑白 Saturn 画布、克制的星光与星座、独立 SaturnBot 管理窗口，以及用于网站、动效和完整交付物的[内置产出工作流](../../packages/skill/skill-premium-output/README.zh.md)。动画遵循减少动态效果与暂停控制。集成使用用户配置的凭据；附带工作流并不代表已连接外部服务。
+
 ## 运行模型
 
 Electron 主进程调用共享的 `@deepseek-ai/dsh/profile-boot` 入口，并在本进程内启动现有 `web` profile。应用不会 spawn CLI 进程，也不会启动需要单独管理的服务子进程。完整 Harness 树启动后，BrowserWindow 才会打开已激活 WebServer 服务报告的地址。
@@ -25,6 +27,10 @@ Electron 主进程调用共享的 `@deepseek-ai/dsh/profile-boot` 入口，并�
 
 ## 系统托盘与窗口关闭
 
+主界面右上角的 **SaturnBot** 按钮会打开独立的原生管理窗口，但不会创建单独的任务栏条目。原生最小化按钮会隐藏管理界面，并将焦点交回主应用。再次点击同一个 SaturnBot 按钮会恢复已有窗口而不重新加载，保留未发送草稿。重复点击会聚焦该窗口；关闭窗口会销毁管理界面，但只要 Host 保持运行，已配置的后台任务就会继续。三栏界面展示同一 Host 运行时的智能体、对话与执行详情。原生窗口只接受同源的精确 `/?saturnbot=1` 路由，保留渲染进程沙箱，并禁止继续打开应用窗口。[最小化决策](../../.agents/notes/implemented/feature/2026-09-15-saturnbot-minimize-to-harness.zh.md) 记录了窗口归属。
+
+沙箱 preload 暴露 `restoreSaturnBot(): Promise<boolean>` 来恢复已有管理窗口。其 IPC 处理器只接受主应用渲染进程的调用；没有存活的 SaturnBot 窗口时返回 `false`。该桥接不创建窗口，也不提供通用原生窗口控制。浏览器客户端保留普通的命名窗口聚焦行为。
+
 - 应用默认安装系统托盘图标（Windows/Linux 为彩色图标，macOS 为单色模板图）。Windows 与 Linux 上单击托盘会显示并聚焦主窗口；托盘右键菜单提供「显示主界面」与「退出」。macOS 遵循平台惯例，点击托盘直接弹出菜单。
 - 默认情况下，点击窗口关闭按钮会把窗口隐藏到托盘：Harness 树继续运行，通过托盘可恢复窗口。真正的退出只发生在托盘「退出」项（或 macOS 应用菜单），并且同样会先等待 Harness 关闭控制器完成。
 - Windows 与 Linux 不再显示 Electron 默认菜单栏（File/Edit/View/...）；macOS 保留系统菜单栏与标准编辑快捷键。
@@ -38,10 +44,11 @@ Electron 主进程调用共享的 `@deepseek-ai/dsh/profile-boot` 入口，并�
 
 ```sh
 pnpm install
-pnpm run desktop:package
+pnpm run build
+pnpm --filter @dshcode/desktop run package
 ```
 
-`desktop:package` 会构建仓库，并为当前平台创建未封装的应用。`desktop:dist` 会生成已配置的分发产物。输出写入 `.artifacts/desktop/release/`。
+完成仓库构建后，`package` 为当前平台创建未封装的应用。`pnpm --filter @dshcode/desktop run dist` 生成已配置的分发产物。输出写入 `.artifacts/desktop/release/`。
 
 ### 平台构建目标
 
@@ -55,13 +62,15 @@ pnpm --filter @dshcode/desktop run dist:win:x64
 
 `node apps/desktop/scripts/smoke-packaged-startup.mjs` 使用隔离的 Harness 主目录和 Electron 用户数据目录启动安装包中的主入口，等待回环地址上的工作区界面出现，再通过应用退出流程关闭。每个桌面打包任务都必须通过此检查才能上传安装包。
 
+冒烟检查恢复打包清单，解除临时配置中的目录联接而不遍历包目标，并且只删除经过验证的临时目录。捕获的启动诊断会去除 URL 凭据、查询参数和片段。启动失败和清理失败都会使检查失败；[清理决策](../../.agents/notes/implemented/bug-fix/2026-09-15-packaged-smoke-junction-cleanup.zh.md) 记录了 Windows 限制。
+
 `node apps/desktop/scripts/test-electron-picker.mjs` 在两个平台的 Electron Node 运行时中执行目录选择器绑定测试。COM 调用使用 mock，所选路径使用真实 koffi 解码。Windows 打包冒烟测试还会打开并中止实际对话框；在已安装应用中完成一次选择仍需手动检查。
 
 `desktop-v*` tag 会把完整且成功的构建矩阵与 `SHA256SUMS.txt` 发布到 [GitHub Releases](https://github.com/whitelonng/dshcode/releases)。手动运行工作流时，安装包只作为普通 Actions 产物保留，不会创建 Release。
 
 ## 打包
 
-暂存脚本会在源码工作区之外创建仅含生产依赖的 `pnpm deploy` 目录。部署前会验证每一个必需的工作区对等依赖（peer dependency）都是直接运行时依赖，从而避免安装后才出现包解析失败。由于 `pnpm deploy` 会把生产过滤条件写入共享工作区状态，暂存结束后还会恢复完整的源码工作区安装状态。
+暂存脚本会在源码工作区之外创建仅含生产依赖的 `pnpm deploy` 目录。部署前遍历应用、bundle、包与 vendor 清单，验证每个必需的工作区对等依赖（peer dependency）都是直接运行时依赖，包括通过 CLI profile bundle 引入的对等依赖。由于 `pnpm deploy` 会把生产过滤条件写入共享工作区状态，暂存结束后还会恢复完整的源码工作区安装状态。[运行时依赖闭包决策](../../.agents/notes/implemented/feature/2026-09-15-desktop-profile-runtime-closure.zh.md) 记录了此打包检查。
 
 应用使用非 ASAR 资源，因为 Harness profile 回退机制需要创建真实的包符号链接。分发包包含上游 MIT 许可证、生成的第三方声明和独立 DSHCode 应用图标；内嵌 Web UI 保留上游署名。虽然 electron-builder 要求 Electron 在源码 manifest（元数据清单）中保持为开发依赖，但许可证生成器会把它视为实际分发的运行时依赖。
 
@@ -69,5 +78,5 @@ pnpm --filter @dshcode/desktop run dist:win:x64
 
 - 预览版安装包目前明确保持未签名状态。在后续版本配置平台签名及 macOS 公证前，macOS Gatekeeper 与 Windows SmartScreen 可能会对本地构建发出警告。
 - 尚未配置自动更新。
-- 内嵌 Web UI 保留上游身份标识，但桌面应用与安装器使用独立 DSHCode 图标；详见仓库的[许可证与品牌声明](../../README.zh.md)。
+- 内嵌 Web UI 使用 Saturn AI 品牌，桌面应用与安装器也使用相同的 Saturn 身份标识；详见仓库的[许可证与品牌声明](../../README.zh.md)。
 - 恢复对话框、托盘与自绘标题栏需要在原生 Windows 构建上手动验证。

@@ -282,6 +282,10 @@
     - id: skill-filesystem
       name: '@deepseek-ai/dsh-skill-filesystem'
 
+    # Shared output guidance; project and user skills override packaged guides.
+    - id: skill-premium-output
+      name: '@deepseek-ai/dsh-skill-premium-output'
+
     - id: skill-badge
       name: '@deepseek-ai/dsh-skill-badge'
       disabled: true

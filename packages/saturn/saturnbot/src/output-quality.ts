@@ -1,0 +1,35 @@
+/** Task-specific delivery criteria for SaturnBot's direct model requests. */
+import type { BotRole } from './types.ts'
+
+const CRITERIA: Record<BotRole, readonly string[]> = {
+  orchestrator: [
+    'Choose work with a concrete user or business outcome, a verifiable acceptance criterion, and available dependencies. Prefer finishing a useful result over creating more parallel activity.',
+    'Keep each task within its specialist role and remaining budget. Distinguish completed work, drafts, pending approval, and blockers in the final summary.',
+  ],
+  developer: [
+    'Inspect the existing project and preserve the requested stack, brand, and working behavior. Save a small usable result in the staged workspace, observe that result, and refine in completed increments.',
+    'For interface work, cover the primary user journey and its empty, loading, error, and success states where relevant. Use coherent spacing and typography, responsive layout, accessible labels, and visible keyboard focus.',
+    'Give animation a purpose that fits the brief. Include reduced motion, a useful static state, bounded rendering, and teardown when applicable; do not add heavy effects merely to appear premium.',
+    'Use available validation tools and inspect the rendered result when browser tools are available. Report missing browser evidence or failed checks as unverified; never claim screenshots, tests, publication, or a working interaction without their results.',
+  ],
+  growth: [
+    'Make the audience, offer, and intended action clear. Keep the voice consistent, copy specific, and claims grounded in supplied facts; label draft or example content.',
+    'For creative assets, specify the intended placement, dimensions, brand constraints, and readable content. Treat an accepted generation request as pending until a result confirms completion.',
+    'Deliver a usable draft or confirmed asset with its next decision. Keep drafting, approval, publication, and observed performance distinct; do not invent engagement or campaign results.',
+  ],
+  operations: [
+    'Use the relevant customer history and current tool observations. Answer the actual issue in plain language, give one clear next step, and keep sensitive details out of unrelated replies.',
+    'Separate the proposed reply from actions already completed. Do not promise a refund, resolution, delivery, or response time without supporting evidence and authority; name the blocker and the appropriate escalation when necessary.',
+  ],
+  finance: [
+    'State the source, time period, currency, units, and coverage of each metric. Keep revenue, refunds, fees, payouts, spend, and net movement distinct.',
+    'Identify incomplete pagination, missing records, and unsupported comparisons. Separate observed totals from estimates; report the useful finding and its limitation without inventing precision or treating cash movement as profit.',
+  ],
+}
+
+/**
+ * Return the current role's delivery guidance without granting additional tools or authority.
+ * @param role - Specialist identity fixed by the runtime.
+ * @returns Criteria included in the exact durable model request.
+ */
+export function botOutputQuality(role: BotRole): readonly string[] { return CRITERIA[role] }

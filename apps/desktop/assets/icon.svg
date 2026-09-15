@@ -11,8 +11,8 @@
 
   Tile: 896 px edge, 224 px corner radius (25%), inset 64 px (6.25%) so the
   rounded square breathes inside the icon frame. Fill is the cold near-black
-  ramp #121216 -> #0a0a0c at 135 degrees; the ring and planet are the locked
-  Saturn gold #DDA43A.
+  ramp #141414 -> #0a0a0a at 135 degrees; the ring and planet are the locked
+  neutral white #F5F5F5.
 
   Ring occlusion is the three-pass construction documented in saturn-mark.svg
   (far ring, planet, near ring clipped to y = 33 of the mark grid). Keep the
@@ -30,7 +30,7 @@
   <defs>
     <linearGradient id="saturn-tile" x1="152" y1="128" x2="872" y2="896" gradientUnits="userSpaceOnUse">
       <stop stop-color="#141414" />
-      <stop offset="1" stop-color="#0a0a0b" />
+      <stop offset="1" stop-color="#0a0a0a" />
     </linearGradient>
     <clipPath id="saturn-ring-near-icon" clipPathUnits="userSpaceOnUse">
       <rect x="0" y="33" width="64" height="31" />
@@ -38,10 +38,10 @@
   </defs>
   <rect x="64" y="64" width="896" height="896" rx="224" fill="url(#saturn-tile)" />
   <g transform="translate(512 512) scale(12) translate(-32 -32)">
-    <ellipse cx="32" cy="32" rx="27" ry="9.5" transform="rotate(-18 32 32)" stroke="#DDA43A" stroke-width="4.5" />
-    <circle cx="32" cy="32" r="15" fill="#DDA43A" />
+    <ellipse cx="32" cy="32" rx="27" ry="9.5" transform="rotate(-18 32 32)" stroke="#F5F5F5" stroke-width="4.5" />
+    <circle cx="32" cy="32" r="15" fill="#F5F5F5" />
     <g clip-path="url(#saturn-ring-near-icon)">
-      <ellipse cx="32" cy="32" rx="27" ry="9.5" transform="rotate(-18 32 32)" stroke="#DDA43A" stroke-width="4.5" />
+      <ellipse cx="32" cy="32" rx="27" ry="9.5" transform="rotate(-18 32 32)" stroke="#F5F5F5" stroke-width="4.5" />
     </g>
   </g>
 </svg>

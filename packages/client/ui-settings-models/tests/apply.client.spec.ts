@@ -6,7 +6,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote, scriptedSettingsRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { apply, inject, refreshIfLoaded } from '@deepseek-ai/dsh-client-ui-settings-models/client'
+import { apply, inject, refreshIfLoaded } from '../src/client/registration.ts'
 import {
   WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_SETTINGS_NAMESPACE, WELCOME_NOTICE_VERSION,
 } from '../src/onboarding-copy.ts'
@@ -68,6 +68,7 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
     // namespace must be mounted for the plugin's inject to be satisfied.
     workspace,
     directoryPicker,
+    designBrain: { status: vi.fn(), connect: vi.fn(), disconnect: vi.fn() },
   })
   // The fixed Host facts the settings provider reads its persistence from.
   remote.$host = { home: undefined, isLoopback }
@@ -103,7 +104,7 @@ describe('ui-settings-models apply', () => {
   it('declares the services it uses', () => {
     expect(inject).toEqual([
       'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
-      'remote.workspace', 'remote.directoryPicker', 'settingsScope', 'settingsSchema',
+      'remote.workspace', 'remote.directoryPicker', 'remote.designBrain', 'settingsScope', 'settingsSchema',
     ])
   })
 
@@ -256,7 +257,7 @@ describe('ui-settings-models apply', () => {
     )
     b.slots.register({ name: 'settings.models.footer', id: 'extra', order: 0 } as never, () => null)
     expect(b.slots.entries('settings.models.provider-card')).toHaveLength(1)
-    expect(b.slots.entries('settings.models.footer')).toHaveLength(1)
+    expect(b.slots.entries('settings.models.footer').map(entry => entry.options.id)).toEqual(['extra', 'design-brain'])
     // Extension-side HMR safety: its own disposer removes the entry.
     disposeCard()
     expect(b.slots.entries('settings.models.provider-card')).toHaveLength(0)

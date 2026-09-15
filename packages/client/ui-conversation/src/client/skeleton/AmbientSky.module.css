@@ -1,0 +1,41 @@
+.motion {
+  position: absolute;
+  right: 18px;
+  bottom: 38px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--saturn-muted, var(--dsw-alias-label-caption));
+  font-family: var(--ds-font-family-code);
+  font-size: 10px;
+  line-height: 16px;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.motion:hover {
+  border-color: var(--saturn-stroke, var(--dsw-alias-border-l2));
+  background: var(--saturn-surface-hover, var(--dsw-alias-interactive-bg-hover));
+  color: var(--saturn-ink, var(--dsw-alias-label-primary));
+}
+
+.motion:focus-visible {
+  outline: 2px solid var(--saturn-accent, var(--dsw-alias-label-primary));
+  outline-offset: 3px;
+}
+
+.motion[aria-pressed='false'] svg {
+  color: var(--saturn-accent, var(--dsw-alias-label-primary));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion { transition: none; }
+}

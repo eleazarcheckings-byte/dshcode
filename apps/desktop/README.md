@@ -4,6 +4,8 @@ English | [中文](README.zh.md)
 
 `@dshcode/desktop` is the Electron shell that turns the existing DeepSeek Harness Web UI into an installable macOS and Windows application. It does not fork or duplicate the renderer UI.
 
+The Saturn AI desktop includes the monochrome Saturn canvas, restrained stars and constellations, the separate SaturnBot management window, and [packaged output workflows](../../packages/skill/skill-premium-output/README.md) for websites, motion, and finished artifacts. Animation respects reduced-motion and pause controls. Integrations use the user's configured credentials; a packaged workflow does not imply that an external service is connected.
+
 ## Runtime model
 
 The Electron main process calls the shared `@deepseek-ai/dsh/profile-boot` entry and boots the existing `web` profile in-process. No CLI process or separately managed server child is spawned. The BrowserWindow opens the address reported by the activated WebServer service only after the complete Harness tree has booted.
@@ -25,6 +27,10 @@ One incompatible plugin must never brick the application. Startup failures are a
 
 ## System tray and window close
 
+The main harness's top-right **SaturnBot** button opens a separate native management window without a separate taskbar entry. Its native Minimize control hides the dashboard and returns focus to the main harness. Clicking the same SaturnBot button restores the existing window without reloading it, preserving its unsent drafts. Repeated clicks focus that window; closing it destroys the dashboard but leaves the configured runner active while the host remains open. Its three-column interface shows agents, conversations, and execution details from the same host runtime. The native window accepts only the exact same-origin `/?saturnbot=1` route, retains the renderer sandbox, and cannot open further application windows. The [minimize decision](../../.agents/notes/implemented/feature/2026-09-15-saturnbot-minimize-to-harness.md) records the window ownership.
+
+The sandboxed preload exposes `restoreSaturnBot(): Promise<boolean>` to restore an existing dashboard. Its IPC handler accepts only the main harness renderer; it returns `false` when there is no live SaturnBot window. This bridge does not create windows or expose general native window control. Browser clients retain the ordinary named-window focus behavior.
+
 - The application always installs a system tray icon (colored on Windows and Linux, a monochrome template image on macOS). On Windows and Linux, left-clicking the tray shows and focuses the main window; the tray context menu offers 显示主界面 (show main window) and 退出 (quit). On macOS the context menu is the platform convention.
 - Clicking the window close button hides the window to the tray by default: the Harness tree keeps running and the tray restores the window. A real exit happens only through the tray 退出 item (or the macOS app menu) and still waits for the Harness shutdown controller first.
 - Windows and Linux run without the default Electron menu bar (File/Edit/View/...); macOS keeps its system menu bar with the standard edit roles.
@@ -38,10 +44,11 @@ From the repository root, install the declared Node.js and pnpm versions, then r
 
 ```sh
 pnpm install
-pnpm run desktop:package
+pnpm run build
+pnpm --filter @dshcode/desktop run package
 ```
 
-`desktop:package` builds the repository and creates an unpacked application for the current platform. `desktop:dist` creates the configured distributable targets. Output is written to `.artifacts/desktop/release/`.
+After the repository build, `package` creates an unpacked application for the current platform. `pnpm --filter @dshcode/desktop run dist` creates the configured distributable targets. Output is written to `.artifacts/desktop/release/`.
 
 ### Platform targets
 
@@ -55,13 +62,15 @@ The `Desktop` GitHub Actions workflow runs the same targets on native macOS and 
 
 `node apps/desktop/scripts/smoke-packaged-startup.mjs` launches the packaged main entry with an isolated Harness home and Electron user-data directory, waits for the workspace interface on its loopback URL, then quits through the application shutdown path. Every desktop packaging job requires this check before uploading installers.
 
+The smoke restores the packaged manifest, unlinks temporary profile junctions without traversing package targets, and removes only its verified scratch directory. Captured startup diagnostics omit URL credentials, queries, and fragments. Launch and cleanup failures both fail the check; the [cleanup decision](../../.agents/notes/implemented/bug-fix/2026-09-15-packaged-smoke-junction-cleanup.md) records the Windows constraint.
+
 `node apps/desktop/scripts/test-electron-picker.mjs` runs the directory-picker binding tests inside Electron's Node runtime on both platforms. COM calls are mocked; selected paths use real koffi decoding. The Windows packaged smoke additionally opens and aborts the actual dialog; completing a selection in the installed application remains a manual check.
 
 A `desktop-v*` tag publishes the complete successful matrix and `SHA256SUMS.txt` to [GitHub Releases](https://github.com/whitelonng/dshcode/releases). Manual workflow runs retain their packages as ordinary Actions artifacts without creating a Release.
 
 ## Packaging
 
-The staging script creates a production-only `pnpm deploy` directory outside the source workspace. Before deployment it verifies that every required workspace peer is a direct runtime dependency, preventing delayed package-resolution failures after installation. The full source workspace installation is restored after staging because `pnpm deploy` records its production filter in shared workspace state.
+The staging script creates a production-only `pnpm deploy` directory outside the source workspace. Before deployment it traverses application, bundle, package, and vendor manifests and verifies that every required workspace peer is a direct runtime dependency, including peers reached through the CLI's profile bundles. The full source workspace installation is restored after staging because `pnpm deploy` records its production filter in shared workspace state. The [runtime-closure decision](../../.agents/notes/implemented/feature/2026-09-15-desktop-profile-runtime-closure.md) records the packaging check.
 
 The application uses unpacked resources because the Harness profile fallback creates real package symlinks. The distribution includes the upstream MIT license, generated third-party notices, and an independent DSHCode application icon; the embedded Web UI retains its upstream attribution. Electron is treated as a shipped runtime dependency even though electron-builder requires it to remain a development dependency in the source manifest.
 

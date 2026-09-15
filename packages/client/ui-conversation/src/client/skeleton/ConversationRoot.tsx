@@ -7,7 +7,7 @@ import clsx from 'clsx'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
 import { conversationPhase } from '../contract/snapshot.ts'
-import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
+import { HeroShell, HeroStarters, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the slot contract. */
@@ -131,7 +131,7 @@ function WidthHandle(props: {
 export function ConversationRoot({
   sessionId, useSession, useSessions, useSessionPendingInteraction,
   useWorkspaces, useConversation, useInput, useComposerBlock,
-  renderSlot, renderSlotChain, selectWorkspace, t,
+  renderSlot, renderSlotChain, selectWorkspace, inputActions, t,
 }: ConversationRootProps) {
   const session = useSession(s => s)
   const pendingInteraction = useSessionPendingInteraction(snapshot =>
@@ -354,13 +354,26 @@ export function ConversationRoot({
     </div>
   )
 
+  const hasDraft = (inputState?.draft.trim() ?? '') !== '' || (inputState?.imageIds.length ?? 0) > 0
   const composerBar = (
-    <div className={clsx(css.composerStack, hero && css.composerHero)}>
+    <div
+      className={clsx(css.composerStack, hero && css.composerHero)}
+    >
       {hero && <HeroShell t={t} renderSlot={renderSlot} />}
       {hero && heroWorkspaceRow}
       {selectorContextRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}
+      {hero && !inert && !blocked && inputActions !== undefined && (
+        <HeroStarters
+          t={t}
+          hidden={hasDraft || inputState?.phase !== 'plain'}
+          onChoose={(text) => {
+            inputActions.setDraft(text)
+            rootEl.current?.querySelector<HTMLElement>('[data-composer-input]')?.focus()
+          }}
+        />
+      )}
     </div>
   )
 

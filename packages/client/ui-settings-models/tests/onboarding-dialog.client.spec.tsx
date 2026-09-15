@@ -221,19 +221,22 @@ describe('DeepSeekOnboardingDialog', () => {
     }
   })
 
-  it('offers no configure-later escape: the key is the only way through', async () => {
+  it('opens Models only on explicit provider choice without writing credentials or readiness', async () => {
     const h = harness()
     render(<DeepSeekOnboardingDialog {...h.props} />)
     await screen.findByRole('dialog')
-    // First Light is a hard gate, and this step inherits that posture: the
-    // footer renders no dismiss action, and neither Escape nor a mask click
-    // can complete it.
     expect(screen.queryByRole('button', { name: en.cancel })).toBeNull()
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(document.querySelector('[class*="mask"]')!)
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(h.complete).not.toHaveBeenCalled()
     expect(h.openSection).not.toHaveBeenCalled()
+    const before = h.controller.store.getSnapshot()
+    fireEvent.click(screen.getByRole('button', { name: en.onboardingOtherProvider }))
+    expect(h.complete).toHaveBeenCalledOnce()
+    expect(h.openSection).toHaveBeenCalledWith('models')
+    expect(h.complete.mock.invocationCallOrder[0]).toBeLessThan(h.openSection.mock.invocationCallOrder[0]!)
+    expect(h.controller.store.getSnapshot()).toEqual(before)
     expect(h.set).not.toHaveBeenCalled()
     expect(h.mutate).not.toHaveBeenCalled()
   })

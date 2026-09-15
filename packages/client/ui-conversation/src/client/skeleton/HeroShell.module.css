@@ -1,213 +1,183 @@
-/* NEW SESSION hero (figma Input_Bottom 75:8208): mark + title, workspace chip
-   above the shared InputBar card. The input itself is InputBar — only stack
-   geometry and the chip live here. */
-
+/* Empty conversation composition. The resident composer remains owned by ConversationRoot. */
 .root {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
   min-width: 0;
-  padding: 0 24px;
+  padding: 0 16px 25px;
 }
 
-/* Cap matches the InputBar card. Glow may paint past the sides. */
 .stack {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  /* figma 75:8208: 12 between title block / workspace / card. */
-  gap: 12px;
+  align-items: center;
   width: 100%;
-  max-width: var(--dsh-composer-card-max-width);
   overflow: visible;
 }
 
-/* figma 34:10411: mark + title, gap 10, centered; 26/32 wt500. The preview
-   badge is a product addition outside that source: a mono superscript pill
-   riding the title's top-right. */
-.headline {
-  display: grid;
-  grid-template-columns: 34px auto auto;
-  column-gap: 10px;
+.eyebrow {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  line-height: 32px;
+  gap: 9px;
+  color: var(--saturn-muted, var(--dsw-alias-label-caption));
+  font-family: var(--ds-font-family-code);
+  font-size: 10px;
   font-weight: 500;
-  color: var(--dsw-alias-label-primary);
+  line-height: 18px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
 }
 
-.headlineText {
-  grid-row: 1;
-  grid-column: 2;
+.brandMark {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.fish {
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+  color: var(--saturn-accent, var(--dsw-alias-label-primary));
 }
 
 .previewBadge {
-  grid-row: 1;
-  grid-column: 3;
-  align-self: start;
-  margin-top: 2px;
-  margin-left: -3px;
-  padding: 1px 7px 0;
-  border: 0.5px solid var(--dsw-alias-interactive-bg-hover);
-  border-radius: 24px;
-  background: var(--dsw-alias-state-business-tertiary);
-  color: var(--dsw-alias-label-primary-bluish);
-  font-family: var(--ds-font-family-code);
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 500;
-  white-space: nowrap;
+  color: var(--saturn-accent, var(--dsw-alias-label-primary));
 }
 
-/* Keep hover detection on a stationary box; hover rules target the hitbox so
-   a slot-occupant mark tilts too. */
-.fishHitbox {
-  grid-row: 1;
-  grid-column: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.eyebrowRule {
+  width: 17px;
+  height: 0.5px;
+  background: var(--saturn-stroke-strong, var(--dsw-alias-border-l3));
 }
 
-/* The hover tilt rotates the mark slightly past its box edges, so clipping
-   would cut the ring mid-swing. The hero mark stays in the same primary ink
-   as its headline. */
-.fish {
-  display: block;
-  overflow: visible;
-  transform-origin: 50% 50%;
-  color: var(--dsw-alias-label-primary);
+.headline {
+  max-width: 580px;
+  margin: 17px 0 0;
+  color: var(--saturn-ink, var(--dsw-alias-label-primary));
+  font-size: clamp(29px, 3.6vw, 43px);
+  font-weight: 450;
+  letter-spacing: -0.045em;
+  line-height: 1.16;
+  text-align: center;
+  text-wrap: balance;
 }
 
-/* Hover tilt: a slow, gentle rock about the planet's center — the ring plane
-   sways one way, then settles back the other, like a lazy wobble. */
-@keyframes hero-mark-tilt {
-  0%,
-  100% {
-    transform: none;
-  }
-
-  35% {
-    transform: rotate(-7deg);
-  }
-
-  70% {
-    transform: rotate(3deg);
-  }
+.description {
+  margin: 15px 0 0;
+  max-width: 520px;
+  color: var(--saturn-muted, var(--dsw-alias-label-secondary));
+  font-size: 13px;
+  line-height: 21px;
+  text-align: center;
+  text-wrap: balance;
 }
 
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .fishHitbox:hover .fish {
-    animation: hero-mark-tilt 1.6s ease-in-out infinite;
-  }
+.planetAnchor {
+  width: 100%;
+  height: clamp(190px, 30vh, 285px);
+  margin-bottom: -8px;
+  pointer-events: none;
 }
 
-/* Workspace row sits 12px above the input card (figma y80 → y112). */
-.body {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  overflow: visible;
+@media (max-height: 720px) {
+  .planetAnchor { height: 190px; margin-bottom: -2px; }
 }
 
-.body > * {
-  position: relative;
-  z-index: 1;
+@media (max-width: 540px) {
+  .planetAnchor { height: 180px; }
 }
-
-/* Must beat `.body > :not(.glow)` specificity so the open Menu (and its
-   right-hand submenu) paints above the InputBar card. */
-.body > .workspaceRow {
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  /* figma 75:8208 workspace row: px 8 above the card. */
-  padding-left: 8px;
-}
-
-/* Folder + label + chevron — transparent at rest; fill only on hover / open. */
 .workspace {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   max-width: min(100%, 360px);
-  min-height: 28px;
-  padding: 0 8px;
-  border: none;
-  border-radius: 16px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 20px;
   font-weight: 500;
   cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
 
 .workspace:not(:disabled):hover,
 .workspace[aria-expanded='true'] {
   background: var(--dsw-alias-interactive-bg-hover);
+  border-color: var(--saturn-stroke, var(--dsw-alias-border-l2));
 }
 
-/* Locked form (bound guidance state): a static echo — no hover feedback, no
-   pointer affordance; label keeps full contrast. */
-.workspace:disabled {
-  cursor: default;
+.workspace:disabled { cursor: default; }
+.folder { flex: none; color: var(--saturn-muted, var(--dsw-alias-label-secondary)); }
+.workspaceLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chevron { flex: none; color: var(--dsw-alias-label-caption); }
+
+.starters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px var(--dsh-composer-side-clearance) 0;
 }
 
-.folder {
-  flex: none;
-  color: var(--dsw-alias-label-primary);
-}
+.starters[data-hidden] { visibility: hidden; }
 
-.workspaceLabel {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chevron {
-  flex: none;
-  color: var(--dsw-alias-label-caption);
-}
-
-/* Dialog field: 44 tall on the modal's 332 content column, r22, hairline
-   border, pad 14/7, 14/22 wt400 primary text, caption placeholder. Focus
-   keeps the resting border (design shows no focus ring). */
-.modalInput {
-  box-sizing: border-box;
-  width: 100%;
-  height: 44px;
-  padding: 7px 14px;
-  border: 0.5px solid var(--dsw-alias-border-l4);
-  border-radius: 22px;
-  outline: none;
+.starter {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 75px;
+  padding: 14px 12px;
+  border: 0.5px solid var(--saturn-stroke, var(--dsw-alias-border-l2));
+  border-radius: 12px;
   background: transparent;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-label-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease;
 }
 
-.modalInput::placeholder {
-  color: var(--dsw-alias-label-caption);
+.starter:hover {
+  border-color: var(--saturn-stroke-strong, var(--dsw-alias-border-l3));
+  background: var(--saturn-surface, var(--dsw-alias-interactive-bg-hover));
 }
 
-.modalInput:disabled {
-  color: var(--dsw-alias-label-dimmed);
+.starterNumber {
+  padding-top: 1px;
+  color: var(--saturn-accent, var(--dsw-alias-label-primary));
+  font-family: var(--ds-font-family-code);
+  font-size: 9px;
+  line-height: 16px;
+  opacity: 0.8;
 }
 
-.modalAction {
-  min-width: 72px;
+.starterCopy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.starterTitle { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 17px; }
+.starterDetail { color: var(--dsw-alias-label-caption); font-size: 10px; line-height: 15px; }
+.starterArrow { flex: none; margin-top: 2px; color: var(--dsw-alias-label-caption); }
+.starter:hover .starterArrow { color: var(--saturn-accent, var(--dsw-alias-label-primary)); }
+
+@media (max-height: 720px) {
+  .root { padding-bottom: 14px; }
+  .headline { margin-top: 12px; font-size: 32px; }
+  .description { margin-top: 9px; }
+  .starter { min-height: 56px; padding: 10px; }
+  .starterDetail { display: none; }
 }
 
-.modalError {
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-state-error-primary);
+@media (max-width: 600px) {
+  .root { padding-bottom: 20px; }
+  .headline { font-size: 30px; }
+  .starters { grid-template-columns: 1fr; gap: 6px; }
+  .starter { min-height: 42px; align-items: center; padding: 10px 12px; }
+  .starterCopy { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+  .starterArrow { margin-top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace, .starter { transition: none; }
 }

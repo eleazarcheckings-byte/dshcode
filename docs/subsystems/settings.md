@@ -345,6 +345,18 @@ Host service backing the generated `ctx.remote.settings` namespace. Every remote
  * @throws RemoteError when the preset is missing, read-only, invalid, or cannot be opened.
  */
 @Remote async openAgentPresetDirectory( agentPreset: string, signal: AbortSignal, ): Promise<AgentPresetDirectoryOpenValue>
+
+/**
+ * Remember the setup profile as agent memory in the user-global instruction
+ * file, which is what the model actually reads. A Host path on purpose: the
+ * browser never writes a file, and the block is delimited so replaying setup
+ * replaces it instead of appending a second copy. Nothing secret is rendered.
+ * @param facts - identity and voice preferences the user chose.
+ * @returns the memory file that now holds the block.
+ * @throws RemoteError when the request is malformed, the deployment keeps no
+ *   local document to sit beside, or the file cannot be written.
+ */
+@Remote('writeProfileMemory') async writeProfileMemory(facts: ProfileMemoryFacts): Promise<ProfileMemoryWriteValue>
 ```
 
 Source: [`packages/api/settings-controller/src/index.ts`](../../packages/api/settings-controller/src/index.ts)

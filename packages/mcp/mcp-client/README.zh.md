@@ -58,6 +58,7 @@ kind: "package-reference"
 | `serverName` | 必填 | 服务器工具名称的 namespace；`[A-Za-z0-9_-]{1,32}`，在一个注册作用域内唯一 |
 | `command` / `args` / `env` / `cwd` | — | stdio：可执行文件、参数、合并到清洗过的环境之上的额外环境变量、工作目录 |
 | `url` / `headers` | — | streamable-http：端点 URL 与额外请求标头 |
+| `connectTimeoutMs` | 省略 | 每次连接实例的可选期限，覆盖握手、初始化通知和首次 tools/list；到期时关闭传输 |
 | `toolCallTimeoutMs` | `60,000` | 每次 `tools/call` 调用的超时 |
 | `failOnStartupError` | `false` | 初始连接或工具同步失败时拒绝插件激活 |
 | `reconnect.enabled` | `true` | 连接丢失后自动重新连接 |
@@ -85,6 +86,8 @@ kind: "package-reference"
 当前模型接受图片输入且 harness 启用了附件功能时支持图片；图片会像其他图片一样出现在对话中。不支持图片时——以及服务器返回音频或嵌入资源时——模型会看到清晰的诊断消息，而不是什么都没有。
 
 ### 启动、工具更新与重连
+
+`isServerConnected(ctx, serverName)` 报告调用方精确注册作用域中的当前监督器连接实例。即使旧工具包装仍已注册，它在首次连接、重连和释放期间也返回 false。它不会发起网络探测，也不保证未来远程调用一定成功。
 
 服务器的工具会在 harness 开始首个轮次之前出现。服务器更改工具列表时，模型的工具集会自动更新；更新失败时，上一组工具继续可用。
 

@@ -1,0 +1,63 @@
+version: 1
+enabled: false
+goal: ''
+workspace: ''
+intervalMinutes: 30
+provider: deepseek-official
+model: deepseek-v4-flash
+maxTasks: 3
+maxActionsPerTask: 8
+toolTimeoutMs: 120000
+modelTimeoutMs: 120000
+maxInputBytes: 131072
+maxOutputTokens: 4096
+requirePrApproval: true
+autoDispatchEmail: false
+requireDeployApproval: true
+requireWriteApproval: true
+allowedTools:
+  - git.status
+  - git.diff
+  - workspace.stage
+  - fs.read
+  - fs.write
+  - shell.validate
+  - github.create_pr
+  - email.inbox
+  - email.draft
+  - email.send
+  - memory.search
+  - memory.write
+  - tickets.list
+  - tickets.upsert
+  - webhook.inbox
+  - stripe.metrics
+  - cloud.deploy
+  - social.publish
+  - creative.generate
+roles:
+  orchestrator:
+    enabled: true
+    instructions: ''
+    tools: [git.status, git.diff, fs.read, memory.search, memory.write, tickets.list, webhook.inbox, email.inbox, stripe.metrics]
+  developer:
+    enabled: true
+    instructions: ''
+    tools: [git.status, git.diff, workspace.stage, fs.read, fs.write, shell.validate, github.create_pr, cloud.deploy, memory.search, memory.write]
+  growth:
+    enabled: true
+    instructions: ''
+    tools: [email.inbox, email.draft, email.send, memory.search, memory.write, social.publish, creative.generate]
+  operations:
+    enabled: true
+    instructions: ''
+    tools: [git.status, git.diff, fs.read, email.inbox, email.draft, email.send, memory.search, memory.write, tickets.list, tickets.upsert, webhook.inbox]
+  finance:
+    enabled: true
+    instructions: ''
+    tools: [stripe.metrics, memory.search, memory.write]
+# Set the exact argv arrays for this repository's checks before approving code publication.
+validationCommands: []
+# Add credentialEnv references and provider resources using ADAPTERS.md.
+integrations: {}
+reportChannel: inbox

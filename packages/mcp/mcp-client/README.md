@@ -58,6 +58,7 @@ Add one entry per server; nothing else is required. After the harness starts, th
 | `serverName` | required | Namespace for the server's tool names; `[A-Za-z0-9_-]{1,32}`, unique inside one registration scope |
 | `command` / `args` / `env` / `cwd` | — | stdio: executable, arguments, extra env merged over scrubbed ambient env, working directory |
 | `url` / `headers` | — | streamable-http: endpoint URL and extra request headers |
+| `connectTimeoutMs` | omitted | Optional deadline per generation for handshake, initialized notification, and initial tools/list; closes the transport on expiry |
 | `toolCallTimeoutMs` | `60,000` | Timeout per `tools/call` invocation |
 | `failOnStartupError` | `false` | Reject plugin activation when the initial connection or tool synchronization fails |
 | `reconnect.enabled` | `true` | Reconnect automatically after a lost connection |
@@ -85,6 +86,8 @@ When the model calls an MCP tool, the call runs against the remote server with a
 Images are supported when the current model accepts image input and the harness attachment feature is enabled; they then appear in the conversation like other images. Otherwise — and for audio or embedded resources — the model sees a clear diagnostic message instead of nothing.
 
 ### Startup, updates, and reconnection
+
+`isServerConnected(ctx, serverName)` reports the current supervisor generation in the caller’s exact registration scope. It returns false during initial connection, reconnect, and disposal, even if old tool wrappers remain registered. It performs no network probe and cannot promise a future remote call succeeds.
 
 The server's tools appear before the harness starts its first turn. When the server changes its tool list, the model's tool set updates automatically; if the update fails, the previous tool set keeps working.
 

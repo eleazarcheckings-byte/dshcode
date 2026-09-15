@@ -10,6 +10,7 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelsSettingsState, ModelsSettingsStore } from './store.ts'
 import { onboardingReadiness } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
@@ -51,7 +52,7 @@ function assertNever(_value: never): never {
  * @returns the onboarding modal or null when onboarding needs no intervention.
  */
 export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): ReactNode {
-  const { complete, controller, useModels, operations, schema, t } = props
+  const { complete, openSection, controller, useModels, operations, schema, t } = props
   const state = useModels(snapshot => snapshot)
   const readiness = onboardingReadiness(state)
 
@@ -118,6 +119,14 @@ export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): 
           submitBusyLabelKey="onboardingSaving"
           onClose={finishCredential}
         />
+      </div>
+      <div className={styles.editor}>
+        <Button onClick={() => {
+          complete()
+          openSection('models')
+        }}>
+          {t('onboardingOtherProvider')}
+        </Button>
       </div>
     </OnboardingModal>
   )

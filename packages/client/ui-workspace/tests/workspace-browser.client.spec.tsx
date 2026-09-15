@@ -646,6 +646,7 @@ describe('WorkspaceBrowser', () => {
 
   it('collapses an empty search on outside click but keeps a non-empty query expanded', () => {
     mount()
+    expect(screen.getByRole('textbox', { name: '搜索会话' })).toBeTruthy()
     const search = screen.getByRole('button', { name: '搜索会话' })
     fireEvent.click(search)
     expect(search.getAttribute('aria-expanded')).toBe('true')

@@ -23,13 +23,13 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay'>
+  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay' | 'shell.background'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
-  return <div className={css.centerCol}>{props.children}</div>
+  return <main className={css.centerCol}>{props.children}</main>
 }
 
 /** Details column grid item; width 0 keeps the subtree mounted (never unmount on close). */
@@ -176,6 +176,7 @@ export function AppFrame({
     <div
       ref={frameRef}
       className={css.frame}
+      data-shell-frame
       style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
@@ -185,6 +186,9 @@ export function AppFrame({
         productTitle={productTitle}
         {...documentTitle === undefined ? {} : { title: documentTitle }}
       />
+      <div className={css.backgroundLayer} data-shell-background aria-hidden="true">
+        {renderSlot('shell.background', {})}
+      </div>
       <div className={css.sidebarCol}>
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the

@@ -75,27 +75,27 @@ describe('ThemeRuntime', () => {
 
   it('setTheme switches, writes through the scope, republishes, and keeps DOM untouched', () => {
     const { theme, events, host } = make()
-    theme.setTheme('dark')
-    expect(theme.getTheme().preference).toBe('dark')
-    expect(theme.getTheme().active.colorScheme).toBe('dark')
-    expect(host.set).toHaveBeenCalledWith('preference', 'dark')
+    theme.setTheme('light')
+    expect(theme.getTheme().preference).toBe('light')
+    expect(theme.getTheme().active.colorScheme).toBe('light')
+    expect(host.set).toHaveBeenCalledWith('preference', 'light')
     expect(events).toHaveLength(1)
     expect(events[0]).toBe(theme.getTheme())
     // The service never touches presentation state.
     expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(false)
     // Same-value set is a no-op (no extra event).
-    theme.setTheme('dark')
+    theme.setTheme('light')
     expect(events).toHaveLength(1)
     expect(host.set).toHaveBeenCalledOnce()
   })
 
   it('adopts a published Host section without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14 }, revision: 1, writable: true })
-    expect(theme.getTheme().preference).toBe('dark')
+    host.publish({ status: 'ready', value: { preference: 'light', fontSize: 14 }, revision: 1, writable: true })
+    expect(theme.getTheme().preference).toBe('light')
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { preference: 'dark', fontSize: 14 }, revision: 2 })
+    host.publish({ value: { preference: 'light', fontSize: 14 }, revision: 2 })
     expect(events).toHaveLength(1)
   })
 
@@ -141,8 +141,8 @@ describe('ThemeRuntime', () => {
 
   it('revision increases monotonically across every publish', () => {
     const { theme, events } = make()
-    theme.setTheme('dark')
     theme.setTheme('light')
+    theme.setTheme('dark')
     const dispose = theme.register({ id: 'sepia', colorScheme: 'dark', tokens: {} })
     dispose()
     expect(events.map(e => e.revision)).toEqual([1, 2, 3, 4])
@@ -161,17 +161,17 @@ describe('ThemeRuntime', () => {
     })
 
     expect(theme.getTheme().active.tokens).toMatchObject({
-      '--first': 'first-only-light',
-      '--shared': 'second-light',
-    })
-    theme.setTheme('dark')
-    expect(theme.getTheme().active.tokens).toMatchObject({
       '--first': 'first-only-dark',
       '--shared': 'second-dark',
     })
+    theme.setTheme('light')
+    expect(theme.getTheme().active.tokens).toMatchObject({
+      '--first': 'first-only-light',
+      '--shared': 'second-light',
+    })
 
     disposeSecond()
-    expect(theme.getTheme().active.tokens['--shared']).toBe('first-dark')
+    expect(theme.getTheme().active.tokens['--shared']).toBe('first-light')
     disposeFirst()
     expect(theme.getTheme().active.tokens['--shared']).toBeUndefined()
   })
@@ -185,7 +185,7 @@ describe('ThemeRuntime', () => {
       '--new': { light: 'new-light', dark: 'new-dark' },
     })
     stale()
-    expect(theme.getTheme().active.tokens).toEqual({ '--new': 'new-light' })
+    expect(theme.getTheme().active.tokens).toEqual({ '--new': 'new-dark' })
     current()
     current()
     expect(theme.getTheme().active.tokens).toEqual({})

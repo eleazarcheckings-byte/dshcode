@@ -11,15 +11,13 @@
  *   pricing.peak / pricing.offPeak     — chip label (short)
  *   pricing.tooltip.peak / .offPeak    — tooltip with next-switch time
  *
- * The ambient canvas animates behind the chip text via absolute positioning;
- * the chip element itself is `overflow: hidden` to clip it to the capsule.
+ * A steady status lamp reinforces the label without suggesting agent activity.
  */
 
 import { useEffect, useState } from 'react'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import { isPeakHour, nextTransition, formatTransitionTime } from './deepseek-peak.ts'
-import { PeakAmbientCanvas } from './PeakAmbientCanvas.tsx'
 import css from './PeakChip.module.css'
 
 // ─── types ───────────────────────────────────────────────────────────────────
@@ -81,8 +79,6 @@ export function PeakChip({ t }: PeakChipProps) {
         aria-label={tooltip}
         className={`${css.chip} ${peak ? css.peak : css.offPeak}`}
       >
-        {/* Ambient canvas — clipped to the capsule, purely decorative. */}
-        <PeakAmbientCanvas peak={peak} />
         <span className={css.dot} aria-hidden />
         <span className={css.label}>{label}</span>
       </span>

@@ -65,6 +65,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
@@ -97,6 +98,7 @@
   padding: 8px 12px;
   border: 1px solid var(--dsh-color-border, #34343d);
   border-radius: 999px;
+  corner-shape: round;
   background: transparent;
   color: var(--dsh-color-text-primary, #f2f2f5);
   font: inherit;

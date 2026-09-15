@@ -2196,6 +2196,24 @@ export interface Config {
 
 Source: [`packages/skill/skill-filesystem/src/index.ts:49`](../packages/skill/skill-filesystem/src/index.ts)
 
+<a id="deepseek-aidsh-skill-premium-output"></a>
+
+## `@deepseek-ai/dsh-skill-premium-output`
+
+Requires: `skills` · `systemPrompt`
+
+```ts config-catalog
+/** Deployment overrides for packaged output guidance. */
+export interface Config {
+  /** Mount the policy and bundled guides; default true. */
+  enabled?: boolean
+  /** Replace the default policy; user and project task requirements still take precedence. */
+  policy?: string
+}
+```
+
+Source: [`packages/skill/skill-premium-output/src/index.ts:21`](../packages/skill/skill-premium-output/src/index.ts)
+
 <a id="deepseek-aidsh-spill-local"></a>
 
 ## `@deepseek-ai/dsh-spill-local`
@@ -3470,6 +3488,30 @@ export interface OrchestrateModeConfig {
 
 Source: [`packages/saturn/orchestrate/src/index.ts:39`](../packages/saturn/orchestrate/src/index.ts)
 
+<a id="saturnaidsh-saturnbot"></a>
+
+## `@saturnai/dsh-saturnbot`
+
+Requires: `llm` · `sessions` · `sessionPersistence` · `subprocess`
+
+```ts config-catalog
+/** Storage locations are deployment-owned; model output cannot change them. */
+export interface Config {
+  /** Absolute directory for the journal, SQLite memory, isolated worktrees, and reports. */
+  dataDirectory?: string
+  /** Optional absolute YAML config path; defaults to config.yaml within dataDirectory. */
+  configFile?: string
+  /** Maximum append-only journal bytes before the runtime requires offline archival. */
+  maxJournalBytes?: number
+  /** Maximum signed webhook request size, at most 128 KiB. */
+  webhookMaxBytes?: number
+  /** Maximum permitted clock difference for signed webhook timestamps. */
+  webhookToleranceSeconds?: number
+}
+```
+
+Source: [`packages/saturn/saturnbot/src/index.ts:32`](../packages/saturn/saturnbot/src/index.ts)
+
 <a id="saturnaidsh-tool-agent-team"></a>
 
 ## `@saturnai/dsh-tool-agent-team`
@@ -3579,6 +3621,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@saturnai/dsh-client-ui-done` ([`packages/client/ui-done/src/index.ts`](../packages/client/ui-done/src/index.ts))
 - `@saturnai/dsh-client-ui-fleet` ([`packages/client/ui-fleet/src/index.ts`](../packages/client/ui-fleet/src/index.ts))
 - `@saturnai/dsh-client-ui-orchestrate` ([`packages/client/ui-orchestrate/src/index.ts`](../packages/client/ui-orchestrate/src/index.ts))
+- `@saturnai/dsh-client-ui-saturnbot` ([`packages/client/ui-saturnbot/src/index.ts`](../packages/client/ui-saturnbot/src/index.ts))
 - `@saturnai/dsh-client-ui-skin-saturn` ([`packages/client/ui-skin-saturn/src/index.ts`](../packages/client/ui-skin-saturn/src/index.ts))
 - `@saturnai/dsh-done` — requires `sessionProjections` · `systemPrompt` ([`packages/saturn/done/src/index.ts`](../packages/saturn/done/src/index.ts))
 
@@ -3651,4 +3694,3 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-util-workspace-path` ([`packages/util/workspace-path/src/index.ts`](../packages/util/workspace-path/src/index.ts))
 - `@deepseek-ai/dsh-win32-process` ([`packages/subprocess/win32-process/src/index.ts`](../packages/subprocess/win32-process/src/index.ts))
 - `@saturnai/dsh-agent-team-profile` ([`packages/bundle/agent-team-profile/src/index.ts`](../packages/bundle/agent-team-profile/src/index.ts))
-- `@saturnai/dsh-agent-team-web-profile` ([`packages/bundle/agent-team-web-profile/src/index.ts`](../packages/bundle/agent-team-web-profile/src/index.ts))

@@ -1,5 +1,6 @@
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
+  isolation: isolate;
   display: grid;
   grid-template-rows: 100%;
   height: 100%;
@@ -8,6 +9,22 @@
   /* Collapse/expand animates the tracks on the deepsuite sider curve
      (--ds-ease-in-out / --ds-transition-duration-slow, ui-theme base.css). */
   transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+/* A registered background supplies the one shared surface behind the columns. */
+.frame:has(> .backgroundLayer:not(:empty)) {
+  --dsh-shell-content-background: transparent;
+  --dsh-shell-sidebar-background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 40%, transparent);
+}
+
+.backgroundLayer {
+  position: absolute;
+  inset: 0;
+  /* The isolated frame keeps this above its base fill without containing
+     foreground fixed-position dialogs inside column stacking contexts. */
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* Dragging writes widths at pointer cadence; easing them would detach the
@@ -25,7 +42,7 @@
 .sidebarCol {
   min-width: 0;
   overflow: hidden;
-  background: var(--dsw-specific-sidebar-fill);
+  background: var(--dsh-shell-content-background, var(--dsw-specific-sidebar-fill));
   border-right: 0.5px solid var(--dsw-alias-border-l3);
 }
 
@@ -34,11 +51,13 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--dsh-shell-content-background, transparent);
 }
 
 .detailsCol {
   min-width: 0;
   overflow: hidden;
+  background: var(--dsh-shell-content-background, transparent);
   border-left: 0.5px solid var(--dsw-alias-border-l3);
 }
 

@@ -1,0 +1,25 @@
+# The shipped Headless composition supplies the plugin, loop, tools and persistence.
+- id: headless-startup
+  disabled: true
+- id: headless-runner
+  disabled: true
+- id: llm-deepseek
+  disabled: true
+- id: llm-pi-ai
+  disabled: true
+- id: session-title-llm
+  disabled: true
+- id: agent-loop
+  config:
+    agents:
+      - id: main
+        provider: quality-mock
+        model: quality-mock
+        cwd: !!js process.cwd()
+- id: session-persistence-jsonl
+  config:
+    root: './.sessions'
+    compression: none
+- insert:
+    - id: quality-mock
+      name: './mock-llm.ts'

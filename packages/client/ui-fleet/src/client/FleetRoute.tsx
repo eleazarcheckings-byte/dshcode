@@ -5,11 +5,11 @@
  * The product's posture is that it delegates by default, so a parallel fan-out
  * must be readable at a glance and must never read as losing control of your own
  * session. Each line is one route: the worker's label, its one state word, and
- * the colour dot that state already owns elsewhere in the product. Colour is
- * never the only signal — the word stands beside it — and there is no count, no
- * percentage, no elapsed time, and no second metric.
+ * the colour dot that state already owns elsewhere in the product. The header
+ * counts working and attention routes. Each route retains one status, with no
+ * estimated percentage, elapsed time, or second row metric.
  */
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   StateDot, type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -78,8 +78,8 @@ function lineText(line: FleetLine, t: TranslateNS<typeof NS>): string {
 
 /**
  * Fleet route surface: the delegated subtree of this conversation, one line per
- * non-settled worker. Rows are ordinary buttons — Enter and Space activate
- * them, the skin's gold focus ring shows where they are, and the accessible
+ * non-settled worker, with an expandable three-route preview. Rows are ordinary buttons — Enter and Space activate
+ * them, the skin's white focus ring shows where they are, and the accessible
  * name carries the same words the row paints. Nothing here opens a menu, so
  * there is no Escape to handle.
  * @param props - runtime slot currency, the injected navigation face, translator.
@@ -88,6 +88,8 @@ function lineText(line: FleetLine, t: TranslateNS<typeof NS>): string {
 export function FleetRoute({
   sessionId, useSessions, useSessionPendingInteraction, openWorker, t,
 }: FleetRouteProps) {
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => { setExpanded(false) }, [sessionId])
   const byId = useSessions(state => state.byId)
   const jobs = useSessions(state => state.jobsBySession)
   const pending = useSessionPendingInteraction(state => state)
@@ -95,6 +97,9 @@ export function FleetRoute({
     () => deriveFleet(sessionId, fleetRoster(byId, jobs, pending)),
     [sessionId, byId, jobs, pending],
   )
+  const attention = lines.filter(line => line.status === 'waiting-for-you' || line.status === 'blocked').length
+  const running = lines.filter(line => line.status === 'running').length
+  const visibleLines = expanded ? lines : lines.slice(0, 3)
 
   if (lines.length === 0) {
     return (
@@ -106,8 +111,13 @@ export function FleetRoute({
 
   return (
     <div className={css.root} data-fleet="routes">
+      <div className={css.heading}>
+        <span>{t('heading')}</span>
+        {running > 0 && <span>{t('summary.running', { count: running })}</span>}
+        {attention > 0 && <span className={css.attention}>{t('summary.attention', { count: attention })}</span>}
+      </div>
       <div className={css.list} role="group" aria-label={t('list.aria')}>
-        {lines.map((line) => {
+        {visibleLines.map((line) => {
           const text = lineText(line, t)
           return (
             <button
@@ -125,6 +135,9 @@ export function FleetRoute({
           )
         })}
       </div>
+      {lines.length > 3 && <button type="button" className={css.expand} aria-expanded={expanded} onClick={() => { setExpanded(current => !current) }}>
+        {expanded ? t('collapse') : t('expand', { count: lines.length - 3 })}
+      </button>}
     </div>
   )
 }

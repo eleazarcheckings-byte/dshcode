@@ -1,4 +1,4 @@
-/** Scoped model-facing tools for the opt-in Agent Teams runtime. */
+/** Scoped model-facing tools for the Agent Teams runtime. */
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -21,16 +21,16 @@ export interface Config {
   readonly forkProvider?: string
 }
 
-/** Loader schema for the opt-in Team tool plugin. */
+/** Loader schema for the Team tool plugin. */
 export const Config: z<Config> = z.object({
   freshProvider: z.string().default('spawn'),
   forkProvider: z.string().default('fork'),
 })
 
 /** Model-facing collaboration guidance shared by Lead and teammates. */
-const POLICY = `Agent Teams is available in this session, but create teammates only when the user explicitly asks to use Agent Teams or teammates.
+const POLICY = `Agent Teams is available for coordinated work. Follow the session multi-task policy: when multi-task mode is ON, proactively delegate substantial independent work to named teammates while you make useful progress. When multi-task mode is OFF, work in one thread unless the user explicitly requests delegation. Without a multi-task policy, use teammates when the task benefits from parallel work or the user requests them. Keep trivial tasks in the Lead thread. Use Team tools for ongoing shared work, peer messages, and dependent tasks; reserve one-shot subagents for bounded work that needs no follow-up.
 
-The Team Lead and all teammates share the same working directory and filesystem. Edits are immediately visible to every member. Split write work into disjoint scopes, record expected write scopes on shared tasks, and use task dependencies when work must be ordered. Write-scope overlap is advisory, not a lock.
+The Team Lead and all teammates share the same working directory and filesystem. Edits are immediately visible to every member. Split write work into disjoint scopes, record expected write scopes on shared tasks, and use task dependencies when work must be ordered. Give every teammate a concrete deliverable, its allowed write scopes, relevant context, and a verification requirement. Shared-task write scopes describe planned work. When claim_scope is available, each writer must also acquire its own file claims before editing and release them after verification; a task assignment alone grants no file ownership. Never bypass a claim denial.
 
 Prefer read/edit/write for file changes. If a file operation returns FS_STALE_VERSION, read the current file, rebase your intended change onto the new content, and retry. Bash, formatters, code generators, and scripts are not fully protected by the filesystem version guard; coordinate them explicitly and have the Lead review the final diff and run tests.
 

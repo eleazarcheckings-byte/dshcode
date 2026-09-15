@@ -61,8 +61,11 @@ async function bench() {
   } as never)
   const pickDirectory = vi.fn(() => Promise.resolve({ ok: true as const, value: '/projects/picked' }))
   const directoryPicker = { pick: pickDirectory }
-  Object.assign(new TestRemote(ctx), { directoryPicker })
+  const openWorkspacePath = vi.fn(async () => ({ ok: true as const, value: undefined }))
+  const remoteSession = { openWorkspacePath }
+  Object.assign(new TestRemote(ctx), { directoryPicker, session: remoteSession })
   ctx.provide('remote.directoryPicker', directoryPicker as never)
+  ctx.provide('remote.session', remoteSession as never)
   const locale = new LocaleRuntime(ctx)
   // These specs assert the shipped Chinese copy. There is no jsdom `window`
   // in this lane, so browser-language detection never runs and the locale
@@ -71,7 +74,7 @@ async function bench() {
   ctx.provide('locale', locale)
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, rename,
-    insertSessionBefore, open, clear, search, renameSession, binding, fork, pickDirectory,
+    insertSessionBefore, open, clear, search, renameSession, binding, fork, pickDirectory, openWorkspacePath,
   }
 }
 
@@ -90,7 +93,7 @@ describe('ui-workspace apply', () => {
 
   it('declares the services it drives', () => {
     expect(inject).toEqual([
-      'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.directoryPicker',
+      'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.directoryPicker', 'remote.session',
     ])
   })
 
@@ -147,6 +150,8 @@ describe('ui-workspace apply', () => {
     expect(b.insertSessionBefore).toHaveBeenCalledWith('ws', 's1', 's2')
     await browser.createWorkspace({ path: '/tmp/browser-project' })
     expect(b.create).toHaveBeenCalledWith({ path: '/tmp/browser-project' })
+    await browser.openPath('/tmp/browser-project')
+    expect(b.openWorkspacePath).toHaveBeenCalledWith({ path: '/tmp/browser-project' })
 
     const picker = (b.slots.entries('conversation.hero.workspace')[0]!.inject as () => WorkspacePickerInjected)()
     await picker.createWorkspace({ path: '/tmp/project' })

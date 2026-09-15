@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`boots the shipped host services, persists the request before dispatch, executes a role tool, and replays its report > role delivery criteria recorded before provider dispatch 1`] = `
+[
+  {
+    "criteria": [
+      "Choose work with a concrete user or business outcome, a verifiable acceptance criterion, and available dependencies. Prefer finishing a useful result over creating more parallel activity.",
+      "Keep each task within its specialist role and remaining budget. Distinguish completed work, drafts, pending approval, and blockers in the final summary.",
+    ],
+    "role": "orchestrator",
+  },
+  {
+    "criteria": [
+      "Use the relevant customer history and current tool observations. Answer the actual issue in plain language, give one clear next step, and keep sensitive details out of unrelated replies.",
+      "Separate the proposed reply from actions already completed. Do not promise a refund, resolution, delivery, or response time without supporting evidence and authority; name the blocker and the appropriate escalation when necessary.",
+    ],
+    "role": "operations",
+  },
+]
+`;
