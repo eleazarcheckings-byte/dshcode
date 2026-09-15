@@ -23,10 +23,16 @@ interface TeamMemberSnapshot {
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
   readonly error?: string
+  /** Absent on rows written before isolation existed, which were all shared. */
+  readonly isolation?: TeamIsolation
+  /** Present only for a member whose isolation is `worktree`. */
+  readonly worktree?: TeamWorktreeSnapshot
 }
 ```
 
 每个 member 都从 `provisioning` 开始，并且只到达一个终态 roster phase：`active` 或 `failed`。运行时 `running`／`idle`／`inactive` 状态单独派生，绝不会重写该记录。
+
+member 的 `isolation` 决定其文件位置。默认的 `shared` 即 Lead 自身的工作目录。`worktree` 会把 Lead 的 HEAD 检出到 `<DSH_HOME>/worktrees/<team>/<member>`，并将该目录作为 teammate 的持久 workspace，因此其改动在 `merge_teammate` 之前对外不可见；merge 会收集该检出的 diff，拒绝任何被同伴 claim 占有的路径，并整体应用补丁，要么全部应用，要么完全不应用。
 
 ## 持久 mailbox
 

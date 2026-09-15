@@ -24,10 +24,16 @@ interface TeamMemberSnapshot {
   readonly context: 'fresh' | 'fork'
   readonly phase: TeamMemberPhase
   readonly error?: string
+  /** Absent on rows written before isolation existed, which were all shared. */
+  readonly isolation?: TeamIsolation
+  /** Present only for a member whose isolation is `worktree`. */
+  readonly worktree?: TeamWorktreeSnapshot
 }
 ```
 
 Every member starts in `provisioning` and reaches exactly one terminal roster phase, `active` or `failed`. Runtime `running`/`idle`/`inactive` status is derived separately and never rewrites this record.
+
+A member's `isolation` decides where its files live. `shared`, the default, is the Lead's own working directory. `worktree` checks the Lead's HEAD out into `<DSH_HOME>/worktrees/<team>/<member>` and hands the teammate that directory as its durable workspace, so its edits stay invisible until `merge_teammate` collects the checkout's diff, refuses every path a peer's claim owns, and applies the patch whole or not at all.
 
 ## Durable mailbox
 
