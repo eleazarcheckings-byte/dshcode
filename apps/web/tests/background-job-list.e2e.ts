@@ -18,8 +18,11 @@ import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/fresh-round-trip/session.jsonl', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/background-job-list', import.meta.url))
-const RUNNING_EXPECTED = join(SNAPSHOT_DIR, 'running.expected.md')
-const SETTLED_EXPECTED = join(SNAPSHOT_DIR, 'settled.expected.md')
+// The shell tool is platform-specific (bash on Unix, pwsh on Windows), so
+// each platform keeps its own golden pair.
+const GOLDEN_SUFFIX = process.platform === 'win32' ? '.win' : ''
+const RUNNING_EXPECTED = join(SNAPSHOT_DIR, `running${GOLDEN_SUFFIX}.expected.md`)
+const SETTLED_EXPECTED = join(SNAPSHOT_DIR, `settled${GOLDEN_SUFFIX}.expected.md`)
 const MODE = webSnapshotMode()
 const SEED_ID = 'background-job-list-web-e2e'
 // The shipped preset swaps bash for pwsh on Windows; the probe runs the
@@ -118,9 +121,12 @@ describe.skipIf(MODE === 'record')('web e2e: background job list', () => {
     await idle.waitFor({ timeout: 20_000 })
 
     // The row label follows on its own tick after the count drops; wait for
-    // the cancelled detail so the snapshot never races the last frame.
+    // the cancelled detail so the snapshot never races the last frame. The
+    // platform's kill settles as a signal on Unix and a hard kill on Windows.
     const settledRow = page.getByRole('list', { name: 'Background jobs' }).getByRole('listitem').first()
-    await expect.poll(() => settledRow.textContent()).toContain('SIGTERM')
+    await expect.poll(() => settledRow.textContent()).toContain(
+      process.platform === 'win32' ? 'killed before exit' : 'SIGTERM',
+    )
 
     const snapshot = await captureStableAria(page, '[class*="menu"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(SETTLED_EXPECTED, snapshot, MODE)
@@ -129,6 +135,9 @@ describe.skipIf(MODE === 'record')('web e2e: background job list', () => {
   }, 60_000)
 
   it('keeps its snapshot inventory closed', async () => {
-    await assertFixtureInventory(SNAPSHOT_DIR, ['running.expected.md', 'settled.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, [
+      'running.expected.md', 'settled.expected.md',
+      'running.win.expected.md', 'settled.win.expected.md',
+    ])
   })
 })
