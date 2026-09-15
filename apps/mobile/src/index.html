@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Saturn AI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- PAIRING -->
+    <section class="screen" data-screen="pairing" hidden>
+      <header class="screen__header">
+        <div class="ring ring--idle" data-ring></div>
+        <h1 class="wordmark">Saturn AI</h1>
+        <p class="subtitle">Pair with a running host</p>
+      </header>
+
+      <div class="card">
+        <button class="btn btn--primary" data-action="scan-qr" type="button">Scan QR code</button>
+        <div class="divider"><span>or</span></div>
+        <label class="field-label" for="pairing-json">Paste the pairing JSON</label>
+        <textarea id="pairing-json" class="textarea" rows="5" placeholder='{"v":1,"name":"…","url":"https://…","token":"…","expires":"…"}'></textarea>
+        <button class="btn btn--ghost" data-action="pair-pasted" type="button">Pair</button>
+      </div>
+
+      <p class="status" data-pairing-status role="status" aria-live="polite"></p>
+      <canvas data-scan-canvas hidden></canvas>
+    </section>
+
+    <!-- LOCK -->
+    <section class="screen" data-screen="lock" hidden>
+      <div class="ring ring--idle" data-ring></div>
+      <h1 class="wordmark">Saturn AI</h1>
+      <p class="subtitle">Locked</p>
+      <button class="btn btn--primary" data-action="unlock" type="button">Unlock</button>
+    </section>
+
+    <!-- OFFLINE -->
+    <section class="screen" data-screen="offline" hidden>
+      <div class="ring ring--idle" data-ring></div>
+      <h1 class="wordmark">Host unreachable</h1>
+      <p class="subtitle" data-offline-detail>Saturn AI can't reach <span data-host-name>your host</span> right now.</p>
+      <button class="btn btn--primary" data-action="retry" type="button">Try again</button>
+      <button class="btn btn--ghost" data-action="unpair" type="button">Forget this host</button>
+    </section>
+
+    <!-- NOTIFICATIONS -->
+    <section class="screen" data-screen="notifications" hidden>
+      <header class="screen__header screen__header--compact">
+        <div class="ring ring--sm" data-ring></div>
+        <h1 class="wordmark wordmark--sm">Activity</h1>
+      </header>
+      <ul class="verdict-list" data-notification-list></ul>
+      <p class="empty-state" data-notification-empty hidden>Nothing yet. Approvals and verdicts from your host will show up here.</p>
+      <button class="btn btn--ghost btn--fixed" data-action="open-webview" type="button">Open Saturn AI</button>
+    </section>
+
+    <!-- CONNECTING (brief transitional state) -->
+    <section class="screen" data-screen="connecting" hidden>
+      <div class="ring ring--idle ring--spin" data-ring></div>
+      <p class="subtitle">Connecting…</p>
+    </section>
+
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

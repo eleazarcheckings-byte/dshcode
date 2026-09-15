@@ -1,0 +1,344 @@
+/* Saturn AI mobile companion — SPEC.md §2 (bg/surface/ink/accent tokens, the
+   ring mark tilted -18deg, Instrument Sans + Commit Mono, the named motion
+   system). This file is the whole app's stylesheet: there is no framework
+   here, just the tokens applied directly to a handful of native-feeling
+   screens. */
+
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/fonts/InstrumentSans-Variable.woff2') format('woff2-variations');
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Commit Mono';
+  src: url('/fonts/CommitMono-400-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Commit Mono';
+  src: url('/fonts/CommitMono-700-Regular.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --saturn-bg: #0b0b12;
+  --saturn-surface: #15151f;
+  --saturn-surface-2: #1c1c29;
+  --saturn-ink: #f2f0ea;
+  --saturn-ink-muted: #9a9aac;
+  --saturn-accent: #dda43a;
+  --saturn-accent-ink: #0b0b12;
+  --saturn-hairline: rgb(242 240 234 / 14%);
+  --saturn-pass: #7fd88f;
+  --saturn-revise: #dda43a;
+  --saturn-reject: #e2685c;
+
+  --saturn-dur-1: 120ms;
+  --saturn-dur-2: 200ms;
+  --saturn-dur-3: 320ms;
+  --saturn-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --saturn-ease-out: cubic-bezier(0, 0, 0, 1);
+  --saturn-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--saturn-bg);
+  color: var(--saturn-ink);
+  font-family: 'Instrument Sans', -apple-system, 'Segoe UI', sans-serif;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+#app {
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px 24px calc(24px + env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.screen__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.screen__header--compact {
+  padding-top: 8px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.ring {
+  color: var(--saturn-accent);
+  width: 48px;
+  height: 48px;
+}
+
+.ring--sm {
+  width: 28px;
+  height: 28px;
+}
+
+.saturn-ring {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+.saturn-ring--draw {
+  animation: saturn-draw var(--saturn-dur-3) var(--saturn-ease-out) both;
+}
+
+@keyframes saturn-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ring--spin {
+  animation: saturn-spin 1.6s linear infinite;
+}
+
+@keyframes saturn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saturn-ring--draw,
+  .ring--spin {
+    animation: none !important;
+  }
+}
+
+.wordmark {
+  font-size: 22px;
+  font-weight: 600;
+  font-stretch: 100%;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.wordmark--sm {
+  font-size: 17px;
+}
+
+.subtitle {
+  color: var(--saturn-ink-muted);
+  font-size: 14px;
+  margin: 0;
+  max-width: 32ch;
+}
+
+.card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--saturn-surface);
+  border: 1px solid var(--saturn-hairline);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--saturn-ink-muted);
+  text-align: left;
+}
+
+.textarea {
+  font-family: 'Commit Mono', ui-monospace, monospace;
+  font-size: 12px;
+  background: var(--saturn-bg);
+  color: var(--saturn-ink);
+  border: 1px solid var(--saturn-hairline);
+  border-radius: 8px;
+  padding: 10px;
+  resize: vertical;
+  min-height: 44px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--saturn-ink-muted);
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--saturn-hairline);
+}
+
+.btn {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform var(--saturn-dur-1) var(--saturn-ease-standard),
+    background-color var(--saturn-dur-2) var(--saturn-ease-standard);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn--primary {
+  background: var(--saturn-accent);
+  color: var(--saturn-accent-ink);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--saturn-ink);
+  border-color: var(--saturn-hairline);
+}
+
+.btn--fixed {
+  position: fixed;
+  left: 24px;
+  right: 24px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+.status {
+  min-height: 18px;
+  font-size: 13px;
+  color: var(--saturn-ink-muted);
+}
+
+.status[data-tone='error'] {
+  color: var(--saturn-reject);
+}
+
+canvas[data-scan-canvas],
+video[data-scan-video] {
+  width: 100%;
+  max-width: 360px;
+  border-radius: 14px;
+}
+
+.verdict-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 88px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.verdict-card {
+  background: var(--saturn-surface);
+  border: 1px solid var(--saturn-hairline);
+  border-left: 3px solid var(--saturn-ink-muted);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-height: 44px;
+  animation: saturn-reveal var(--saturn-dur-3) var(--saturn-ease-out) both;
+}
+
+.verdict-card[data-kind='pass'] {
+  border-left-color: var(--saturn-pass);
+}
+
+.verdict-card[data-kind='revise'] {
+  border-left-color: var(--saturn-revise);
+}
+
+.verdict-card[data-kind='reject'] {
+  border-left-color: var(--saturn-reject);
+}
+
+@keyframes saturn-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verdict-card {
+    animation: none;
+  }
+}
+
+.verdict-card__title {
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+.verdict-card__body {
+  font-size: 13px;
+  color: var(--saturn-ink-muted);
+  margin: 0;
+}
+
+.verdict-card__meta {
+  font-family: 'Commit Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--saturn-ink-muted);
+  margin-top: 6px;
+}
+
+.empty-state {
+  color: var(--saturn-ink-muted);
+  font-size: 13px;
+  max-width: 30ch;
+  margin-top: 40px;
+}
