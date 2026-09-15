@@ -2,7 +2,7 @@
 
 English | [中文](ADAPTERS.zh.md)
 
-The [runtime](README.md) admits these 19 typed tools through global and per-role allowlists. An adapter declaration supplies its role ceiling, effect, input schema, and retry policy; model arguments cannot override them. `createBotTools` requires a Host-owned data directory and the managed subprocess service. Tests inject HTTP responses while exercising real Git, files, process trees, and SQLite.
+The [runtime](README.md) admits these 23 typed tools through global and per-role allowlists. An adapter declaration supplies its role ceiling, effect, input schema, and retry policy; model arguments cannot override them. `createBotTools` requires a Host-owned data directory and the managed subprocess service. Tests inject HTTP responses while exercising real Git, files, process trees, and SQLite.
 
 ## Local tools and isolation
 
@@ -24,7 +24,7 @@ Stages persist for inspection and approval recovery; a failed stage creation att
 
 ## Configure credentials
 
-Integration settings contain environment variable **names**, never credential literals. Supply the referenced variables to the process launching the configured `dsh` profile. Preserve least-privilege provider permissions and configure the intended repository, mailbox, or project. A connection marked `configured` means its settings and credential variable are present; authentication has not been tested. Missing configuration and provider 401/403 responses surface as action required.
+Integration settings contain environment variable **names**, never credential literals. Supply the referenced variables to the process launching the configured `dsh` profile, **or** drop them in an optional `<dataDirectory>/.env` file (`KEY=value` lines; comments and blank lines ignored). The file is read once at boot and never logged; an inherited process variable of the same name always wins over the file. Preserve least-privilege provider permissions and configure the intended repository, mailbox, store, or project. A connection marked `configured` means its settings and credential variable are present; authentication has not been tested. Missing configuration and provider 401/403 responses surface as action required.
 
 ```yaml
 integrations:
@@ -36,6 +36,16 @@ integrations:
     resource: operator@example.com
   stripe:
     credentialEnv: SATURN_STRIPE_KEY
+  telegram:
+    credentialEnv: SATURN_TELEGRAM_BOT_TOKEN
+    resource: '123456789' # default chat id; a call may supply chatId instead
+  shopify:
+    credentialEnv: SATURN_SHOPIFY_TOKEN
+    resource: your-store.myshopify.com
+  vercel:
+    endpoint: https://api.vercel.com/v1/integrations/deploy/<project>/<hook>
+  cloudflare-pages:
+    endpoint: https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/<hook-id>
   cloud:
     endpoint: https://deploy.example.com/saturnbot
     credentialEnv: SATURN_DEPLOY_TOKEN
@@ -50,7 +60,9 @@ integrations:
     credentialEnv: SATURN_WEBHOOK_SECRET
 ```
 
-Endpoint overrides must use HTTPS without embedded credentials, queries, or fragments. Redirects are rejected. Remote response bodies are limited to 128 KiB before JSON parsing, then checked against provider response schemas. Retained data redacts configured credential values; transport failures do not retain provider bodies or exception excerpts. Providers may still return private business content, so protect the local data directory and dashboard access.
+Endpoint overrides must use HTTPS without embedded credentials or a fragment (a query string is also rejected except for `vercel`/`cloudflare-pages`, whose deploy-hook URL may legitimately carry one). Redirects are rejected. Remote response bodies are limited to 128 KiB before JSON parsing, then checked against provider response schemas. Retained data redacts configured credential values; transport failures do not retain provider bodies or exception excerpts. Providers may still return private business content, so protect the local data directory and dashboard access.
+
+`vercel` and `cloudflare-pages` are the two exceptions to "credential required": a deploy-hook URL is itself the secret (the platform authenticates the request by the URL alone), so `credentialEnv` is optional for these two names. When present it is still sent as `Authorization: Bearer …`.
 
 ## Provider operations
 
@@ -59,15 +71,22 @@ Endpoint overrides must use HTTPS without embedded credentials, queries, or frag
 | `github.create_pr` | Push the approved commit to a deterministic task branch and create a draft PR; never merge. |
 | `email.inbox`, `email.draft`, `email.send` | Read inbox previews, create an unsent draft, or submit the exact approved message. |
 | `stripe.metrics` | Read balances and one bounded transaction page, preserving currencies and minor units. |
-| `cloud.deploy` | Verify the commit exists on GitHub, then submit its SHA to the configured deployment provider. |
+| `cloud.deploy` | Verify the commit exists on GitHub, then trigger a first-class `vercel`/`cloudflare-pages` deploy hook or the configured generic deployment webhook. |
 | `social.publish` | Submit approved channel/text to the configured provider. |
-| `creative.generate` | Request an image, video, or audio asset and return the provider's actual status and HTTPS links. |
+| `creative.generate` | Route to a connected media provider when present, else request an image/video/audio asset from the configured webhook; return the actual status and links either way. |
+| `telegram.send` | Send an approved message through the configured bot to its default or an explicit chat. |
+| `shopify.orders_list`, `shopify.products_list` | Read a bounded, customer-PII-free page of orders or products and variant inventory. |
+| `shopify.inventory_update` | Set one inventory item's available quantity at one location after approval. |
 
 GitHub defaults to `https://api.github.com` and API version `2026-03-10`. The token needs repository contents write and pull requests write for publication. The adapter finds an existing PR only when its task marker and head revision match exactly. Push authentication is supplied only to that Git invocation; hooks, credential helpers, signing, and redirects are disabled. See [GitHub pull requests](https://docs.github.com/en/rest/pulls/pulls).
 
 Email defaults to Microsoft Graph `https://graph.microsoft.com/v1.0`, using `/users/{mailbox}`. Grant mail read for inbox access, mail read/write for draft creation, and mail send for submission; delegated versus application access follows your tenant's authorization policy. `email.send` requires HTTP 202 and reports acceptance, **not confirmed delivery**. Drafts remain unsent. No email mutation is retried after an uncertain network outcome. See [list messages](https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0) and [send mail](https://learn.microsoft.com/en-us/graph/api/user-sendmail?view=graph-rest-1.0).
 
 Stripe defaults to `https://api.stripe.com/v1`; use a key with balance and balance-transaction read access. The adapter groups charge/payment revenue, refunds, fees, payouts, other outflows, and net movement separately by currency. Integers remain in each currency's minor units. Payouts are not revenue. Totals describe only the returned page; `hasMore` explicitly reports additional transactions. These are account cash movements, not a complete accounting profit calculation. See [balance transactions](https://docs.stripe.com/api/balance_transactions/list).
+
+Telegram defaults to `https://api.telegram.org`; the bot token is carried in the request path (`/bot<token>/sendMessage`), not an `Authorization` header, matching the [Bot API](https://core.telegram.org/bots/api#sendmessage). `telegram.send` posts to the configured `resource` chat id unless the call supplies `chatId`. Create the bot with [@BotFather](https://core.telegram.org/bots#how-do-i-create-a-bot) and add it to the target chat before sending.
+
+Shopify derives its endpoint from `resource` (the store domain) as `https://<resource>/admin/api/2025-01` unless `endpoint` overrides it, and authenticates with `X-Shopify-Access-Token`, not a bearer token — see [Admin API access tokens](https://shopify.dev/docs/api/admin-rest). `shopify.orders_list`/`shopify.products_list` retain only commerce fields (id, name/title, status, totals, currency, line items/variants); no customer name, email, or address ever reaches model-visible data. `shopify.inventory_update` requires an exact `inventoryItemId` and `locationId` and reports the provider-confirmed `available` quantity, per [inventory levels](https://shopify.dev/docs/api/admin-rest/2025-01/resources/inventorylevel).
 
 ## Deployment, social, and creative HTTP requests
 
@@ -80,6 +99,16 @@ These integrations require an operator-configured endpoint implementing the foll
 | Creative | `resource?`, `kind` (`image`, `video`, `audio`), `prompt`, `requestId` |
 
 A successful JSON response contains `id` and `status` (`accepted`, `running`, or `completed`), plus optional HTTPS `url`. Creative responses may include up to 20 `assets`, each with HTTPS `url` and `mimeType`. Large retained asset lists report `omittedAssets`. Asset URLs cannot embed user/password credentials. Asynchronous acceptance remains asynchronous; adapters do not invent completion, poll status, or download assets. Publication, deployment, and creative generation have no automatic retry after an uncertain response. Their approval rules are owned by the central runtime.
+
+## First-class deploy hooks and media routing
+
+`cloud.deploy` accepts an optional `target`: `webhook` (default, the generic contract above), `vercel`, or `cloudflare-pages`. For the latter two it still verifies the commit exists on GitHub first, then POSTs `{ ref, environment, requestId }` straight to the configured deploy-hook `endpoint` — `Authorization: Bearer …` only when `credentialEnv` is configured — and returns the provider's JSON response verbatim under `response`, since Vercel and Cloudflare Pages each shape their own acceptance payload and this runtime does not assert their exact fields. See [Vercel deploy hooks](https://vercel.com/docs/deployments/deploy-hooks) and [Cloudflare Pages deploy hooks](https://developers.cloudflare.com/pages/configuration/deploy-hooks/).
+
+`creative.generate` first checks for a connected media capability (`ctx.get('media')`, the `@saturnai/dsh-tool-media` contract: `generate({ kind, prompt, provider?, model?, params?, workspace }) → { id, status, assets, cost }`). When present, the request routes there instead of the generic creative webhook, and the returned `cost.estimatedUsd`/`provider`/`model` are retained alongside `assets`. Absent a connected media capability, the tool falls back to the generic webhook contract above unchanged.
+
+## Report delivery
+
+`reportChannel: inbox` (default) only ever writes to the durable report inbox. `reportChannel: telegram` additionally sends the daily digest — truncated to 4096 characters — to the configured Telegram integration's chat id once cycle settlement completes; a delivery failure raises an alert but never loses the inbox copy. Any other channel name keeps the pre-existing behavior: an explicit alert stating the channel is not implemented, report retained in the inbox only.
 
 ## Signed webhook ingress
 

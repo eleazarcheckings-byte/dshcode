@@ -2,7 +2,7 @@
 
 [English](ADAPTERS.md) | 中文
 
-[运行时](README.zh.md)通过全局和各角色的允许列表准入这 19 个强类型工具。适配器声明规定角色上限、效果、输入模式和重试策略；模型参数不能覆盖这些规则。`createBotTools` 需要 Host 管理的数据目录和托管子进程服务。测试仅替换 HTTP 响应，同时使用真实的 Git、文件、进程树和 SQLite。
+[运行时](README.zh.md)通过全局和各角色的允许列表准入这 23 个强类型工具。适配器声明规定角色上限、效果、输入模式和重试策略；模型参数不能覆盖这些规则。`createBotTools` 需要 Host 管理的数据目录和托管子进程服务。测试仅替换 HTTP 响应，同时使用真实的 Git、文件、进程树和 SQLite。
 
 ## 本地工具与隔离
 
@@ -24,7 +24,7 @@
 
 ## 配置凭据
 
-集成设置仅包含环境变量**名称**，不包含凭据字面量。向启动相应 `dsh` 配置档的进程提供这些变量。为提供方设置最小权限，并指定预期仓库、邮箱或项目。连接标记为 `configured` 仅表示设置和凭据变量存在，尚未测试认证。缺少配置或提供方返回 401/403 时，显示需要操作。
+集成设置仅包含环境变量**名称**，不包含凭据字面量。向启动相应 `dsh` 配置档的进程提供这些变量，**或者**将其写入可选的 `<dataDirectory>/.env` 文件（`KEY=value` 形式，忽略注释和空行）。该文件仅在启动时读取一次且从不记录日志；同名的继承进程变量始终优先于文件。为提供方设置最小权限，并指定预期仓库、邮箱、店铺或项目。连接标记为 `configured` 仅表示设置和凭据变量存在，尚未测试认证。缺少配置或提供方返回 401/403 时，显示需要操作。
 
 ```yaml
 integrations:
@@ -36,6 +36,16 @@ integrations:
     resource: operator@example.com
   stripe:
     credentialEnv: SATURN_STRIPE_KEY
+  telegram:
+    credentialEnv: SATURN_TELEGRAM_BOT_TOKEN
+    resource: '123456789' # 默认聊天 ID；调用时也可改为提供 chatId
+  shopify:
+    credentialEnv: SATURN_SHOPIFY_TOKEN
+    resource: your-store.myshopify.com
+  vercel:
+    endpoint: https://api.vercel.com/v1/integrations/deploy/<project>/<hook>
+  cloudflare-pages:
+    endpoint: https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/<hook-id>
   cloud:
     endpoint: https://deploy.example.com/saturnbot
     credentialEnv: SATURN_DEPLOY_TOKEN
@@ -50,7 +60,9 @@ integrations:
     credentialEnv: SATURN_WEBHOOK_SECRET
 ```
 
-端点覆盖值必须使用 HTTPS，且不得嵌入凭据、查询或片段。重定向会被拒绝。远程响应体在解析 JSON 前限制为 128 KiB，随后按提供方响应模式验证。保留的数据会隐去配置的凭据值；传输失败不会保留提供方响应体或异常内容片段。提供方仍可能返回私有业务内容，因此需要保护本地数据目录和仪表盘访问。
+端点覆盖值必须使用 HTTPS，且不得嵌入凭据或片段（查询字符串同样会被拒绝，但 `vercel`/`cloudflare-pages` 的部署钩子 URL 例外，其本身可以合法携带查询字符串）。重定向会被拒绝。远程响应体在解析 JSON 前限制为 128 KiB，随后按提供方响应模式验证。保留的数据会隐去配置的凭据值；传输失败不会保留提供方响应体或异常内容片段。提供方仍可能返回私有业务内容，因此需要保护本地数据目录和仪表盘访问。
+
+`vercel` 和 `cloudflare-pages` 是"必须配置凭据"规则的两个例外：部署钩子 URL 本身即是密钥（平台仅凭该 URL 即可完成认证），因此这两者的 `credentialEnv` 为可选项。若配置了该字段，仍会以 `Authorization: Bearer …` 形式发送。
 
 ## 提供方操作
 
@@ -59,15 +71,22 @@ integrations:
 | `github.create_pr` | 将批准的提交推送到确定性的任务分支并创建草稿 PR，不执行合并。 |
 | `email.inbox`、`email.draft`、`email.send` | 读取收件箱预览、创建未发送草稿，或提交精确批准的邮件。 |
 | `stripe.metrics` | 读取余额和一页受限的交易记录，保留各币种及其最小货币单位。 |
-| `cloud.deploy` | 确认提交已存在于 GitHub，然后将其 SHA 提交给配置的部署提供方。 |
+| `cloud.deploy` | 确认提交已存在于 GitHub，然后触发一等公民的 `vercel`/`cloudflare-pages` 部署钩子，或配置的通用部署 webhook。 |
 | `social.publish` | 将批准的频道和文本提交给配置的提供方。 |
-| `creative.generate` | 请求图像、视频或音频资产，返回提供方实际状态和 HTTPS 链接。 |
+| `creative.generate` | 若已连接媒体提供方则路由至该处，否则向配置的 webhook 请求图像/视频/音频资产；两种情况下都返回实际状态和链接。 |
+| `telegram.send` | 通过配置的机器人向默认聊天或指定聊天发送已批准的消息。 |
+| `shopify.orders_list`、`shopify.products_list` | 读取一页受限、不含客户个人信息的订单或产品及库存变体数据。 |
+| `shopify.inventory_update` | 在获得批准后，设置某库存项在某地点的可用数量。 |
 
 GitHub 默认使用 `https://api.github.com` 和 API 版本 `2026-03-10`。发布令牌需要仓库内容写入和拉取请求写入权限。仅当任务标记和头部版本完全匹配时，适配器才复用已有 PR。推送认证仅提供给对应的 Git 调用；钩子、凭据助手、签名和重定向均被禁用。参见 [GitHub 拉取请求](https://docs.github.com/en/rest/pulls/pulls)。
 
 邮件默认使用 Microsoft Graph `https://graph.microsoft.com/v1.0` 的 `/users/{mailbox}`。收件箱访问需要邮件读取权限，创建草稿需要邮件读写权限，提交邮件需要发送权限；委托访问或应用访问遵循租户的授权策略。`email.send` 要求 HTTP 202，并报告已接受提交，**不确认送达**。草稿保持未发送状态。网络结果不确定时，邮件变更不会重试。参见[列出邮件](https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0)和[发送邮件](https://learn.microsoft.com/en-us/graph/api/user-sendmail?view=graph-rest-1.0)。
 
 Stripe 默认使用 `https://api.stripe.com/v1`；密钥需要余额和余额交易读取权限。适配器按币种分别汇总 charge/payment 收入、退款、手续费、提现、其他流出和净变动。整数保留各币种的最小单位。提现不计入收入。合计仅覆盖返回的一页；`hasMore` 明确说明存在更多交易。这些数值表示账户资金变动，不是完整的会计利润计算。参见[余额交易](https://docs.stripe.com/api/balance_transactions/list)。
+
+Telegram 默认使用 `https://api.telegram.org`；机器人令牌携带在请求路径中（`/bot<token>/sendMessage`），而非 `Authorization` 请求头，与 [Bot API](https://core.telegram.org/bots/api#sendmessage) 一致。`telegram.send` 默认发送到配置的 `resource` 聊天 ID，除非调用时提供了 `chatId`。请先通过 [@BotFather](https://core.telegram.org/bots#how-do-i-create-a-bot) 创建机器人并将其加入目标聊天，然后再发送消息。
+
+Shopify 会依据 `resource`（店铺域名）推导端点为 `https://<resource>/admin/api/2025-01`，除非 `endpoint` 覆盖该值；认证方式为 `X-Shopify-Access-Token`，而非 bearer 令牌——参见 [Admin API 访问令牌](https://shopify.dev/docs/api/admin-rest)。`shopify.orders_list`/`shopify.products_list` 只保留商务字段（id、名称/标题、状态、总额、币种、行项目/变体）；客户姓名、邮箱或地址永远不会进入模型可见的数据。`shopify.inventory_update` 需要精确的 `inventoryItemId` 和 `locationId`，并报告提供方确认的 `available` 数量，参见[库存水平](https://shopify.dev/docs/api/admin-rest/2025-01/resources/inventorylevel)。
 
 ## 部署、社交与创意 HTTP 请求
 
@@ -80,6 +99,16 @@ Stripe 默认使用 `https://api.stripe.com/v1`；密钥需要余额和余额交
 | Creative | `resource?`、`kind`（`image`、`video`、`audio`）、`prompt`、`requestId` |
 
 成功的 JSON 响应包含 `id` 和 `status`（`accepted`、`running` 或 `completed`），以及可选 HTTPS `url`。创意响应最多可以包含 20 个 `assets`，每项具有 HTTPS `url` 和 `mimeType`。保留的资产列表较大时会报告 `omittedAssets`。资产 URL 不得嵌入用户名或密码凭据。异步接受保持异步状态；适配器不会虚构完成、轮询状态或下载资产。发布、部署和创意生成在响应不确定时均不会自动重试。其审批规则由中央运行时负责。
+
+## 一等公民部署钩子与媒体路由
+
+`cloud.deploy` 接受可选的 `target`：`webhook`（默认，即上述通用契约）、`vercel` 或 `cloudflare-pages`。对于后两者，它仍会先确认提交已存在于 GitHub，然后直接向配置的部署钩子 `endpoint` POST `{ ref, environment, requestId }`——仅当配置了 `credentialEnv` 时才附加 `Authorization: Bearer …`——并将提供方的 JSON 响应原样返回在 `response` 字段中，因为 Vercel 与 Cloudflare Pages 各自的接受响应结构不同，本运行时不对其具体字段做断言。参见 [Vercel 部署钩子](https://vercel.com/docs/deployments/deploy-hooks)与 [Cloudflare Pages 部署钩子](https://developers.cloudflare.com/pages/configuration/deploy-hooks/)。
+
+`creative.generate` 首先检查是否已连接媒体能力（`ctx.get('media')`，即 `@saturnai/dsh-tool-media` 契约：`generate({ kind, prompt, provider?, model?, params?, workspace }) → { id, status, assets, cost }`）。若已连接，请求将路由至该处而非通用创意 webhook，返回的 `cost.estimatedUsd`/`provider`/`model` 会与 `assets` 一并保留。若未连接媒体能力，该工具的行为与上述通用 webhook 契约保持不变。
+
+## 报告投递
+
+`reportChannel: inbox`（默认）只会写入持久化的报告收件箱。`reportChannel: telegram` 会在周期结算完成后，额外将每日摘要（截断至 4096 字符）发送到配置的 Telegram 集成对应的聊天 ID；投递失败会产生提醒，但绝不会丢失收件箱中的副本。其他任何频道名称保持原有行为：产生明确提醒说明该频道未实现，报告仅保留在收件箱中。
 
 ## 签名 webhook 接入
 
