@@ -49,9 +49,9 @@ describe('SidebarRoot.module.css: active-row ring', () => {
     expect(ring?.get('pointer-events'), 'must never intercept row clicks/menus').toBe('none')
   })
 
-  it('paints the ring in the Saturn accent token via a mask, so it inherits the accent rather than a fixed hex', () => {
+  it('paints the ring in currentColor via a mask, so it inherits the row\'s own text color per SPEC §3 C3 ACCEPTANCE ("the sidebar active row shows the ring in currentColor") rather than a fixed hex or a token that could resolve to something else', () => {
     const ring = declarations(`${ROW}::after`)
-    expect(ring?.get('background-color')).toBe('var(--saturn-accent, currentColor)')
+    expect(ring?.get('background-color')).toBe('currentColor')
     expect(ring?.get('mask-image'), 'a mask-image (not background-image), so background-color paints through the stroke').toBeDefined()
     expect(ring?.get('-webkit-mask-image'), 'Chromium/Electron requires the -webkit- prefixed form too').toBeDefined()
   })

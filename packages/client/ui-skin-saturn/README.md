@@ -1,3 +1,8 @@
+---
+description: "Saturn Premium dark skin: palette tokens, the self-hosted Instrument Sans + Commit Mono type system, and the -18deg favicon ring."
+kind: "package-reference"
+---
+
 # @saturnai/dsh-client-ui-skin-saturn
 
 English | [中文](README.zh.md)

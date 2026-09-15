@@ -1,3 +1,8 @@
+---
+description: "Saturn Premium 深色皮肤：调色板 token、自托管的 Instrument Sans + Commit Mono 字体系统，以及 -18 度 favicon 圆环。"
+kind: "package-reference"
+---
+
 # @saturnai/dsh-client-ui-skin-saturn
 
 [English](README.md) | 中文

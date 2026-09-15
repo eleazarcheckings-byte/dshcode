@@ -383,7 +383,7 @@
   width: 18px;
   height: 18px;
   transform: translateY(-50%);
-  background-color: var(--saturn-accent, currentColor);
+  background-color: currentColor;
   /* Same ellipse geometry as the favicon ring (ui-skin-saturn/src/client/index.ts:
      rx=27 ry=9.5, rotate(-18deg), 64x64 viewBox) — one tilt, everywhere. A mask
      (not a background-image) so the shape paints in the accent token above,
