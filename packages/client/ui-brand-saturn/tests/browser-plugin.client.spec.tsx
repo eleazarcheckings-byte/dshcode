@@ -80,8 +80,11 @@ describe('Saturn browser-brand plugin', () => {
 
     // A cold apply after the holes already exist (declared-before-apply) fills
     // them exactly once — no duplicate registration from replaying the effect.
-    const after = await bench(true)
+    const after = await bench(false)
     await after.ctx.plugin({ inject: [...inject], apply }).await()
+    for (const hole of HOLES) expect(after.slots.entries(hole)).toHaveLength(0)
+    after.declareHoles()
+    await Promise.resolve()
     for (const hole of HOLES) expect(after.slots.entries(hole)).toHaveLength(1)
   })
 
