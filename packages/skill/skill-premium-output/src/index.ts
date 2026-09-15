@@ -1,6 +1,6 @@
 /**
  * Packaged output-design guidance shared by base-backed Saturn AI profiles.
- * @module @deepseek-ai/dsh-skill-premium-output
+ * @module @saturnai/dsh-skill-premium-output
  */
 
 import { readFile } from 'node:fs/promises'

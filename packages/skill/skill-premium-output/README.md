@@ -3,7 +3,7 @@ description: "Packaged output-design guidance for Saturn AI agents: shared polic
 kind: "package-reference"
 ---
 
-# @deepseek-ai/dsh-skill-premium-output
+# @saturnai/dsh-skill-premium-output
 
 English | [中文](README.zh.md)
 

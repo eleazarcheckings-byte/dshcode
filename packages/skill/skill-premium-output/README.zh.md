@@ -3,7 +3,7 @@ description: "面向 Saturn AI agent 的内置产出设计指导：共享策略�
 kind: "package-reference"
 ---
 
-# @deepseek-ai/dsh-skill-premium-output
+# @saturnai/dsh-skill-premium-output
 
 [English](README.md) | 中文
 

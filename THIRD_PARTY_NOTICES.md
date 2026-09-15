@@ -38,6 +38,7 @@ External packages that a workspace package resolves at runtime. The tier covers 
 | [`@babel/code-frame`](https://github.com/babel/babel) | MIT |
 | [`@capacitor/android`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/app`](https://github.com/ionic-team/capacitor-plugins) | MIT |
+| [`@capacitor/background-runner`](https://github.com/ionic-team/capacitor-background-runner) | MIT |
 | [`@capacitor/camera`](https://github.com/ionic-team/capacitor-camera) | MIT |
 | [`@capacitor/core`](https://github.com/ionic-team/capacitor) | MIT |
 | [`@capacitor/ios`](https://github.com/ionic-team/capacitor) | MIT |

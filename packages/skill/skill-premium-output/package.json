@@ -1,5 +1,5 @@
 {
-  "name": "@deepseek-ai/dsh-skill-premium-output",
+  "name": "@saturnai/dsh-skill-premium-output",
   "description": "Packaged premium output workflows and task-aware design guidance for Saturn AI",
   "version": "0.1.2-alpha.4",
   "publishConfig": {
