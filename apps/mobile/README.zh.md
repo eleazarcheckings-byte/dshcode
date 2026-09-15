@@ -107,12 +107,15 @@ open ios/App/App.xcodeproj      # or: npx cap open ios
 
 iOS 与 Android 都不会在应用进入后台后继续保持 `EventSource` 连接，因此由 `@capacitor/background-runner`（官方 `@capacitor` 作用域）安排一个独立于 WebView、自行运行的周期性轮询：
 
-- **`assets/background-runner.js`** 运行在该插件的隔离 JS 引擎中（没有 DOM，也不能 `import` 模块 —— 其中的常量与事件映射逻辑是从 `src/lib/remoteApi.ts`/`eventsMapper.ts` 手工镜像过来的，见该文件顶部注释），并通过 `CapacitorNotifications.schedule` 为任何比它自己 `CapacitorKV` 存储里记录的“最后一个事件 id”更新的事件触发本地通知。
+- **`assets/background-runner.js`** 是一个**生成文件**（`scripts/backgroundRunnerBuild.mjs`，通过 `npm run build:background-runner` 运行，并作为本包的 `prebuild` 挂接）—— 它把 `src/lib/backgroundEventsCore.js` 里的纯逻辑辅助函数（SSE 帧解析、事件 id 的数值排序、事件到通知的映射）内联到 `scripts/background-runner.entry.js` 的 OS 定时任务接线代码之下，因为该插件的隔离 JS 引擎完全没有模块加载器，根本无法执行 `import`/`export` 语句。如果提交的文件与一次全新渲染结果出现漂移，`tests/backgroundRunnerGenerated.test.ts` 会让 `npm test` 失败 —— 这样两份源文件就不会像手工镜像那样悄悄产生分歧。
+- **每一次触发时**，运行器会在 `GET /saturn/remote/events` 请求上带上 `Last-Event-ID` 请求头（而不是 `?since=` 查询参数 —— 主机的路由会剥离查询字符串、始终路由到它的 SSE 流，所以基于查询参数的轮询永远不会结束：见下文“本轮已修复”），并以 8 秒的读取截止时间增量读取响应体，超时后主动取消 reader，让连接真正关闭，而不是一直挂到操作系统把整个任务杀掉。事件 id（`String(sequence)`，一个普通递增计数器）按**数值**比较；每条触发的通知都携带 `extra: { deepLink, eventId, type }`——与前台路径 `src/lib/eventsMapper.ts` 附加的结构完全一致——因此点击能正确跳转；`src/main.ts` 的 `onNotificationTapped` 处理函数会对完全没有 `extra` 的通知（例如旧版本触发的，或系统自身的通知）做出防护。
 - **`src/lib/backgroundSync.ts`** 是应用侧的另一半：在配对成功后、撤销/忘记主机时、以及每次启动时，通过 `dispatchEvent('storeSession', …)` 把已配对的会话推送进这个隔离的 KV 存储 —— 该运行环境看不到 `@capacitor/preferences`。
 - **`capacitor.config.ts`** 的 `plugins.BackgroundRunner` 配置块（`buildBackgroundRunnerConfig()`）注册了一个每 15 分钟重复一次的轮询（这是 Android 对重复后台任务的下限；iOS 的 BGTaskScheduler 只把这个数字当作提示，实际节奏由系统自行决定）。
 - **Android**：已完整接入，且是下面 debug 构建的一部分 —— `android/app/build.gradle` 的 `flatDir` 条目与 Gradle 插件模块均已就位；APK 一侧不需要额外代码。
 - **iOS**：`Info.plist` 的 `BGTaskSchedulerPermittedIdentifiers`/`UIBackgroundModes` 与 `AppDelegate.swift` 中的两处 `BackgroundRunnerPlugin` 调用均已提交，但 **Background Modes 能力**（Background fetch + Background processing）仍需在 Xcode 的 Signing & Capabilities 标签页中手动打开 —— 这一步是仅限 Mac、修改 Xcode 工程文件的操作，没有可用纯文本编辑替代的办法。见下文“Mac 上的步骤”。
 - **无论哪个平台**：真正“锁屏也能立即收到推送”（完全没有轮询延迟）都需要主机通过 APNs/FCM 推送，这仍然超出本分支范围，与此前一致。
+
+**本轮已修复（Mars r2，`M3-apps-mobile-r2.md`）：** 此前版本的运行器调用的是 `fetch('…/events?since=poll').then(r => r.text())`——主机的这条路由只支持 SSE、从不自行关闭（`packages/saturn/remote-access/src/proxy.ts` 的 `stream()`，只有 25 秒一次的心跳、没有结束），所以这次调用永远不会 resolve，后台通知也就永远不可能触发。它还把事件 id 当字符串比较（`"10" <= "9"` 为真，一旦超过个位数就会悄悄丢弃 10 到 89 之间的所有事件），并且触发的通知不带 `extra`，导致在 `main.ts` 里点击时崩溃。以上三点均已在上文修复；鉴于隔离引擎文档化的 Web API 范围（`fetch`、`TextDecoder`、定时器 —— 没有 `AbortController`），这里的读取截止时间方案是尽力而为的折中，尚未在真机或模拟器上以真实的 OS 定时任务跑过一遍 —— `npm test` 验证的是纯逻辑（帧解析、id 排序、`extra` 的结构），而不是端到端的真实网络/系统行为。
 
 ## 已知限制与遗留工作
 
