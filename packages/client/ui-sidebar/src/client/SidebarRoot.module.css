@@ -357,3 +357,47 @@
     animation: none;
   }
 }
+
+/* Signature ring on the active session row (SPEC §2/§3 C3): "the ring is the
+   hover state, the focus state, and the seal" — carried here as the mark of
+   the row that IS the open session. The actual row markup, and its hashed
+   CSS-module class names, belong to ui-workspace's slotted browser
+   (`sidebar.workspaces`) — out of this package's write scope, and a private
+   class name it could rename tomorrow without notice. So this reaches
+   through `.regionArea` (this file's own scoped class) to the two
+   attributes every session/search row already carries regardless of which
+   package renders it: `role="treeitem"` and `aria-selected`
+   (`ui-workspace`'s `Rows.tsx`). Only the leading class name in a compound
+   selector is rewritten by CSS Modules — a bracket attribute selector is
+   plain CSS and reaches straight through, so no coordination with that
+   package is needed for this rule to keep working. */
+.regionArea [role='treeitem'][aria-selected='true'] {
+  position: relative;
+}
+
+.regionArea [role='treeitem'][aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translateY(-50%);
+  background-color: var(--saturn-accent, currentColor);
+  /* Same ellipse geometry as the favicon ring (ui-skin-saturn/src/client/index.ts:
+     rx=27 ry=9.5, rotate(-18deg), 64x64 viewBox) — one tilt, everywhere. A mask
+     (not a background-image) so the shape paints in the accent token above,
+     not a baked-in color; fill:none + stroke draws only the hairline, leaving
+     the row's own status dot fully visible through the ring's open center. */
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='32' cy='32' rx='27' ry='9.5' transform='rotate(-18 32 32)' fill='none' stroke='black' stroke-width='7'/%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='32' cy='32' rx='27' ry='9.5' transform='rotate(-18 32 32)' fill='none' stroke='black' stroke-width='7'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  /* The overlay must never steal a click or a right-click context-menu open
+     from the row it decorates. */
+  pointer-events: none;
+}

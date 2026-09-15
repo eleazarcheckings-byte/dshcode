@@ -85,12 +85,77 @@ function tokenBlock(set: Record<string, string>): string {
  */
 const PALETTE_SCOPE = 'body[data-dsh-saturn][data-dsh-saturn]'
 
+/**
+ * Self-hosted type system (SPEC §2 / §3 C3): one variable family carries UI
+ * and display — Instrument Sans variable (OFL, `wght` 400-700, `wdth` 75-100,
+ * fetched from the official `Instrument/instrument-sans` GitHub release) —
+ * plus Commit Mono for spec plates and receipts. Both font files ship under
+ * `apps/web/public/fonts/`, which Vite's default `publicDir` convention
+ * copies verbatim to the built `dist` root; `@deepseek-ai/dsh-host-frontend-
+ * static` then serves any dist-root file by its decoded path with no
+ * allowlist (`packages/host/frontend-static/src/index.ts`), so `/fonts/*`
+ * resolves exactly like the existing `/favicon.svg` and
+ * `/manifest.webmanifest` public assets already do — proved in
+ * `tests/font-served-path.spec.ts`, which reads that source directly rather
+ * than assuming it. The two files this skin actually references in its
+ * critical path are preloaded from `apps/web/index.html`.
+ *
+ * Commit Mono's official repository ships no `woff2`, only `.otf`/`.ttf`; the
+ * two weights here were compiled to `woff2` with `fontTools` from the
+ * `v1.143` GitHub release without altering any outline or metric — see the
+ * Agent Note for the exact command. Its LICENSE is deliberately named
+ * `LICENSE-OFL-COMMITMONO.txt`, not `LICENSE-MIT.txt`: the repository's root
+ * `LICENSE` (MIT) covers the specimen site and build tooling, but the font
+ * binaries themselves carry their own `LICENSE-FONT`, which is the SIL Open
+ * Font License — identical text to the `license.txt` bundled inside the
+ * release zip beside the `.otf` files. Shipping an MIT label on an
+ * OFL-licensed binary would misrepresent its terms, so the filename follows
+ * the license that actually governs the redistributed bytes; logged as a
+ * deviation from the literal SPEC filename.
+ *
+ * Each family also declares a metrics-matched local fallback face
+ * (`size-adjust` + the three `*-override` descriptors) so the FOUC/FOIT swap
+ * never visibly reflows layout. The ratios are not guessed: computed from
+ * each font's own `OS/2`/`head` tables against its system fallback with
+ * `fontTools.ttLib` (Instrument Sans -> Arial, Commit Mono -> Consolas); see
+ * the Agent Note for the exact figures and the script that produced them.
+ */
+const FONTS = '/fonts'
+const FONT_FACES = [
+  `@font-face{font-family:'Instrument Sans';src:url(${FONTS}/InstrumentSans-Variable.woff2) format('woff2');font-weight:400 700;font-stretch:75% 100%;font-style:normal;font-display:swap}`,
+  // Metrics-matched fallback: Arial scaled/clipped to Instrument Sans' own
+  // ascent/descent/x-height ratios (computed, not guessed — see the Agent Note).
+  '@font-face{font-family:\'Instrument Sans Fallback\';src:local(\'Arial\'),local(\'Helvetica Neue\'),local(\'Helvetica\');ascent-override:97%;descent-override:25%;line-gap-override:0%;size-adjust:98.35%}',
+  `@font-face{font-family:'Commit Mono';src:url(${FONTS}/CommitMono-400-Regular.woff2) format('woff2');font-weight:400;font-style:normal;font-display:swap}`,
+  `@font-face{font-family:'Commit Mono';src:url(${FONTS}/CommitMono-700-Regular.woff2) format('woff2');font-weight:700;font-style:normal;font-display:swap}`,
+  '@font-face{font-family:\'Commit Mono Fallback\';src:local(\'Consolas\'),local(\'Menlo\');ascent-override:90%;descent-override:20%;line-gap-override:0%;size-adjust:110.15%}',
+].join('\n')
+
+/** The display family stack, referenced by both the display and body tokens (§2: one variable family carries both roles). */
+const SANS_STACK = "'Instrument Sans','Instrument Sans Fallback',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+const MONO_STACK = "'Commit Mono','Commit Mono Fallback',ui-monospace,'SF Mono',Consolas,'Liberation Mono',monospace"
+
 const SKIN_CSS = [
   // ── the frame ──────────────────────────────────────────────────────────
   `${PALETTE_SCOPE}{color:#e8e8e8;background-color:${VOID};color-scheme:dark}`,
   `${PALETTE_SCOPE}{${tokenBlock(DARK)}}`,
   // Shared application surfaces; semantic status colors stay in the upstream aliases.
   `${PALETTE_SCOPE}{--saturn-void:${VOID};--saturn-surface:#111111;--saturn-surface-raised:#181818;--saturn-surface-hover:#222222;--saturn-stroke:rgba(255,255,255,.085);--saturn-stroke-strong:rgba(255,255,255,.15);--saturn-ink:#efefef;--saturn-muted:#a0a0a0;--saturn-accent:${ACCENT};--saturn-accent-dim:rgba(255,255,255,.08);--saturn-accent-secondary:#c4c4c4;--saturn-ease:cubic-bezier(.22,1,.36,1);--saturn-duration:180ms}`,
+  // ── type system (SPEC §2/§3 C3) ─────────────────────────────────────────
+  FONT_FACES,
+  // Display and body share the same variable family; the display role also
+  // pins the `wdth` axis explicitly at its wide (default) end so the move
+  // reads as deliberate rather than an inherited default that could drift if
+  // a future font swap changes the axis default. Consumers combine this with
+  // their own tight tracking (e.g. HeroShell's existing -0.045em headline).
+  `${PALETTE_SCOPE}{--saturn-font-display:${SANS_STACK};--saturn-font-body:${SANS_STACK};--saturn-font-mono:${MONO_STACK};--saturn-font-display-variation:'wdth' 100}`,
+  // Single-source-of-truth override: every upstream component already reads
+  // --dsw-font-family / --ds-font-family-code (defined `:root`-wide in
+  // ui-theme/src/styles/base.css), so re-pointing them here — at the higher
+  // body[data-dsh-saturn][data-dsh-saturn] specificity this file already
+  // uses for the palette — carries the Saturn type system into every
+  // existing screen without editing each consuming component.
+  `${PALETTE_SCOPE}{--dsw-font-family:var(--saturn-font-body);--ds-font-family-code:var(--saturn-font-mono)}`,
   // ── typography rendering ───────────────────────────────────────────────
   `${PALETTE_SCOPE}{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;font-variant-ligatures:contextual common-ligatures}`,
   // Shared selection and keyboard focus treatments.
