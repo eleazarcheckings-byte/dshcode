@@ -214,6 +214,7 @@ describe('assets land under <workspace>/.saturn/media/', () => {
     const value = result.value as { assets: Array<{ path: string; mimeType: string }> }
     expect(value.assets).toHaveLength(1)
     const [asset] = value.assets
+    if (!asset) throw new Error('expected one asset')
     expect(asset.path.startsWith(join(ws, '.saturn', 'media'))).toBe(true)
     expect(asset.path.endsWith('.png')).toBe(true)
     expect(existsSync(asset.path)).toBe(true)

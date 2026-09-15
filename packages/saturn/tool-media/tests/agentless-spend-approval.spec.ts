@@ -93,16 +93,20 @@ describe('the agentless spend-approval fallback (ctx.userQuestions, no Agent any
     expect(requestsAtAskTime).toBe(0) // zero network requests before the human answered
     expect(mock.requests).toHaveLength(1)
     expect(seen).toHaveLength(1)
-    expect(seen[0].questions[0].detail).toContain('estimated cost')
-    expect(seen[0].questions[0].detail).toContain('$0.067')
-    expect(seen[0].agent).toBeUndefined() // truly agentless — nothing to scope the ask to
+    const ask = seen[0]
+    if (!ask) throw new Error('expected exactly one ask')
+    const question = ask.questions[0]
+    if (!question) throw new Error('expected one question in the ask')
+    expect(question.detail).toContain('estimated cost')
+    expect(question.detail).toContain('$0.067')
+    expect(ask.agent).toBeUndefined() // truly agentless — nothing to scope the ask to
   })
 
   it('declining through ctx.userQuestions fails the call closed with no network request at all', async () => {
     const mock = await server((_request, res) => { jsonReply(res, 200, { output_image: { data: PNG_BYTES.toString('base64'), mime_type: 'image/png' } }) })
     const { ctx } = await boot(
       { gemini: { apiKey: 'sk-test', baseURL: mock.url } },
-      request => declineAnswer(request.questions[0].id),
+      request => declineAnswer(request.questions[0]?.id ?? ''),
     )
 
     const request: MediaGenerateRequest = { kind: 'image', prompt: 'x', workspace: await workspace() }

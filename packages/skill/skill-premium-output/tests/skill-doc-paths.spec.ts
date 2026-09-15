@@ -33,6 +33,7 @@ function pathClaims(text: string): string[] {
   const claims: string[] = []
   for (const match of text.matchAll(PATH_CLAIM_RE)) {
     const [, prefix, filename] = match
+    if (prefix === undefined || filename === undefined) continue
     if (prefix.includes('/')) claims.push(`${prefix}${filename}`)
   }
   return claims
