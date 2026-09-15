@@ -28,7 +28,7 @@ import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { TeamError } from './error.ts'
 
@@ -207,6 +207,34 @@ export class WorktreeManager {
    */
   async repositoryRoot(workspace: string, signal: AbortSignal): Promise<string> {
     return resolve(await this.git(workspace, ['rev-parse', '--show-toplevel'], signal))
+  }
+
+  /**
+   * The directory inside a checkout that stands where a workspace stands.
+   *
+   * `git worktree add` always checks out the whole repository, so a Lead whose
+   * session sits in `<repo>/app` would otherwise hand its teammate the checkout
+   * ROOT — a different depth, and therefore a different claim space, since
+   * claims are recorded against a workspace. The teammate's lease on
+   * `src/app.ts` would be filed under the repository while the Lead's merge
+   * asked about it under `<repo>/app`, and the lease would be invisible exactly
+   * when it matters. Mirroring the depth keeps one surface with one name on
+   * both sides.
+   * @param workspace - the Lead's workspace, inside the repository.
+   * @param checkout - the checkout root created by {@link create}.
+   * @param signal - caller cancellation.
+   * @returns the corresponding directory inside the checkout, created if absent.
+   */
+  async checkoutWorkspace(workspace: string, checkout: string, signal: AbortSignal): Promise<string> {
+    const root = await this.repositoryRoot(workspace, signal)
+    const within = relative(root, resolve(workspace))
+    if (within === '' || within.startsWith('..') || isAbsolute(within)) return checkout
+    const path = join(checkout, within)
+    // A directory tracked only through ignored files — or through files added
+    // after the base commit — is absent from a checkout of HEAD, and a session
+    // cannot start in a directory that does not exist.
+    await mkdir(path, { recursive: true })
+    return path
   }
 
   /** Remove a checkout directory and any registration git still holds for it. */

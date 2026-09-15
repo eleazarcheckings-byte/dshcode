@@ -10,6 +10,12 @@
  * and the operands of a command whose entire purpose is to change a file. Those
  * land on a peer's claimed surface or they do not.
  *
+ * Which vocabulary a line is read in is never guessed from the host platform.
+ * `bash` and `pwsh` are distinct tools backed by distinct executables, so each
+ * one's dialect is a fact; a terminal is whatever shell the session opened, so
+ * its lines are read in both and denied if either reading writes a claimed
+ * path.
+ *
  * Two properties are deliberate. First, reads stay free: a guard that denied
  * `cat` would be routed around within a day, and a lock writers route around
  * protects nothing. Second, the ledger transaction is NOT held across dispatch
@@ -36,8 +42,16 @@ export type ShellDialect = 'posix' | 'powershell'
 export interface ShellCall {
   /** The command line as the model wrote it. */
   readonly command: string
-  /** The vocabulary its head commands belong to. */
-  readonly dialect: ShellDialect
+  /**
+   * The vocabularies its head commands may belong to.
+   *
+   * A dedicated tool names exactly one, because its executable is a fact:
+   * `bash` runs bash and `pwsh` runs PowerShell. A terminal names both,
+   * because the shell behind it is whatever the session opened — Git Bash on
+   * Windows and `pwsh` on Linux are both ordinary — and the costly error is
+   * the missed write, not the extra question.
+   */
+  readonly dialects: readonly ShellDialect[]
   /** The directory relative operands resolve against, when the call names one. */
   readonly workdir?: string
 }
@@ -269,14 +283,19 @@ function shellCall(exec: ToolExecutionInput): ShellCall | undefined {
     const workdir = 'workdir' in args && typeof args.workdir === 'string' ? args.workdir : undefined
     return {
       command: args.command,
-      dialect: exec.name === 'pwsh' ? 'powershell' : 'posix',
+      dialects: [exec.name === 'pwsh' ? 'powershell' : 'posix'],
       ...workdir === undefined ? {} : { workdir },
     }
   }
   if (exec.name === 'terminal_send' && 'text' in args && typeof args.text === 'string') {
-    // A terminal carries whichever shell the session opened; read it in both
-    // vocabularies rather than guess, since a missed write is the costly error.
-    return { command: args.text, dialect: process.platform === 'win32' ? 'powershell' : 'posix' }
+    // A terminal carries whichever shell the session opened, and the host
+    // platform does not decide it: Git Bash on Windows and `pwsh` on Linux are
+    // both ordinary. Guessing from `process.platform` left one whole mutator
+    // table unconsulted — `sed -i` on a Windows terminal, `Set-Content` on a
+    // POSIX one — so the line is read in both vocabularies instead. The cost is
+    // an occasional extra question about a name that means nothing in the other
+    // shell; the cost of the guess was a peer's file, silently overwritten.
+    return { command: args.text, dialects: ['posix', 'powershell'] }
   }
   return undefined
 }
@@ -307,7 +326,7 @@ export function installShellGuard(ctx: Context, store: ClaimStore): void {
     const session = exec.agent?.session
     const cwd = session?.header.cwd
     if (call === undefined || session === undefined || cwd === undefined || cwd === '') return await next()
-    const targets = shellWriteTargets(call.command, call.dialect)
+    const targets = [...new Set(call.dialects.flatMap(dialect => shellWriteTargets(call.command, dialect)))]
     if (targets.length === 0) return await next()
 
     exec.signal.throwIfAborted()

@@ -431,8 +431,17 @@ export class TeamRoster {
 
     let started: ContinuableStart
     let worktree: WorktreeRecord | undefined
+    let childWorkspace: string | undefined
     try {
-      if (workspace !== undefined) worktree = await this.worktrees.create(workspace, root.id, name, signal)
+      if (workspace !== undefined) {
+        worktree = await this.worktrees.create(workspace, root.id, name, signal)
+        // The checkout is the whole repository, but the teammate stands where
+        // its Lead stands inside it. Handing it the checkout root when the Lead
+        // works in a subdirectory would file its claims against the repository
+        // while the Lead asks about them against the subdirectory, and a lease
+        // nobody can see is worse than no lease at all.
+        childWorkspace = await this.worktrees.checkoutWorkspace(workspace, worktree.path, signal)
+      }
       started = await this.ctx.subagents.startContinuable({
         childId,
         provider: request.provider,
@@ -441,7 +450,7 @@ export class TeamRoster {
           prompt: request.prompt,
           parent: root,
         },
-        ...worktree === undefined ? {} : { cwd: worktree.path },
+        ...childWorkspace === undefined ? {} : { cwd: childWorkspace },
         signal,
       })
       await this.checkpointInitialPrompt(childId, started.messageId, signal)
