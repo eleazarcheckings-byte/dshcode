@@ -44,10 +44,6 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "workspace:^"
   },
-  "optionalDependencies": {
-    "@deepseek-ai/dsh-subagent-codex": "workspace:^",
-    "@deepseek-ai/dsh-subagent-claude-code": "workspace:^"
-  },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/cordis-plugin-include": "workspace:^",

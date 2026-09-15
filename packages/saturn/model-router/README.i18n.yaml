@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/saturn/model-router/README.md
-README.md: 7d9bfe4367f7bb23c725ca5f4ef0fb937ae31090
-README.zh.md: 82863be1757cc997cc1760238a72bd90cb76b209
+README.md: 07f89a201b827d12c2ea8bfa622d1e511226b3bf
+README.zh.md: 44837e87d24df662503ce631298671196dc9fa64

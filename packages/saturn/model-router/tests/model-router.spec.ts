@@ -100,6 +100,14 @@ describe('ModelRouterService', () => {
 
     await bench.ctx.settings.update(MODEL_ROUTER_SETTINGS_NAMESPACE, { externalHarnesses: true })
     expect(bench.router.externalHarnessesEnabled()).toBe(true)
+    // Real-environment resolution, not an injected fake: whatever this checkout's
+    // actual two-stage probe (wrapper package, then its CLI dependency resolved
+    // FROM the wrapper) reports is what mounting must agree with — this pins
+    // externalHarnessMounted to harnessAvailable's real answer without assuming
+    // which way that answer goes. The case where the two stages disagree (wrapper
+    // resolves, CLI dependency absent) is covered with injected resolvers in
+    // tests/harness-cli-resolution.spec.ts, where the true/false split is fixed
+    // and deterministic rather than dependent on what happens to be installed.
     expect(bench.router.externalHarnessMounted('codex')).toBe(bench.router.harnessAvailable('codex'))
     await bench.ctx.fiber.dispose()
   })

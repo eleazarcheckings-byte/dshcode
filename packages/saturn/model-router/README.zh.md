@@ -79,7 +79,7 @@ saturn-model-router:
 
 `ModelRouterService` 通过 `ctx.settings.register` 注册该命名空间,后者按顺序解析模式默认值、组合层的 `base`(此处没有——每个字段都有模式默认值)以及用户层;`resolve()` 在每次调用时读取当前注册状态,而不是缓存快照,因此编辑该命名空间会在下一次 `resolve` 时生效,无需重启。回退到 `agentDefaultModel` 是一次鸭子类型的 `ctx.get('agentDefaultModel')` 读取,而不是硬依赖,这与 SPEC §4 中的接口契约(`ctx.modelRouter`,C6 → C5/C8a)一致:从未挂载 `agent-default-model` 的组合仍会把每个 `'default'` 分级解析为随包附带的 DeepSeek V4 Flash 兜底值,而不是抛出异常。
 
-`harnessAvailable()` 是针对每个原生工具自身 npm 包(`@deepseek-ai/dsh-subagent-codex`、`@deepseek-ai/dsh-subagent-claude-code`)的 `require.resolve` 探测,锚定在本包自身的模块上——`cordis` 预设的 SKILL.md 编写指南将它们记录为捆绑了各自“包内平台 CLI”,因此包的可解析性本身就是 CLI 是否存在的判据,而不是 `PATH` 查找或派生探测。结果按进程缓存:某个可选依赖是否已安装在进程运行期间不会改变,而一次派生探测会带来禁用表达式求值器(一次同步的 `eval`)无法等待的延迟与副作用。
+`harnessAvailable()` 是一次两阶段的 `require.resolve` 探测,而不是仅针对每个原生工具自身包装包的单次检查。仅探测包装包(`@deepseek-ai/dsh-subagent-codex`、`@deepseek-ai/dsh-subagent-claude-code`)会产生假阳性:只要该包装包在模块图中的任何地方被声明——例如某个消费者的 `devDependencies`——即使它实际依赖的平台 CLI 未能安装或在生产安装中被剪除,探测仍会成功。`harnessCliResolvable()` 转而分两步进行:(1) 用一个锚定在本包上的解析器解析包装包自身的 `package.json`;(2) 再用一个锚定在该清单上的 `require` 解析包装包真正依赖的 CLI(`codex` 对应 `@openai/codex`;`claude-code` 对应 `@anthropic-ai/claude-agent-sdk`)——这与 Node 自身从包装包内部加载该 CLI 时所用的解析顺序一致。只有两个阶段都成功,该工具才算可用。结果按进程缓存:某个包是否已安装在进程运行期间不会改变,而一次派生探测会带来禁用表达式求值器(一次同步的 `eval`)无法等待的延迟与副作用。
 
 </details>
 

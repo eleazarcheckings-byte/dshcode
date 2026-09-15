@@ -89,10 +89,24 @@ export const ModelRouterSettingsSchema: z<ModelRouterSettings> = z.object({
 /** Fallback route used only when neither a tier override nor `agentDefaultModel` is available. */
 const FALLBACK_ROUTE: TierRoute = { provider: 'deepseek-official', model: 'deepseek-v4-flash' }
 
-/** The npm package each external harness resolves through; also its "CLI is absent" check. */
+/** The npm package each external harness's Host row mounts. */
 const HARNESS_PACKAGE: Record<ExternalHarness, string> = {
   codex: '@deepseek-ai/dsh-subagent-codex',
   'claude-code': '@deepseek-ai/dsh-subagent-claude-code',
+}
+
+/**
+ * The actual platform CLI dependency bundled INSIDE each harness's wrapper
+ * package — this, not the wrapper's own resolvability, is the "CLI is
+ * absent" check. `dsh-subagent-codex` depends on `@openai/codex`;
+ * `dsh-subagent-claude-code` depends on `@anthropic-ai/claude-agent-sdk`.
+ * Probing only the wrapper is a false positive whenever the wrapper is
+ * declared (a devDependency of a consumer, say) but its own CLI dependency
+ * failed to install or was pruned from a production install.
+ */
+const HARNESS_CLI_PACKAGE: Record<ExternalHarness, string> = {
+  codex: '@openai/codex',
+  'claude-code': '@anthropic-ai/claude-agent-sdk',
 }
 
 const requireFromHere = createRequire(import.meta.url)
@@ -116,6 +130,41 @@ export function packageResolvable(resolver: NodeJS.Require, specifier: string): 
 }
 
 /**
+ * Whether `harness`'s real platform CLI dependency resolves — anchored not
+ * at this package, but at the harness's OWN wrapper package, so a wrapper
+ * that happens to resolve can never report "available" when the CLI
+ * dependency bundled inside it failed to install. Two stages: first locate
+ * the wrapper's own manifest from `resolver`'s module graph, then resolve
+ * `cliPackage` from a `require` anchored at that manifest — the exact
+ * resolution order Node itself would use to load the CLI from inside the
+ * wrapper.
+ * @param resolver - a `createRequire`-produced resolver anchored at the caller's module; locates the wrapper.
+ * @param subagentPackage - the wrapper package's specifier (e.g. `@deepseek-ai/dsh-subagent-codex`).
+ * @param cliPackage - the platform CLI specifier the wrapper actually depends on (e.g. `@openai/codex`).
+ * @param createRequireFn - overridable in tests; real mounts always use `node:module`'s `createRequire`.
+ * @returns true only when both the wrapper and its CLI dependency resolve.
+ */
+export function harnessCliResolvable(
+  resolver: NodeJS.Require,
+  subagentPackage: string,
+  cliPackage: string,
+  createRequireFn: (path: string) => NodeJS.Require = createRequire,
+): boolean {
+  let subagentManifest: string
+  try {
+    subagentManifest = resolver.resolve(`${subagentPackage}/package.json`)
+  } catch {
+    return false
+  }
+  try {
+    createRequireFn(subagentManifest).resolve(cliPackage)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Owns the `saturn-model-router` settings namespace and answers tier and
  * external-harness questions for subagent spawns, SaturnBot, and the Bundle
  * rows that mount native product providers.
@@ -128,16 +177,25 @@ export class ModelRouterService extends Service {
   private readonly scope: SettingsScope<ModelRouterSettings>
   private readonly harnessAvailability = new Map<ExternalHarness, boolean>()
   private readonly resolver: NodeJS.Require
+  private readonly createRequireFn: (path: string) => NodeJS.Require
 
   /**
    * @param ctx - Host context carrying the settings service.
    * @param _config - composition entry; every field currently resolves through settings.
-   * @param resolver - `require.resolve`-shaped probe for harness packages, overridable in tests;
-   *   real mounts always use the module-anchored default.
+   * @param resolver - `require.resolve`-shaped probe locating each harness's wrapper package,
+   *   overridable in tests; real mounts always use the module-anchored default.
+   * @param createRequireFn - produces the second-stage resolver anchored at a wrapper's own
+   *   manifest, overridable in tests; real mounts always use `node:module`'s `createRequire`.
    */
-  constructor(ctx: Context, _config: Config, resolver: NodeJS.Require = requireFromHere) {
+  constructor(
+    ctx: Context,
+    _config: Config,
+    resolver: NodeJS.Require = requireFromHere,
+    createRequireFn: (path: string) => NodeJS.Require = createRequire,
+  ) {
     super(ctx, 'modelRouter')
     this.resolver = resolver
+    this.createRequireFn = createRequireFn
     this.scope = ctx.settings.register(MODEL_ROUTER_SETTINGS_NAMESPACE, ModelRouterSettingsSchema, {
       applies: 'live',
     })
@@ -171,12 +229,18 @@ export class ModelRouterService extends Service {
    * Whether `harness`'s package-local platform CLI is installed. Cached per
    * process: package presence does not change while a process is running.
    * @param harness - the native product subagent to probe.
-   * @returns true when the harness's Bundle package resolves.
+   * @returns true only when both the harness's wrapper package AND the
+   *   actual CLI dependency bundled inside it resolve.
    */
   harnessAvailable(harness: ExternalHarness): boolean {
     const cached = this.harnessAvailability.get(harness)
     if (cached !== undefined) return cached
-    const resolvable = packageResolvable(this.resolver, HARNESS_PACKAGE[harness])
+    const resolvable = harnessCliResolvable(
+      this.resolver,
+      HARNESS_PACKAGE[harness],
+      HARNESS_CLI_PACKAGE[harness],
+      this.createRequireFn,
+    )
     this.harnessAvailability.set(harness, resolvable)
     return resolvable
   }

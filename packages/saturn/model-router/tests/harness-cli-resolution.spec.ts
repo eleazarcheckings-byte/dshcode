@@ -72,12 +72,19 @@ describe('harnessCliResolvable', () => {
 })
 
 describe('ModelRouterService.externalHarnessMounted — real gate, not the toggle alone', () => {
+  // `ctx.plugin(ModelRouterService, config)` only ever forwards `(ctx, config)`
+  // to the constructor (vendor/cordis/src/registry.ts `Fiber` construction), so
+  // the extra `resolver`/`createRequireFn` test-injection parameters cannot
+  // reach the instance through `ctx.plugin`. `Service`'s own constructor
+  // (vendor/cordis/src/service.ts) registers the instance on `ctx` directly via
+  // `ctx.reflect.provide`, independent of the plugin/fiber machinery, so
+  // constructing directly is the correct way to inject these for a test.
   it('stays false with externalHarnesses ON when the wrapper resolves but the CLI dependency does not', async () => {
     const ctx = new Context()
     const settingsFiber = ctx.plugin(MemorySettings)
     await settingsFiber.await()
     const { resolver, createRequireFn } = fakeResolver(true, false)
-    await ctx.plugin(ModelRouterService, {}, resolver, createRequireFn)
+    new ModelRouterService(ctx, {}, resolver, createRequireFn)
     await ctx.settings.update('saturn-model-router', { externalHarnesses: true })
 
     expect(ctx.modelRouter.externalHarnessesEnabled()).toBe(true)
@@ -91,7 +98,7 @@ describe('ModelRouterService.externalHarnessMounted — real gate, not the toggl
     const settingsFiber = ctx.plugin(MemorySettings)
     await settingsFiber.await()
     const { resolver, createRequireFn } = fakeResolver(true, true)
-    await ctx.plugin(ModelRouterService, {}, resolver, createRequireFn)
+    new ModelRouterService(ctx, {}, resolver, createRequireFn)
     await ctx.settings.update('saturn-model-router', { externalHarnesses: true })
 
     expect(ctx.modelRouter.harnessAvailable('codex')).toBe(true)
