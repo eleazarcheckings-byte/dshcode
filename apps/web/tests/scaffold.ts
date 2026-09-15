@@ -994,17 +994,21 @@ export function fixtureIdentity(
  * @returns the realized fixture text.
  */
 export function realizeSeedFixture(scaffold: WebScaffold, fixtureText: string, id: string): string {
+  // Windows paths carry backslashes, which are not legal raw inside a JSON
+  // string; substitute the JSON-escaped form so the realized fixture parses
+  // on every platform.
+  const escapedCwd = JSON.stringify(scaffold.workspaceCwd).slice(1, -1)
   const realized = fixtureText
     .split('{{sessionId}}').join(id)
     .split('{{session:1}}').join(id)
     .replace(/\{\{session:([2-9]\d*)\}\}/g, (_token, ordinal: string) => `${id}-child-${ordinal}`)
     .replace(/\{\{(message|approval|workflow|command|rpc|retry|id):([1-9]\d*)\}\}/g, (_token, kind: string, ordinal: string) =>
       fixtureIdentity(kind as 'message' | 'approval' | 'workflow' | 'command' | 'rpc' | 'retry' | 'id', Number(ordinal)))
-    .split('{{cwd}}').join(scaffold.workspaceCwd)
+    .split('{{cwd}}').join(escapedCwd)
   const fixtureCwd = (JSON.parse(realized.split('\n', 1)[0]!) as { cwd?: string }).cwd
   return fixtureCwd === undefined
     ? realized
-    : realized.split(fixtureCwd).join(scaffold.workspaceCwd)
+    : realized.split(fixtureCwd).join(escapedCwd)
 }
 
 /**
