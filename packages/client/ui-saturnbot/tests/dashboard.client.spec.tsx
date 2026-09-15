@@ -15,7 +15,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
 describe('SaturnBot messenger', () => {
   it('opens an honest first conversation with five selectable roles and real context', () => {
-    render(<Dashboard state={state()} workspaces={[]} actions={actions()} t={t} />)
+    render(<Dashboard state={state()} workspaces={[]} actions={actions()} pickDirectory={vi.fn(async () => null)} t={t} />)
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Chief of Staff')
     expect(screen.getByRole('button', { name: /Developer/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Growth/ })).toBeTruthy()
@@ -27,7 +27,7 @@ describe('SaturnBot messenger', () => {
 
   it('keeps separate role drafts, sends the selected role, and clears only after success', async () => {
     const api = actions()
-    render(<Dashboard state={state()} workspaces={[]} actions={api} t={t} />)
+    render(<Dashboard state={state()} workspaces={[]} actions={api} pickDirectory={vi.fn(async () => null)} t={t} />)
     const chiefDraft = screen.getByRole('textbox', { name: /Message Chief/ })
     fireEvent.change(chiefDraft, { target: { value: 'Plan the week' } })
     fireEvent.click(screen.getByRole('button', { name: /Developer/ }))
@@ -43,7 +43,7 @@ describe('SaturnBot messenger', () => {
 
   it('retains a rejected message and reports the actual error', async () => {
     const api = actions(); vi.mocked(api.message).mockRejectedValue(new Error('The team is already running.'))
-    render(<Dashboard state={state()} workspaces={[]} actions={api} t={t} />)
+    render(<Dashboard state={state()} workspaces={[]} actions={api} pickDirectory={vi.fn(async () => null)} t={t} />)
     const draft = screen.getByRole<HTMLTextAreaElement>('textbox', { name: /Message Chief/ })
     fireEvent.change(draft, { target: { value: 'Keep this draft' } })
     fireEvent.click(screen.getByRole('button', { name: en['chat.send'] }))
@@ -56,7 +56,7 @@ describe('SaturnBot messenger', () => {
       { id: id('m1'), role: 'developer', sender: 'agent', content: 'Navigation inspected.', at, cycleId: id('cycle-1') },
       { id: id('m2'), role: 'finance', sender: 'agent', content: 'Ledger reviewed.', at, cycleId: id('cycle-1') },
     ] })
-    render(<Dashboard state={state(data)} workspaces={[]} actions={actions()} t={t} />)
+    render(<Dashboard state={state(data)} workspaces={[]} actions={actions()} pickDirectory={vi.fn(async () => null)} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: /Developer/ }))
     expect(within(screen.getByRole('log')).getByText('Navigation inspected.')).toBeTruthy()
     expect(within(screen.getByRole('log')).queryByText('Ledger reviewed.')).toBeNull()
@@ -70,7 +70,7 @@ describe('SaturnBot messenger', () => {
 
   it('takes incomplete setup to configuration instead of dispatching or resuming', () => {
     const api = actions(), data = snapshot({ status: 'needs-setup', config: { ...snapshot().config, goal: '', workspace: '' } })
-    render(<Dashboard state={state(data)} workspaces={[]} actions={api} t={t} />)
+    render(<Dashboard state={state(data)} workspaces={[]} actions={api} pickDirectory={vi.fn(async () => null)} t={t} />)
     fireEvent.click(screen.getAllByRole('button', { name: 'Configure SaturnBot' })[0]!)
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Settings')
     expect(api.runNow).not.toHaveBeenCalled()
@@ -80,7 +80,7 @@ describe('SaturnBot messenger', () => {
   it('pauses only the visualization while live execution context continues to update', () => {
     const api = actions()
     const cycle = { id: id('cycle-1'), status: 'running' as const, startedAt: at, finishedAt: null, plan: 'Review', branches: [branch] }
-    const view = render(<Dashboard state={state(snapshot({ status: 'running', activeCycle: cycle }))} workspaces={[]} actions={api} t={t} />)
+    const view = render(<Dashboard state={state(snapshot({ status: 'running', activeCycle: cycle }))} workspaces={[]} actions={api} pickDirectory={vi.fn(async () => null)} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: en['chat.showInspector'] }))
     const pause = screen.getByRole<HTMLButtonElement>('button', { name: en['canvas.pause'] })
     expect(pause.type).toBe('button')
@@ -89,7 +89,7 @@ describe('SaturnBot messenger', () => {
     expect(pause).toMatchSnapshot('pause visualization action')
     fireEvent.click(pause)
     expect(screen.getByRole('button', { name: en['canvas.resume'] })).toMatchSnapshot('resume visualization action')
-    view.rerender(<Dashboard state={state(snapshot({ status: 'awaiting-approval', activeCycle: { ...cycle, status: 'awaiting-approval', branches: [{ ...branch, status: 'awaiting-approval' }] } }))} workspaces={[]} actions={api} t={t} />)
+    view.rerender(<Dashboard state={state(snapshot({ status: 'awaiting-approval', activeCycle: { ...cycle, status: 'awaiting-approval', branches: [{ ...branch, status: 'awaiting-approval' }] } }))} workspaces={[]} actions={api} pickDirectory={vi.fn(async () => null)} t={t} />)
     const inspector = screen.getByRole('complementary', { name: en['chat.inspector'] })
     expect(within(inspector).getAllByText(en['status.awaiting-approval']).length).toBeGreaterThan(0)
     expect(within(inspector).getByRole('button', { name: en['canvas.resume'] })).toBeTruthy()
