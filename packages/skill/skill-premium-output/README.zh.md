@@ -56,7 +56,7 @@ kind: "package-reference"
 
 在重大视觉交付物移交前，共享策略与全部三份指南现在都要求由一个新鲜上下文的评审者——一个看不到构建 agent 私有推理过程的独立上下文——对其评分，并明确记录这一步骤，而不是默默跳过：
 
-- [`scripts/review-grade.mjs`](scripts/review-grade.mjs) 是针对已渲染 HTML 页面的确定性同质化痕迹与卫生检查探针。它使用 `jsdom`（而非真实浏览器）解析计算样式，并对 [`rubric.schema.json`](rubric.schema.json) 中的十二项检查清单——即 `scripts/harness/SATURN-DESIGN-RULES.md` 中的上线前检查清单——评分，写出 `rubric.json` 与便于阅读的 `rubric.md`。它移植了 SaturnAI design brain 的 `collect-evidence.js`（v2）中的多个探针（渐变/色相痕迹、卡片同质化统计、批量淡入统计、对比度取样、预置装饰痕迹），并在脚本头部注释中注明出处；不会修改该文件。四项检查清单条目（品牌测试、唯一命名机制、偏差记录、写者 ≠ 评审者）始终返回 `UNVERIFIED` 且评分为 `null`——它们是任何标记探针都无法判定的主观或流程事实，绝不猜测通过。
+- [`review-grade.mjs`](skills/premium-web-experience/scripts/review-grade.mjs) 是针对已渲染 HTML 页面的确定性同质化痕迹与卫生检查探针。它使用 `jsdom`（而非真实浏览器）解析计算样式，并对 [`rubric.schema.json`](rubric.schema.json) 中的十二项检查清单——即 `scripts/harness/SATURN-DESIGN-RULES.md` 中的上线前检查清单——评分，写出 `rubric.json` 与便于阅读的 `rubric.md`。它移植了 SaturnAI design brain 的 `collect-evidence.js`（v2）中的多个探针（渐变/色相痕迹、卡片同质化统计、批量淡入统计、对比度取样、预置装饰痕迹），并在脚本头部注释中注明出处；不会修改该文件。四项检查清单条目（品牌测试、唯一命名机制、偏差记录、写者 ≠ 评审者）始终返回 `UNVERIFIED` 且评分为 `null`——它们是任何标记探针都无法判定的主观或流程事实，绝不猜测通过。
 - [`tests/fixtures/premium.html`](tests/fixtures/premium.html) 与 [`tests/fixtures/slop.html`](tests/fixtures/slop.html) 是探针自身测试所依据的 PASS/REJECT 参照对照页面。
 - 各指南现在还要求在实现之前将工作方向保存为 `.saturn/design-plan.md`，而不仅仅是对话中的文字，并将 CSS 锚点定位与 Popover API 组合列为菜单、工具提示或其他分层浮层的默认方案。
 - 当 design brain 连接可用时，收集到的证据也会传递给 `mcp__saturnai__review`。

@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://saturnai.tools/schema/premium-output/rubric.schema.json",
+  "title": "Saturn AI premium-output visual review rubric",
+  "description": "Shape of the rubric produced by scripts/review-grade.mjs and consumed by the fresh-context reviewer subagent described in policy.ts and the three packaged SKILL.md guides. One item per pre-ship checklist entry in scripts/harness/SATURN-DESIGN-RULES.md ('Pre-ship checklist'), in that document's order. score/verdict follow the SPEC §5 Mars rubric shape ({criterion, score 1-5, evidence, verdict}), extended with UNVERIFIED for a checklist item a static probe genuinely cannot judge (never a guessed PASS) — the honest-instrument posture this package's collect-evidence.js-derived probes already carry.",
+  "type": "object",
+  "required": ["version", "source", "generatedAt", "items", "overallVerdict"],
+  "additionalProperties": true,
+  "properties": {
+    "version": { "const": 1 },
+    "source": {
+      "type": "string",
+      "description": "Path or label of the rendered page this rubric grades."
+    },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "engine": {
+      "type": "string",
+      "description": "The static-DOM engine used to resolve computed styles (e.g. 'jsdom@<version>'), or 'unavailable' when the probe degraded."
+    },
+    "overallVerdict": {
+      "$ref": "#/definitions/verdict",
+      "description": "REJECT if any mechanically-scored item is REJECT; else REVISE if any is REVISE; else PASS. UNVERIFIED items never gate this and must still be surfaced to whoever reviews the rubric."
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Instrument-level caveats (degraded mode, unreadable stylesheet, missing layout engine, etc.) — never silently dropped findings."
+    },
+    "items": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": { "$ref": "#/definitions/item" }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Raw named tells behind the scored items (gradient stops, uniform-card groups, fade-up census, etc.), for a human or subagent reviewer to inspect directly.",
+      "items": {
+        "type": "object",
+        "required": ["tell", "severity", "evidence"],
+        "properties": {
+          "tell": { "type": "string" },
+          "severity": { "enum": ["hard", "soft", "info"] },
+          "evidence": { "type": "string" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "verdict": { "enum": ["PASS", "REVISE", "REJECT", "UNVERIFIED"] },
+    "criterion": {
+      "enum": [
+        "Brand test",
+        "One named mechanism",
+        "ai-slop scan",
+        "homogenized-premium scan",
+        "Motion budget respected",
+        "Ambient canvas quality bar",
+        "Contrast measured",
+        "Spacing, type roles, and real imagery",
+        "One primary CTA per section; real routes",
+        "Reduced-motion state designed",
+        "Deviation log",
+        "Writer ≠ reviewer"
+      ]
+    },
+    "item": {
+      "type": "object",
+      "required": ["criterion", "score", "evidence", "verdict"],
+      "additionalProperties": false,
+      "properties": {
+        "criterion": { "$ref": "#/definitions/criterion" },
+        "score": {
+          "description": "1 (fails) through 5 (clean); null only when verdict is UNVERIFIED.",
+          "oneOf": [
+            { "type": "integer", "minimum": 1, "maximum": 5 },
+            { "type": "null" }
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What was actually measured, or why the item is UNVERIFIED. Never a bare 'looks good'."
+        },
+        "verdict": { "$ref": "#/definitions/verdict" }
+      }
+    }
+  }
+}

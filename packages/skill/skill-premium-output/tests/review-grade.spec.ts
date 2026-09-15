@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import schema from '../rubric.schema.json' with { type: 'json' }
 
 const execFileAsync = promisify(execFile)
-const script = resolve(import.meta.dirname, '../scripts/review-grade.mjs')
+const script = resolve(import.meta.dirname, '../skills/premium-web-experience/scripts/review-grade.mjs')
 const fixtures = resolve(import.meta.dirname, 'fixtures')
 
 interface RubricItem {
