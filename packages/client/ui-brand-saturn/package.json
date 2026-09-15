@@ -21,6 +21,14 @@
     }
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/client/ui-brand-saturn"
+  },
   "files": [
     "lib",
     "README.md"

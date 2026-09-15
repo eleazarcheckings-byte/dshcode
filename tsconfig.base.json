@@ -458,6 +458,38 @@
       "@deepseek-ai/dsh/profile-boot": [
         "./apps/cli/src/profile-boot.ts"
       ],
+      // Saturn AI packages: the @saturnai scope sits outside the generated
+      // `@deepseek-ai/dsh-` region above, so these stay hand-written like the
+      // desktop-only entries. One bare alias per package, name -> its src tree,
+      // mirroring the generated convention (a package whose name is not exactly
+      // `@deepseek-ai/dsh-<dir>` is never emitted there).
+      "@saturnai/dsh-checkpoints": [
+        "./packages/saturn/checkpoints/src"
+      ],
+      "@saturnai/dsh-claims": [
+        "./packages/saturn/claims/src"
+      ],
+      "@saturnai/dsh-done": [
+        "./packages/saturn/done/src"
+      ],
+      "@saturnai/dsh-orchestrate": [
+        "./packages/saturn/orchestrate/src"
+      ],
+      "@saturnai/dsh-client-ui-brand-saturn": [
+        "./packages/client/ui-brand-saturn/src"
+      ],
+      "@saturnai/dsh-client-ui-done": [
+        "./packages/client/ui-done/src"
+      ],
+      "@saturnai/dsh-client-ui-fleet": [
+        "./packages/client/ui-fleet/src"
+      ],
+      "@saturnai/dsh-client-ui-orchestrate": [
+        "./packages/client/ui-orchestrate/src"
+      ],
+      "@saturnai/dsh-client-ui-skin-saturn": [
+        "./packages/client/ui-skin-saturn/src"
+      ],
     }
   }
 }
