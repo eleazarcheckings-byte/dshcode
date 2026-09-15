@@ -15,6 +15,7 @@
 // into this worker — which never parses JavaScript.
 import { createWorkerHost } from './worker-host.ts'
 import './node/builtin_modules/implemented/buffer.ts'
+import './node/globals/global.ts'
 import { alsCausality, runAtAsyncContextRoot } from './node/builtin_modules/implemented/async_hooks.ts'
 import { installAsyncContextHooks } from './polyfill/async-context/async-context-hooks.ts'
 import { createNodeBuiltins, REPLACED_PREFIXES } from './node/builtins.ts'

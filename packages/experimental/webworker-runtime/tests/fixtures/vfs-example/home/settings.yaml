@@ -1,0 +1,8 @@
+# Preview fixture settings: the showcase exercises a finished setup. The
+# versioned First Light seal and the welcome acknowledgement both read as
+# done, so the worker boots straight to the composer — onboarding UX has its
+# own dedicated web e2e lanes against the real host.
+ui-first-light:
+  complete: 2026-09-14.1
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1

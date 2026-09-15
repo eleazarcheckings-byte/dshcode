@@ -21,7 +21,7 @@ import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
-import { dirname, extname, join, normalize } from 'node:path'
+import { dirname, extname, join, posix } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import type { Browser } from 'playwright'
@@ -183,7 +183,10 @@ async function respond(
   overrides: ReadonlyMap<string, string>,
 ): Promise<void> {
   const path = new URL(request.url ?? '/', 'http://127.0.0.1').pathname
-  const relative = normalize(decodeURIComponent(path)).replace(/^\/+/, '')
+  // posix: a request path is URL-form, so a platform normalize would turn its
+  // separators into backslashes on Windows and miss the override map, which is
+  // keyed with forward slashes.
+  const relative = posix.normalize(decodeURIComponent(path)).replace(/^\/+/, '')
   try {
     const body = await readFile(overrides.get(relative) ?? join(DIST_ROOT, relative))
     response.writeHead(200, { 'content-type': MIME[extname(relative)] ?? 'application/octet-stream' })
@@ -302,16 +305,22 @@ async function bootPreview(origin: string, browser: Browser): Promise<void> {
     // report the older one.
     expect(bootLine).toContain(`image lowering=${WRAPPER_CONTRACT}`)
     expect(bootLine).toContain('data overlays=1')
-    // The versioned notice is the seeded preview's first stable interactive
-    // surface after the startup chain completes over the tunnel.
-    const continueButton = page.getByRole('button', { name: 'Continue' })
-    await continueButton.waitFor({ timeout: HERO_TIMEOUT_MS })
-    await continueButton.click()
-    const configureLater = page.getByRole('button', { name: 'Configure later' })
-    await configureLater.waitFor({ timeout: 30_000 })
-    await configureLater.click()
+    // The seeded fixture completes setup (First Light sealed and the welcome
+    // notice acknowledged in its settings overlay), so the composer is the
+    // first stable interactive surface after the startup chain completes over
+    // the tunnel. Onboarding UX has its own lanes against the real host.
     await page.locator('[data-composer-input][data-placeholder="Describe what you want to build"]')
-      .waitFor({ timeout: 30_000 })
+      .waitFor({ timeout: HERO_TIMEOUT_MS })
+    // A fresh home carries no DeepSeek credential, so the shipped provider
+    // prompt still follows the sealed setup steps; its deferral is one shipped
+    // click and proves the prompt's own boot path over the tunnel.
+    const providerPrompt = page.getByRole('dialog', { name: 'Choose your model provider' })
+    await providerPrompt.waitFor({ timeout: 30_000 })
+    await providerPrompt.getByRole('button', { name: 'Use another provider' }).click()
+    await providerPrompt.waitFor({ state: 'detached', timeout: 30_000 })
+    // Deferral opens the Models settings panel; close it to return to the workspace.
+    await page.keyboard.press('Escape')
+    await page.getByRole('dialog', { name: 'Settings' }).waitFor({ state: 'detached', timeout: 30_000 })
 
     const exercised = await page.evaluate(async () => {
       type Result<T> = { result: { ok: true; value: T } | { ok: false; error: { code: string; message: string } } }

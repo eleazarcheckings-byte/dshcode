@@ -1,5 +1,5 @@
-- dialog "内测声明":
-  - heading "内测声明" [level=2]
-  - paragraph: Saturn AI 仍处于测试阶段，还有许多地方需要持续改进和打磨，希望听取广大开发者的反馈建议。预计 Saturn AI 的核心插件以及基础 API 都会在接下来的一段时间内快速迭代、持续演化。
-  - paragraph: 我们期待与全球开发者一起，在开源、开放、可复用、可组合的基础设施之上，共同探索智能上限。欢迎全球插件开发者加入 Saturn AI 生态。
+- dialog "欢迎使用 Saturn AI":
+  - heading "欢迎使用 Saturn AI" [level=2]
+  - paragraph: Saturn AI 已准备好。
+  - paragraph: 打开项目，选择模型，开始构建。
   - button "继续"

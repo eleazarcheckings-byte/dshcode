@@ -10,9 +10,9 @@
     - button "插件":
       - img
       - text: 插件
-    - button "Agent 预设":
+    - button "模式":
       - img
-      - text: Agent 预设
+      - text: 模式
     - button "归档会话":
       - img
       - text: 归档会话
@@ -74,3 +74,10 @@
   - group: 自定义设置
   - button "取消"
   - button "保存"
+  - region "设计大脑":
+    - heading "设计大脑" [level=3]
+    - paragraph: 为智能体提供可选的设计指导和基于证据的评审工具。内置高品质产出指南无需此连接。工具调用会将智能体提供的需求和证据发送给 SaturnAI；工具不会自动检查已渲染的网站。
+    - status: 可选工具已关闭
+    - paragraph: https://saturnai.tools/api/mcp
+    - button "刷新状态"
+    - button "连接工具"
