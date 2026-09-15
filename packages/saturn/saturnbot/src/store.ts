@@ -112,6 +112,7 @@ export class SaturnBotStore {
       config, status, activeCycle, cycles: ordered.slice(0, 50), approvals: [...approvals.values()].reverse().slice(0, 200),
       reports: [...reports.values()].reverse().slice(0, 100), alerts: alerts.slice(-100).reverse(),
       messages: messages.slice(-200), cursor: events.length, nextRunAt: null, tools: [], connections: [],
+      firstRun: { goal: config.goal, workspace: config.workspace, provider: config.provider, credentials: [] }, integrationCatalog: [],
     })
   }
 

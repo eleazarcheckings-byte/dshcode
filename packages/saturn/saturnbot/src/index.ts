@@ -13,7 +13,9 @@ import { SaturnBotScheduler } from './scheduler.ts'
 import { LoggedBotModel } from './model.ts'
 import { createBotTools } from './tools.ts'
 import { BotDataStore } from './adapters/memory.ts'
-import { describeBotConnections } from './adapters/integrations.ts'
+import { createReportDeliveries, describeBotConnections } from './adapters/integrations.ts'
+import { resolveBotEnvironment } from './adapters/env-file.ts'
+import { botIntegrationCatalog, describeFirstRun } from './wizard.ts'
 import type { BotMemoryRecord, BotWebhookRecord, BotTicketRecord } from './service-types.ts'
 import { createBotWebhookHandler } from './webhook.ts'
 import type { BotConfig, BotEventPage, BotId, BotRole, BotSnapshot } from './types.ts'
@@ -54,6 +56,7 @@ export class SaturnBotService extends TypertRemoteService {
   private readonly engine: SaturnBotEngine
   private readonly scheduler: SaturnBotScheduler
   private readonly data: BotDataStore
+  private readonly environment: Readonly<NodeJS.ProcessEnv>
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'saturnbot')
@@ -65,9 +68,15 @@ export class SaturnBotService extends TypertRemoteService {
       ...config.configFile === undefined ? {} : { configFile: config.configFile },
       ...config.maxJournalBytes === undefined ? {} : { maxJournalBytes: config.maxJournalBytes },
     })
+    // Read once at boot: an operator-supplied <dataDirectory>/.env sits beneath
+    // the inherited process environment, which always wins.
+    this.environment = resolveBotEnvironment(dataDirectory)
+    const toolOptions = { dataDirectory, subprocess: ctx.subprocess, environment: this.environment, services: ctx }
     this.engine = new SaturnBotEngine({
       store, model: new LoggedBotModel(ctx),
-      tools: createBotTools({ dataDirectory, subprocess: ctx.subprocess }),
+      tools: createBotTools(toolOptions),
+      environment: this.environment,
+      reportDeliveries: createReportDeliveries(toolOptions),
     })
     this.data = new BotDataStore(dataDirectory)
     this.scheduler = new SaturnBotScheduler(this.engine, {
@@ -177,9 +186,13 @@ export class SaturnBotService extends TypertRemoteService {
   async tickets(): Promise<BotTicketRecord[]> { return await this.data.listTickets() }
 
   private project(state: BotSnapshot): BotSnapshot {
-    const connections = describeBotConnections(state.config)
+    const connections = describeBotConnections(state.config, this.environment)
       .map(item => ({ id: item.name, status: item.status, detail: item.message }))
-    return { ...state, connections }
+    return {
+      ...state, connections,
+      firstRun: describeFirstRun(state.config, this.environment),
+      integrationCatalog: botIntegrationCatalog(),
+    }
   }
 
   private async operation(action: () => Promise<BotSnapshot>): Promise<BotSnapshot> {
