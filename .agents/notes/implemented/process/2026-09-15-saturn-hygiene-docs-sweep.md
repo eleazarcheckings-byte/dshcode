@@ -1,0 +1,27 @@
+# Agent Note: Doc-quick hygiene sweep over the Saturn hygiene-docs cell's scope
+
+Status: implemented
+
+English | [中文](2026-09-15-saturn-hygiene-docs-sweep.zh.md)
+
+## Problem
+
+The 2026-09-15 Saturn fan-out recon (`harness-audit.md`) found the repository's own documentation-gate ladder (`scripts/run-gates.ts doc-quick`) failing 6 of 15 checks, almost entirely against the new Saturn packages: missing `## Known Limitations and Deferred Work` and `## Model Experience` sections, non-canonical heading order, missing YAML frontmatter, a dead cross-language anchor, and no top-level `@saturnai` group entry in `packages/README.md`. `ui-orchestrate` had no README at all, and `ui-brand-saturn`/`ui-orchestrate` had no unit tests proving their slot registration survives HMR.
+
+## Decision
+
+Every README this cell owns (`packages/saturn/checkpoints`, `packages/saturn/design-brain` (zh anchor + Dev Note heading only), `packages/client/ui-fleet`, `packages/client/ui-agent-team`, `packages/client/ui-brand-saturn`, `packages/client/ui-orchestrate` (new), plus the top-level `packages/README.md`) now carries the canonical Summary/Table of Contents/Dev Note skeleton, YAML frontmatter (`kind`, `description`), a `## Model Experience` section (either the full three-field structured form or, where already audited, the short sentence form), and `## Known Limitations and Deferred Work` as the final H2 (Model Experience is the second-to-last). A new `packages/saturn/README.md` (+ zh) group page was added and linked from the top-level map, since "add the saturn group to the map" implies a real target, not a broken link — its two rows for packages this cell does not own (`claims`, `done`, `orchestrate`) are left as plain text rather than links, because those packages' own README.zh.md siblings are other cells' deliverables still in flight.
+
+Two new browser-plugin test files (`ui-brand-saturn/tests/browser-plugin.client.spec.tsx`, `ui-orchestrate/tests/browser-plugin.client.spec.tsx`) prove: the slot(s) are declaration-aware (fill whether the hole exists before or after `apply`), and both sides of the HMR contract hold — disposing the declaring slot's fiber empties the occupant, and disposing this plugin's own fiber does the same, with no duplicate registration on redeclare. `ui-orchestrate`'s test additionally proves the `/orchestrate on|off` command dispatch and its RPC-failure/unmatched-admission folding, mirroring the existing `ui-plan` and `ui-goal` test patterns.
+
+## Alternatives considered
+
+- **Register `ui-agent-team`, `ui-fleet`, `ui-brand-saturn`, `checkpoints` in `SENTENCE_MODEL_EXPERIENCE`/`NO_LIMITATIONS`** (the short-form allowlists in `scripts/verify-package-readme-model-experience.ts`) — rejected: those scripts live outside this cell's IN scope (`scripts/**` is not listed in SPEC §3 C1), so every package instead carries the full structured Model Experience form (or, for `ui-agent-team`, the already-registered short form its allowlist entry supports).
+- **Link `packages/saturn/README.zh.md`'s `claims`/`done`/`orchestrate` rows to their `README.zh.md`** — rejected: those files do not exist yet (owned by C4/C5), and linking to a nonexistent target fails `verify-md-links`; the English page also drops the link for the same three rows so both language pages stay structurally identical for the translation-pairing gate.
+
+## Consequences
+
+- `doc-quick` (markdown links, translation pairing, markdown wrap, package-readme limitations, package-readme model experience, and the `doc-standard.spec.ts` vitest suite) passes for every file this cell owns; the remaining `doc-quick` failures the orchestrator will see belong to sibling cells' in-flight packages (`ui-done`, `ui-skin-saturn`, `ui-saturnbot`, `claims`, `done`, `orchestrate`, `saturnbot`, `skill-premium-output`, `model-router`, `review`, `tool-media`) and to pre-existing, Saturn-unrelated translation drift (`README.md`, `docs/cordis-tutorial/**`, several older packages) already present before this fan-out.
+- `tsc -p <pkg>/tsconfig.json --noEmit` is clean across all 16 named Saturn packages (8 `packages/saturn/*` + 7 `packages/client/ui-*` + `skill-premium-output`).
+- A repo-wide `knip` run surfaces two items outside this cell's scope: `packages/saturn/agent-team/tests/built-lib.e2e.ts` flagged unused (owned by C5), and `@deepseek-ai/dsh-client-ui-slots` flagged as an unused `ui-brand-saturn` devDependency (pre-existing, likely a type-only augmentation `knip` cannot see statically — left alone rather than risk breaking the type merge). `knip.json`'s default `packages/*/*` entry pattern (`tests/**/*.spec.ts`) does not match the new `.spec.tsx` tests; `ui-brand-saturn` and `ui-orchestrate` join a pre-existing list of packages with the same gap (`ui-brand-official`, `ui-done`, `ui-approval`, `ui-settings-plugin-inventory`, `util/values`) — a `knip.json` fix is out of this cell's reach (explicitly forbidden to edit) and is reported to the orchestrator instead.
+- Working in the same shared git working tree as twelve sibling cells surfaced a real hazard: an in-flight sibling's own `git add`/pre-commit cycle can sweep up this cell's staged-but-uncommitted files into its own commit (observed: this cell's README fixes landed inside another cell's `feat(saturn): add the visual review loop …` commit rather than a commit of this cell's own). The content itself is correct and durable either way; the audit trail is not clean. This is exactly the hazard SPEC §3 C5 (worktree isolation) exists to close.
