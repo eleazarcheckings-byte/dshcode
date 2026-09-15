@@ -321,6 +321,21 @@
     - id: saturn-claims
       name: '@saturnai/dsh-claims'
 
+    # Saturn AI independent review: a fresh reviewer subagent (spawn provider,
+    # never a context-inheriting fork) grades the session's definition of done
+    # against the six-criterion rubric and mints the countersign the proof gate
+    # in @saturnai/dsh-done accepts.
+    - id: saturn-review
+      name: '@saturnai/dsh-review'
+      config:
+        provider: spawn
+
+    # Saturn AI media generation: `ctx.media` plus the media_* tools over the
+    # gemini / openai / higgsfield providers. Every paid generation asks for
+    # approval with its estimated cost before any network call.
+    - id: saturn-tool-media
+      name: '@saturnai/dsh-tool-media'
+
     # Saturn AI multi-harness teammates: the native Claude Code / Codex
     # subagent providers, mounted on the Host plane behind the
     # `saturn-model-router.externalHarnesses` settings toggle (default off —

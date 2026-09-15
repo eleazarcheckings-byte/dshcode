@@ -209,6 +209,30 @@
         "debug"
       ]
     },
+    "packages/client/ui-brand-saturn": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ]
+    },
+    "packages/client/ui-orchestrate": {
+      "entry": [
+        "tests/**/*.spec.ts",
+        "tests/**/*.spec.tsx"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tests/**/*.ts",
+        "tests/**/*.tsx"
+      ]
+    },
     "packages/*/*": {
       "entry": [
         "tests/**/*.spec.ts"

@@ -27,10 +27,10 @@ The Saturn group carries the harness's Saturn AI-branded additions: peer-messagi
 | [`agent-team`](agent-team/README.md) | Implicit-root Agent Teams roster, durable peer mailbox, and shared task DAG | `ctx.agentTeams` |
 | [`tool-agent-team`](tool-agent-team/README.md) | Scoped model-facing Agent Teams tools over `ctx.agentTeams` | no service key |
 | [`checkpoints`](checkpoints/README.md) | Per-session code checkpoints: content-addressed snapshot, `checkpoints` projection, and the `/checkpoint` restore command | no service key |
-| `claims` | Enforced workspace claims: a durable, TTL-leased ledger of which agent owns which file surface (README has no Chinese counterpart yet) | no service key |
+| [`claims`](claims/README.md) | Enforced workspace claims: a durable, TTL-leased ledger of which agent owns which file surface | no service key |
 | [`design-brain`](design-brain/README.md) | Opt-in SaturnAI MCP connection with durable preference and verified Host tool availability | `ctx.designBrain` |
-| `done` | Per-session definition of done: the `done` projection, the `done:policy` prompt section, the `/done` command, and `set_definition_of_done` (README has no Chinese counterpart yet) | no service key |
-| `orchestrate` | Logged per-session multi-task (always-orchestrate) mode: the `orchestrate` projection, its policy prompt section, and the `/orchestrate` command (README has no Chinese counterpart yet) | no service key |
+| [`done`](done/README.md) | Per-session definition of done: the `done` projection, the `done:policy` prompt section, the `/done` command, and `set_definition_of_done` | no service key |
+| [`orchestrate`](orchestrate/README.md) | Logged per-session multi-task (always-orchestrate) mode: the `orchestrate` projection, its policy prompt section, and the `/orchestrate` command | no service key |
 | [`saturnbot`](saturnbot/README.md) | Persistent role-bound SaturnBot execution cycles, approvals, and typed business tools | `ctx.saturnbot` |
 
 -----

@@ -502,6 +502,18 @@
       "@saturnai/dsh-agent-team-profile": [
         "./packages/bundle/agent-team-profile/src"
       ],
+      "@saturnai/dsh-model-router": [
+        "./packages/saturn/model-router/src"
+      ],
+      "@saturnai/dsh-review": [
+        "./packages/saturn/review/src"
+      ],
+      "@saturnai/dsh-review/types": [
+        "./packages/saturn/review/src/types.ts"
+      ],
+      "@saturnai/dsh-tool-media": [
+        "./packages/saturn/tool-media/src"
+      ],
     }
   }
 }

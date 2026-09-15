@@ -38,6 +38,7 @@ async function loadComposition(): Promise<Context> {
   await writeFile(distIndex, '<head></head><body>shell</body>')
   await writeFile(join(dist, 'app.js'), 'export {}')
   await writeFile(join(dist, 'blob.bin'), 'BLOB')
+  await writeFile(join(dist, 'brand.woff2'), 'wOF2')
   await writeFile(join(dist, 'manifest.webmanifest'), '{}')
   await mkdir(join(dist, 'empty'))
   const configPath = join(root, 'cordis.yml')
@@ -137,6 +138,9 @@ describe('real Loader composition', () => {
     })
     await writeFile(join(root!, 'dist', 'app.js'), 'export const rebuilt = true')
     expect(await request(port, '/app.js')).toMatchObject({ status: 200, body: 'export const rebuilt = true' })
+
+    // Self-hosted font faces carry the registered font MIME type so same-origin @font-face loads are typed.
+    expect(await request(port, '/brand.woff2')).toMatchObject({ status: 200, type: 'font/woff2', body: 'wOF2' })
 
     // Unknown extension ships as octet-stream.
     expect(await request(port, '/blob.bin')).toMatchObject({ status: 200, type: 'application/octet-stream', body: 'BLOB' })

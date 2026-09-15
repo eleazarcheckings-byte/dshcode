@@ -346,6 +346,9 @@
     { "path": "./apps/cli" },
     { "path": "./apps/desktop" },
     { "path": "./packages/saturn/saturnbot" },
-    { "path": "./packages/saturn/design-brain" }
+    { "path": "./packages/saturn/design-brain" },
+    { "path": "./packages/saturn/model-router" },
+    { "path": "./packages/saturn/review" },
+    { "path": "./packages/saturn/tool-media" }
   ]
 }

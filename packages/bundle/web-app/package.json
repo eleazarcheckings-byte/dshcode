@@ -63,6 +63,8 @@
     "@saturnai/dsh-orchestrate": "workspace:^",
     "@saturnai/dsh-agent-team": "workspace:^",
     "@saturnai/dsh-tool-agent-team": "workspace:^",
+    "@saturnai/dsh-review": "workspace:^",
+    "@saturnai/dsh-tool-media": "workspace:^",
     "@deepseek-ai/dsh-client-ui-commands": "workspace:^",
     "@deepseek-ai/dsh-client-ui-chat": "workspace:^",
     "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
