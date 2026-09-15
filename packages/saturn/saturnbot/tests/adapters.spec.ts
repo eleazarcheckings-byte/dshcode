@@ -309,7 +309,9 @@ describe('telegram adapter', () => {
     const f = await fixture()
     f.context.config.integrations.telegram = { credentialEnv: 'TG_TOKEN', resource: '123456' }
     f.options.environment = { TG_TOKEN: 'secret-bot-token' }
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({ ok: true, result: { message_id: 42 } }))
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json({ ok: true, result: { message_id: 42 } }))
+      .mockResolvedValueOnce(Response.json({ ok: true, result: { message_id: 43 } }))
     f.options.fetch = fetch
     const result = await f.execute('telegram.send', { text: 'Digest ready' })
     expect(result.data).toEqual({ messageId: 42, chatId: '123456' })
@@ -395,6 +397,7 @@ describe('cloud.deploy first-class targets', () => {
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(Response.json({ sha: f.context.stage.revision }))
       .mockResolvedValueOnce(Response.json({ success: true, result: { id: 'deployment-1' } }))
+      .mockResolvedValueOnce(Response.json({ sha: f.context.stage.revision }))
     f.options.fetch = fetch
     const result = await f.execute('cloud.deploy', { environment: 'production', target: 'cloudflare-pages' })
     expect(result.data).toMatchObject({ target: 'cloudflare-pages', response: { success: true } })
