@@ -171,7 +171,12 @@ async function bootstrap(): Promise<void> {
   await enterPairedState(session)
 }
 
-onNotificationTapped(extra => deepLinkTo(extra.deepLink))
+// `extra` is absent for any notification that wasn't scheduled with one --
+// the background runner's own notifications before this fix round did
+// exactly that and threw here on tap (Mars r2 R2-F3 on M3-apps-mobile-r2.md).
+onNotificationTapped((extra) => {
+  if (extra?.deepLink) deepLinkTo(extra.deepLink)
+})
 
 App.addListener('appStateChange', ({ isActive }) => {
   if (!isActive) {

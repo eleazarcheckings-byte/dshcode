@@ -23,11 +23,16 @@ export async function fireNotification(descriptor: LocalNotificationDescriptor):
   });
 }
 
-export type NotificationTapListener = (extra: LocalNotificationDescriptor['extra']) => void;
+// `extra` is honestly optional here: the Capacitor plugin types it as `any`,
+// and a notification fired without one (a stray OS/system notification, or
+// one scheduled by an older build) really does deliver `undefined` — see
+// main.ts's onNotificationTapped call, which must guard against exactly this
+// (Mars r2 R2-F3 on M3-apps-mobile-r2.md).
+export type NotificationTapListener = (extra: LocalNotificationDescriptor['extra'] | undefined) => void;
 
 /** Wires a tap on a delivered notification to the deep-link handler in main.ts. */
 export function onNotificationTapped(listener: NotificationTapListener): void {
   void LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
-    listener(action.notification.extra as LocalNotificationDescriptor['extra']);
+    listener(action.notification.extra as LocalNotificationDescriptor['extra'] | undefined);
   });
 }

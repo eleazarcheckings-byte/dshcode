@@ -5,7 +5,9 @@
   "description": "Saturn AI companion shell for iOS and Android (Capacitor). Pairs with a running Saturn AI host, renders the same web UI, and surfaces approvals and verdicts as native notifications.",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/build-background-runner.mjs",
     "build": "vite build",
+    "build:background-runner": "node scripts/build-background-runner.mjs",
     "dev": "vite",
     "test": "vitest run",
     "test:watch": "vitest",
