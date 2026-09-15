@@ -43,10 +43,17 @@ import {
 } from './providers/higgsfield.ts'
 import type { HiggsfieldConfig, HiggsfieldCredential, HiggsfieldMediaOutput, ResolvedHiggsfieldConfig } from './providers/higgsfield.ts'
 import type { MediaAsset, MediaCost, MediaGenerateRequest, MediaJob, MediaKind, MediaProviderId } from './types.ts'
-import { MEDIA_PROVIDER_IDS } from './types.ts'
 
 export type { MediaAsset, MediaCost, MediaGenerateRequest, MediaJob, MediaJobStatus, MediaKind, MediaProviderId } from './types.ts'
-export { MEDIA_KINDS, MEDIA_PROVIDER_IDS } from './types.ts'
+
+/**
+ * Every {@link MediaProviderId}, for option advertisement and runtime validation of a caller-supplied
+ * provider string. Lives here (not `types.ts`) per this repo's `src/types.ts`-is-types-only convention.
+ */
+export const MEDIA_PROVIDER_IDS: readonly MediaProviderId[] = ['gemini', 'openai', 'higgsfield']
+
+/** Every {@link MediaKind}. Lives here for the same reason as {@link MEDIA_PROVIDER_IDS}. */
+export const MEDIA_KINDS: readonly MediaKind[] = ['image', 'video', 'audio', 'motion-transfer']
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -182,6 +189,17 @@ export interface MediaExecContext {
   readonly toolName?: string
 }
 
+/**
+ * A binding of `ctx.media` to one calling identity — matches SPEC §4's pinned single-argument
+ * `{ generate(req): Promise<Job>; status(id): Promise<Job> }` interface exactly, so a consumer that
+ * holds an {@link Agent} once (rather than per call) can hand this object anywhere the pinned shape
+ * is expected. See {@link MediaService.withAgent}.
+ */
+export interface BoundMediaService {
+  generate(request: MediaGenerateRequest): Promise<MediaJob>
+  status(id: string): Promise<MediaJob>
+}
+
 /** One job this service is still tracking after `generate()` returned it non-terminal, or has already resolved. */
 type TrackedJob =
   | { readonly kind: 'resolved'; job: MediaJob }
@@ -243,8 +261,11 @@ function assertAbsoluteWorkspace(workspace: string): void {
  * fundamentally requires to route its prompt (the pinned single-object `req` shape has no room for
  * an `Agent`). A consumer that calls `generate(req)` with only the pinned shape still type-checks
  * and runs — it simply gets the fail-closed "no agent to route the approval prompt through" error
- * for any provider whose price is not $0, which every provider in this package's scope is. See the
- * README's Known Limitations for the full rationale.
+ * for any provider whose price is not $0, which every provider in this package's scope is. A
+ * consumer that DOES hold an `Agent` up front should call {@link MediaService.withAgent} once and
+ * hand the resulting {@link BoundMediaService} to code expecting the pinned shape instead — see the
+ * README's Known Limitations for the full rationale, including where this still doesn't close the
+ * gap (a caller with no `Agent`-shaped identity anywhere in its own execution model).
  */
 export class MediaService extends Service {
   static Config = Config
@@ -280,6 +301,26 @@ export class MediaService extends Service {
     const raw = this.config.higgsfield ?? {}
     const combined = await resolveApiKey(this.ctx, 'higgsfield', raw.apiKey, raw.apiKeyEnv ?? DEFAULT_HIGGSFIELD_API_KEY_ENV)
     return parseHiggsfieldCredential(combined)
+  }
+
+  /**
+   * Bind this service to one calling {@link Agent}, producing a {@link BoundMediaService} that
+   * matches SPEC §4's pinned single-argument `generate(req)`/`status(id)` shape exactly — the answer
+   * to a consumer that holds an `Agent` up front (e.g. once per composition) and wants to hand the
+   * pinned interface to code that has no `exec` parameter to thread through, rather than calling the
+   * raw `generate(req, exec)` on every request. Spend approval still runs exactly as it would for the
+   * raw call — `agent` here becomes `exec.agent` — so a rejected/cancelled/unavailable approval still
+   * throws the same distinct errors, and there is still no free path for any provider in this package.
+   * @param agent - the identity `ctx.approval` routes this binding's prompts through.
+   * @param defaults - additional `exec` fields (`callId`, `signal`, `toolName`) applied to every call
+   *   made through the binding; `toolName` defaults to `'media'` when omitted, matching direct `ctx.media` use.
+   */
+  withAgent(agent: Agent, defaults: Omit<MediaExecContext, 'agent'> = {}): BoundMediaService {
+    const exec: MediaExecContext = { agent, ...defaults }
+    return {
+      generate: request => this.generate(request, exec),
+      status: id => this.status(id),
+    }
   }
 
   /**

@@ -79,7 +79,7 @@ kind: "package-reference"
 
 **统一接缝下的多供应商**(`src/providers/{gemini,openai,higgsfield}.ts`),每个都针对本地 HTTP 测试夹具独立完成单元测试(测试中没有真实网络调用):`gemini.ts` 实现了 `interactions` 图像端点以及 Veo 的 `predictLongRunning` 提交→轮询→下载流程;`openai.ts` 实现了 `images/generations`;`higgsfield.ts` 实现了针对异步任务 API 的提交/状态/取消/估算/轮询。`MediaService`(`src/index.ts`)就是这层接缝:它为每次调用解析供应商、在批准闸门之后才发出网络调用、把结果字节写入 `<workspace>/.saturn/media/<uuid>.<ext>`,并按 id 缓存每一个终态任务,供 `media_job_status` 之后重新读取。
 
-**一处有文档记录的接口扩展。** SPEC §4 将 `ctx.media` 的 `generate(req): Promise<Job>` 固定为单一对象签名,其中没有位置容纳 `Agent`——但 `ctx.approval` 从根本上需要一个 agent 才能路由其提示。因此 `MediaService.generate()` 接受一个可选的第二参数 `exec`(`{ agent?, callId?, signal?, toolName? }`);仅按固定形状调用 `generate(req)` 的消费者依然能通过类型检查并正常运行,只是会收到"没有 agent 可用于路由批准提示"这一关闭失败的错误——这是正确的,因为本包中的每个供应商都会产生费用。
+**一处有文档记录的接口扩展,及其绑定方式。** SPEC §4 将 `ctx.media` 的 `generate(req): Promise<Job>` 固定为单一对象签名,其中没有位置容纳 `Agent`——但 `ctx.approval` 从根本上需要一个 agent 才能路由其提示。因此 `MediaService.generate()` 接受一个可选的第二参数 `exec`(`{ agent?, callId?, signal?, toolName? }`);仅按固定形状调用 `generate(req)` 的消费者依然能通过类型检查并正常运行,只是会收到"没有 agent 可用于路由批准提示"这一关闭失败的错误——这是正确的,因为本包中的每个供应商都会产生费用。`MediaService.withAgent(agent, defaults?)` 为持有单个 `Agent`(而不想在每个调用点都传递 `exec`)的消费者补上了这一缺口:它返回一个 `BoundMediaService`——`{ generate(req): Promise<Job>; status(id): Promise<Job> }`——与固定形状完全一致,且仍会经过真正的花费闸门。本绑定未能解决的那一个调用方,见"已知限制"。
 
 </details>
 
@@ -133,7 +133,8 @@ kind: "package-reference"
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Genjutsu(动作迁移/物体替换)没有已发布的 REST 路径**——`docs.higgsfield.ai` 公开的 `openapi.json`(2026-09-15 抓取,共 50 个端点)中没有任何动作迁移/物体替换/genjutsu 操作;只有另一个已连接的 Higgsfield MCP 集成以内部模型 id(`hf_mult_motion_control`、`hf_mult_replace_object`)的形式暴露了它,那是与本包不同的接入面。`media_motion_transfer` 要求调用方提供确切的 `params.modelPath` 与 `params.body`,而不是猜测一个 URL;一旦 Higgsfield 发布该端点,补上一个真实默认值只是一个小的后续工作(只需修改 `generateWithHiggsfield` 中的这一处判断,而不用改动周边架构)。
+- **`ctx.get('media')` 唯一已知的消费者(SaturnBot 的 `creative.generate`,C7)直接调用固定的单参数形状,且完全无法提供 `Agent`**——本轮修复中通过阅读 `packages/saturn/saturnbot/src/adapters/integrations.ts`(`media.generate({ kind, prompt, workspace })`,没有第二个参数)与 `contracts.ts` 的 `BotMediaService`(即那个固定形状本身)已核实。`MediaService.withAgent(agent)`(见上文)解决的是一般情形——手上确实有一个真正 `dsh-agent` `Agent` 的消费者——但 SaturnBot 自身的工具执行模型里根本没有 `Agent` 对象:它的工具由自己的 `roles`/`effect` 中心化审批机制(`ActionRequiredError`,与 `ctx.approval` 不同)在调用前统一把关,而不是针对某个交互式会话逐次审批。要求一个没有会话形态身份的调用方,在 `media.generate` 内部再走一次*独立*的 `ctx.approval` 审批,是架构层面的不匹配,不是缺了一个绑定——本包无法仅凭自己的 IN 范围(`packages/saturn/tool-media/**`)单方面解决它。因此在这里如实记录为一项阻塞性的 `integration_needs`,并列出三个具体选项,交给 C7↔C8a 接线的负责人决定,而不是在此处猜测代劳。
+- **Genjutsu(动作迁移/物体替换)没有已发布的 REST 路径**——`docs.higgsfield.ai` 公开的 `openapi.json`(2026-09-15 抓取,共 50 个端点,**本轮修复中重新抓取**,结果相同,仍无匹配)中没有任何动作迁移/物体替换/genjutsu 操作;直接尝试猜测文档页面(`docs/genjutsu`、`docs/motion-control`、`docs/models/genjutsu`)均返回 404 或被重定向到文档首页(一个客户端渲染的 SPA,没有静态站点地图,所以不带 JS 运行时的抓取器只能确认到这一步)。只有另一个已连接的 Higgsfield MCP 集成以内部模型 id(`hf_mult_motion_control`、`hf_mult_replace_object`)的形式暴露了它,那是与本包不同的接入面。`media_motion_transfer` 要求调用方提供确切的 `params.modelPath` 与 `params.body`,而不是猜测一个 URL;一旦 Higgsfield 发布该端点,补上一个真实默认值只是一个小的后续工作(只需修改 `generateWithHiggsfield` 中的这一处判断,而不用改动周边架构)。在 izzy 给出明确决定、要求改为发布一个猜测路径之前,这仍是诚实的选择。
 - **没有已验证的 OpenAI 单张图像价格**——公开定价页面对本次会话的抓取器只返回了重定向、没有静态内容;端点与当前模型 id(`gpt-image-2.5-flare`、`gpt-image-2.5-sunburst`、`gpt-image-2`)已针对 `developers.openai.com` 实时确认,但 `provider: 'openai'` 的 `media_generate_image` 需要显式的 `params.pricePerImageUsd`,拒绝猜测。后续会话应重新抓取 OpenAI 的定价页面(或其 API 自身的成本上报字段,如果存在的话),再移除这一要求。
 - **`generate()` 会阻塞到任务终态,而不是立即返回 `'queued'`**——包括在内部轮询 Higgsfield 的状态端点与 Veo 的长时间运行操作,以各供应商的 `pollTimeoutMs` 为界。因此 `media_job_status` 大多是重新读取已缓存的终态结果,而不是恢复一个真正仍在进行中的轮询;若需要真正的"提交后即忘、之后再轮询(甚至换一个进程轮询)",需要后续工作把被跟踪的任务表持久化到进程内存之外。这是本次会话的有意范围决策,而非疏漏——详见 `MediaService` 的类文档。
 - **gemini/openai 尚无已验证的音频契约**——Gemini 定价页面列出了 TTS/音乐模型(`gemini-3.1-flash-tts-preview`、`Lyria 3.5`),OpenAI 也有自己的音频 API,但本次会话未抓取二者的请求/响应契约;`media_generate_audio` 仅通过 `higgsfield` 路由(其本身也需要显式的 `params.modelPath`,原因同上文的 Genjutsu 缺口——公开的 `openapi.json` 50 条路径列表中同样没有明显的音频端点,尽管状态模式的 `audio`/`audios` 输出字段暗示某些账户层级上存在这样的端点)。
@@ -148,6 +149,8 @@ kind: "package-reference"
 
 于 2026-09-15 作为 SaturnAI 升级扇出的 SPEC §3 C7 构建。本包实现的每一个 REST 契约(Gemini 的 `interactions` + Veo 的 `predictLongRunning`,Higgsfield 完整的异步任务 API)都是本次会话用 `curl` 针对供应商自身当前文档实时抓取的,而非沿用训练时的记忆或第三方聚合器数据;`src/pricing.ts` 中的每一条价格都附带确切的来源 URL 与 `2026-09-15` 的 `verified` 日期。在文档未能清晰到足以诚实实现的地方(OpenAI 定价、Higgsfield 的 Genjutsu 端点、gemini/openai 音频),本包在代码与本文档中如实说明,而不是去猜测。
 
+**修复轮次(同日)。** 一次全新上下文的 Mars 评审要求了四处改动,均已应用:(1)新增 `MediaService.withAgent(agent)`(测试见 `tests/with-agent.spec.ts`,先提交 RED),使持有 `Agent` 的消费者无需在每个调用点传递 `exec` 即可使用 SPEC §4 固定的单参数形状;SaturnBot 的实际调用点经阅读确认其自身模型中根本没有 `Agent`,因此仍作为一项 `integration_needs` 记录在上文,而不是在本包 IN 范围之外凭空猜测一处代码改动。(2)`MEDIA_PROVIDER_IDS`/`MEDIA_KINDS` 从 `types.ts` 移入 `index.ts`(本仓库自身的包约定是 `src/types.ts` 仅存放类型)。(3)Genjutsu 缺失一事已重新实时核实(结果相同)。(4)此前有一次提交把本包的 `feat` 差异夹带进了另一个 cell 的提交中(共享 git 索引导致的问题,而非篡改——它唯一改动的测试文件那一处 hunk 只是替换了 mock 的响应形状,而非断言本身);由于提交历史本身无法事后改写,这里如实记录一笔;本轮修复自身的提交是干净的。
+
 </details>
 
-**运行时不变量:** 未发布配套包:`ctx.media` 是本包唯一的跨插件接口,由接入它的角色配置(按 SPEC §4,SaturnBot 的 `creative`/`growth` 角色)消费——关于超出固定 `generate(req): Promise<Job>` 签名之外那处有意扩展,见上文的 `ctx.media` 接口说明。
+**运行时不变量:** 未发布配套包:`ctx.media` 是本包唯一的跨插件接口,由接入它的角色配置(按 SPEC §4,SaturnBot 的 `creative`/`growth` 角色)消费——关于超出固定 `generate(req): Promise<Job>` 签名之外那处有意扩展,见上文的 `ctx.media` 接口说明;关于为持有 `Agent` 的消费者精确满足该固定形状的绑定方式,见 `MediaService.withAgent`。

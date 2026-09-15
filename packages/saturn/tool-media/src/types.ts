@@ -2,20 +2,19 @@
  * Dependency-light shapes shared across the media generation seam: the request the
  * `ctx.media` service accepts, the job it returns, and the provider vocabulary the
  * tools and the loader-config schema both validate against.
+ *
+ * Types only — the runtime vocabulary lists ({@link MediaProviderId}'s and
+ * {@link MediaKind}'s own member arrays) live in `src/index.ts` per this repo's
+ * package convention (`docs/cookbook/adding-a-package.md`: `src/types.ts` is
+ * types-only) and are re-exported from there under the same names.
  * @module @saturnai/dsh-tool-media/types
  */
 
 /** The backend a generation call resolves to. */
 export type MediaProviderId = 'gemini' | 'openai' | 'higgsfield'
 
-/** Every {@link MediaProviderId}, for option advertisement and runtime validation of a caller-supplied provider string. */
-export const MEDIA_PROVIDER_IDS: readonly MediaProviderId[] = ['gemini', 'openai', 'higgsfield']
-
 /** The media family a generation call produces. */
 export type MediaKind = 'image' | 'video' | 'audio' | 'motion-transfer'
-
-/** Every {@link MediaKind}. */
-export const MEDIA_KINDS: readonly MediaKind[] = ['image', 'video', 'audio', 'motion-transfer']
 
 /** Closed lifecycle vocabulary for one generation job, normalized across every provider. */
 export type MediaJobStatus = 'queued' | 'running' | 'done' | 'failed'
