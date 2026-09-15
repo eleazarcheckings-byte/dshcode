@@ -1,0 +1,30 @@
+- id: sessions
+  name: cordis:review-test-sessions
+- id: system-prompt
+  name: cordis:review-test-system-prompt
+- id: tools
+  name: cordis:review-test-tools
+- id: llm
+  name: cordis:review-test-llm
+- id: agents
+  name: cordis:review-test-agents
+- id: projections
+  name: cordis:review-test-projections
+- id: agent-loop
+  name: cordis:review-test-agent-loop
+  config:
+    agents: []
+- id: subagents
+  name: cordis:review-test-subagents
+- id: subagent-spawn
+  name: cordis:review-test-subagent-spawn
+  config:
+    providerName: spawn
+- id: fs
+  name: cordis:review-test-fs
+- id: tool-fs
+  name: cordis:review-test-tool-fs
+- id: done
+  name: cordis:review-test-done
+- id: review
+  name: cordis:review-test-review
