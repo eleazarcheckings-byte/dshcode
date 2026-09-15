@@ -211,6 +211,10 @@
   .duration {
     animation: none;
   }
+
+  .root[data-state='running']::after {
+    animation: none;
+  }
 }
 
 .summary {

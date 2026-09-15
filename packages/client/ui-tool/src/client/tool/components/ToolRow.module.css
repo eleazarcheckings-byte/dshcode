@@ -182,6 +182,10 @@
   .duration {
     animation: none;
   }
+
+  .root[data-state='running'] .row::after {
+    animation: none;
+  }
 }
 
 /* Error row's collapsed summary: the failure's first line in the error color. */
