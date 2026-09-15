@@ -93,24 +93,35 @@ export class LoggedBotModel implements BotModel {
    * Resolve the provider/model/effort for one call through a connected model
    * router when present, falling back to the configured provider/model. A
    * router that is absent, throws, or returns an incomplete route never
-   * blocks a cycle — it only forgoes routing for that one call.
+   * blocks a cycle — it only forgoes routing for that one call. A resolved
+   * `reasoningEffort` the target model does not declare is dropped rather
+   * than left to hard-fail the call: the LLM runtime rejects an unsupported
+   * explicit effort before provider I/O, so an unvalidated router effort
+   * would otherwise break every planner/specialist call for that model.
    */
-  private resolveRoute(context: BotModelContext, task?: BotTask): BotModelRoute {
+  private async resolveRoute(context: BotModelContext, task?: BotTask): Promise<BotModelRoute> {
     const fallback: BotModelRoute = { provider: context.config.provider, model: context.config.model }
     const router = this.ctx.get('modelRouter') as BotModelRouter | undefined
     if (router === undefined) return fallback
+    let resolved: BotModelRoute
     try {
       const tier = task === undefined ? 'coordinator' : 'specialist'
-      const resolved = router.resolve(tier)
-      if (typeof resolved?.provider !== 'string' || typeof resolved.model !== 'string' || resolved.provider === '' || resolved.model === '') return fallback
-      return resolved
+      const candidate = router.resolve(tier)
+      if (typeof candidate?.provider !== 'string' || typeof candidate.model !== 'string' || candidate.provider === '' || candidate.model === '') return fallback
+      resolved = candidate
     } catch { return fallback }
+    if (resolved.reasoningEffort === undefined) return resolved
+    try {
+      const effort = ReasoningEffortId(resolved.reasoningEffort)
+      await this.ctx.llm.resolveCallConfig({ provider: resolved.provider, model: resolved.model, reasoningEffort: effort }, context.signal)
+      return resolved
+    } catch { return { provider: resolved.provider, model: resolved.model } }
   }
 
   private async generate(context: BotModelContext, task?: BotTask): Promise<unknown> {
     context.signal.throwIfAborted()
     const prompt = botModelPrompt(context, task)
-    const route = this.resolveRoute(context, task)
+    const route = await this.resolveRoute(context, task)
     const session = this.ctx.sessions.prepare(SessionId(`saturnbot-${randomUUID()}`), {
       meta: { cwd: context.config.workspace, origin: 'subagent' },
     })

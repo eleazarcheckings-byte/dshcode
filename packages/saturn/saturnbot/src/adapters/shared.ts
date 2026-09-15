@@ -51,8 +51,10 @@ export function redact(value: string, options: BotToolOptions, context: BotToolC
   let text = value
   const environment = options.environment ?? process.env
   for (const integration of Object.values(context.config.integrations)) {
-    const secret = integration.credentialEnv === undefined ? undefined : environment[integration.credentialEnv]
-    if (secret) text = text.replaceAll(secret, '[redacted]')
+    for (const envName of [integration.credentialEnv, integration.endpointEnv]) {
+      const secret = envName === undefined ? undefined : environment[envName]
+      if (secret) text = text.replaceAll(secret, '[redacted]')
+    }
   }
   text = text.replace(/\b(?:Bearer|Basic)\s+[a-z0-9+/_=.\-]+/giu, '[redacted authorization]')
     .replace(/((?:api[_-]?key|access[_-]?token|password|secret)\s*[=:]\s*)[^\s,;]+/giu, '$1[redacted]')
@@ -86,24 +88,34 @@ export function integration(
 /**
  * Resolve a deploy-hook style integration whose credential is optional: a
  * Vercel or Cloudflare Pages deploy hook URL is itself the secret (the
- * platform authenticates the hook by its URL), so an operator may configure
- * no `credentialEnv` at all. When one is configured it must still resolve.
+ * platform authenticates the hook by its URL). Because configuration is
+ * durably journaled verbatim, the hook URL itself is never accepted as a
+ * literal config value — it must resolve through `endpointEnv`, the same
+ * environment/`.env` lane every other credential resolves through. A
+ * `credentialEnv` remains optional and, when present, still resolves to an
+ * additional bearer token.
  * @param options - Host environment snapshot.
  * @param config - Current validated configuration.
  * @param name - Stable integration key (`vercel` or `cloudflare-pages`).
- * @returns the exact configured HTTPS hook URL and an optional bearer token.
+ * @returns the exact resolved HTTPS hook URL and an optional bearer token.
  */
 export function deployHook(
   options: BotToolOptions, config: BotConfig, name: string,
 ): { endpoint: string; token: string | undefined } {
   const entry = config.integrations[name]
-  if (entry?.endpoint === undefined) throw new ActionRequiredError(`Configure the ${name} deploy hook URL in SaturnBot settings.`)
+  if (entry?.endpoint !== undefined) {
+    throw new ActionRequiredError(`${name}'s deploy hook URL is itself a secret; configure endpointEnv (an environment variable name), never a literal endpoint.`)
+  }
+  if (entry?.endpointEnv === undefined) throw new ActionRequiredError(`Configure the ${name} deploy hook URL's environment variable (endpointEnv) in SaturnBot settings.`)
+  const environment = options.environment ?? process.env
+  const resolvedEndpoint = environment[entry.endpointEnv]
+  if (!resolvedEndpoint) throw new ActionRequiredError(`Set the environment variable configured for the ${name} deploy hook URL.`)
   let url: URL
-  try { url = new URL(entry.endpoint) } catch { throw new ActionRequiredError(`Configure a valid HTTPS ${name} deploy hook URL.`) }
+  try { url = new URL(resolvedEndpoint) } catch { throw new ActionRequiredError(`Configure a valid HTTPS ${name} deploy hook URL.`) }
   if (url.protocol !== 'https:' || url.username || url.password || url.hash) {
     throw new ActionRequiredError(`${name} requires an HTTPS deploy hook URL without embedded credentials or a fragment.`)
   }
-  const token = entry.credentialEnv === undefined ? undefined : (options.environment ?? process.env)[entry.credentialEnv]
+  const token = entry.credentialEnv === undefined ? undefined : environment[entry.credentialEnv]
   if (entry.credentialEnv !== undefined && !token) throw new ActionRequiredError(`Set the credential environment variable configured for ${name}.`)
   return { endpoint: url.href, token }
 }

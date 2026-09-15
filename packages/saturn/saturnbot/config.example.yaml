@@ -65,7 +65,9 @@ validationCommands: []
 # Add credentialEnv references and provider resources using ADAPTERS.md.
 # telegram: { credentialEnv: SATURN_TELEGRAM_BOT_TOKEN, resource: <default chat id> }
 # shopify: { credentialEnv: SATURN_SHOPIFY_TOKEN, resource: <your-store>.myshopify.com }
-# vercel: { endpoint: https://api.vercel.com/v1/integrations/deploy/<project>/<hook> }
-# cloudflare-pages: { endpoint: https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/<hook-id> }
+# vercel/cloudflare-pages: the deploy hook URL is itself a secret; configure endpointEnv
+# (an environment variable name) and paste the actual URL into .env, never here.
+# vercel: { endpointEnv: SATURN_VERCEL_DEPLOY_HOOK_URL }
+# cloudflare-pages: { endpointEnv: SATURN_CLOUDFLARE_PAGES_DEPLOY_HOOK_URL }
 integrations: {}
 reportChannel: inbox

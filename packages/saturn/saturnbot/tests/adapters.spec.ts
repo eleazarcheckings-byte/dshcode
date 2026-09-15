@@ -398,9 +398,11 @@ describe('cloud.deploy first-class targets', () => {
     expect(result.data).toMatchObject({ target: 'vercel', revision: f.context.stage.revision, response: { job: { id: 'job-1' } } })
     expect(fetch.mock.calls[1]![0]).toBe('https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y')
     expect((fetch.mock.calls[1]![1]!.headers as Record<string, string>)['Authorization']).toBeUndefined()
-    // A literal endpoint in config is refused before any secret can be resolved or dispatched.
+    // A literal endpoint in config is refused before the hook is ever dispatched.
+    fetch.mockResolvedValueOnce(Response.json({ sha: f.context.stage.revision }))
     f.context.config.integrations.vercel = { endpoint: 'https://api.vercel.com/v1/integrations/deploy/prj_x/hook_y' }
     await expect(f.execute('cloud.deploy', { environment: 'production', target: 'vercel' })).rejects.toMatchObject({ code: 'action-required' })
+    expect(fetch).toHaveBeenCalledTimes(3)
   }, 20_000)
 
   it('deploys through a configured Cloudflare Pages deploy hook and rejects a hook URL carrying embedded credentials', async () => {

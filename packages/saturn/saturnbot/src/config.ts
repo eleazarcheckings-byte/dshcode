@@ -34,12 +34,21 @@ export const botConfigSchema = z.object({
       const url = new URL(value)
       return ['https:', 'http:'].includes(url.protocol) && url.username === '' && url.password === '' && url.search === ''
     }, 'Endpoints cannot contain credentials or query strings').optional(),
+    endpointEnv: z.string().regex(/^[A-Z_][A-Z0-9_]*$/).optional(),
     credentialEnv: z.string().regex(/^[A-Z_][A-Z0-9_]*$/).optional(), resource: z.string().max(2000).optional(),
   }).strict()).default({}),
   reportChannel: z.string().max(200).default('inbox'),
 }).strict().superRefine((config, ctx) => {
   if (config.workspace !== '' && !isAbsolute(config.workspace)) ctx.addIssue({ code: 'custom', path: ['workspace'], message: 'Workspace must be an absolute path' })
   if (config.enabled && (config.goal.trim() === '' || config.workspace.trim() === '')) ctx.addIssue({ code: 'custom', message: 'Set a goal and workspace before enabling the daemon' })
+  // A vercel/cloudflare-pages deploy-hook URL is itself the secret (the platform
+  // authenticates the request by the URL alone); it must never be stored as a
+  // literal config value, since configuration is durably journaled verbatim.
+  for (const name of ['vercel', 'cloudflare-pages']) {
+    if (config.integrations[name]?.endpoint !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['integrations', name, 'endpoint'], message: `${name}'s deploy hook URL is itself a secret; configure endpointEnv (an environment variable name) instead of a literal endpoint` })
+    }
+  }
 })
 
 /** Parse configuration at a JSON or wire boundary.

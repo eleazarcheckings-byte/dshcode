@@ -43,9 +43,9 @@ integrations:
     credentialEnv: SATURN_SHOPIFY_TOKEN
     resource: your-store.myshopify.com
   vercel:
-    endpoint: https://api.vercel.com/v1/integrations/deploy/<project>/<hook>
+    endpointEnv: SATURN_VERCEL_DEPLOY_HOOK_URL # the hook URL itself; paste it into .env, never here
   cloudflare-pages:
-    endpoint: https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/<hook-id>
+    endpointEnv: SATURN_CLOUDFLARE_PAGES_DEPLOY_HOOK_URL # same: the hook URL itself, resolved through .env
   cloud:
     endpoint: https://deploy.example.com/saturnbot
     credentialEnv: SATURN_DEPLOY_TOKEN
@@ -62,7 +62,7 @@ integrations:
 
 Endpoint overrides must use HTTPS without embedded credentials or a fragment (a query string is also rejected except for `vercel`/`cloudflare-pages`, whose deploy-hook URL may legitimately carry one). Redirects are rejected. Remote response bodies are limited to 128 KiB before JSON parsing, then checked against provider response schemas. Retained data redacts configured credential values; transport failures do not retain provider bodies or exception excerpts. Providers may still return private business content, so protect the local data directory and dashboard access.
 
-`vercel` and `cloudflare-pages` are the two exceptions to "credential required": a deploy-hook URL is itself the secret (the platform authenticates the request by the URL alone), so `credentialEnv` is optional for these two names. When present it is still sent as `Authorization: Bearer …`.
+`vercel` and `cloudflare-pages` are the two exceptions to "credential required" — **and to "`endpoint` holds the URL"**: a deploy-hook URL is itself the secret (the platform authenticates the request by the URL alone), so it can never be stored as a literal `endpoint` value — configuration is durably journaled verbatim, and a literal secret there would leak into the journal. Configure `endpointEnv` (an environment variable name, resolved the same way `credentialEnv` is) instead; a literal `endpoint` on either integration is rejected at configuration time. `credentialEnv` remains optional for these two names and, when present, is still sent as `Authorization: Bearer …`.
 
 ## Provider operations
 
@@ -86,7 +86,7 @@ Stripe defaults to `https://api.stripe.com/v1`; use a key with balance and balan
 
 Telegram defaults to `https://api.telegram.org`; the bot token is carried in the request path (`/bot<token>/sendMessage`), not an `Authorization` header, matching the [Bot API](https://core.telegram.org/bots/api#sendmessage). `telegram.send` posts to the configured `resource` chat id unless the call supplies `chatId`. Create the bot with [@BotFather](https://core.telegram.org/bots#how-do-i-create-a-bot) and add it to the target chat before sending.
 
-Shopify derives its endpoint from `resource` (the store domain) as `https://<resource>/admin/api/2025-01` unless `endpoint` overrides it, and authenticates with `X-Shopify-Access-Token`, not a bearer token — see [Admin API access tokens](https://shopify.dev/docs/api/admin-rest). `shopify.orders_list`/`shopify.products_list` retain only commerce fields (id, name/title, status, totals, currency, line items/variants); no customer name, email, or address ever reaches model-visible data. `shopify.inventory_update` requires an exact `inventoryItemId` and `locationId` and reports the provider-confirmed `available` quantity, per [inventory levels](https://shopify.dev/docs/api/admin-rest/2025-01/resources/inventorylevel).
+Shopify derives its endpoint from `resource` (the store domain, validated as `<label>.myshopify.com` before any request is dispatched — a mistyped or hostile value would otherwise send the Admin API token to that host) as `https://<resource>/admin/api/2026-07` unless `endpoint` overrides it, and authenticates with `X-Shopify-Access-Token`, not a bearer token — see [Admin API access tokens](https://shopify.dev/docs/api/admin-rest). `2026-07` is Shopify's currently supported Admin API version as of 2026-09-15 (each release is supported for roughly 12 months); revisit before 2027-07. `shopify.orders_list`/`shopify.products_list` retain only commerce fields (id, name/title, status, totals, currency, line items/variants); no customer name, email, or address ever reaches model-visible data. `shopify.inventory_update` requires an exact `inventoryItemId` and `locationId` and reports the provider-confirmed `available` quantity, per [inventory levels](https://shopify.dev/docs/api/admin-rest/2026-07/resources/inventorylevel).
 
 ## Deployment, social, and creative HTTP requests
 
@@ -102,7 +102,7 @@ A successful JSON response contains `id` and `status` (`accepted`, `running`, or
 
 ## First-class deploy hooks and media routing
 
-`cloud.deploy` accepts an optional `target`: `webhook` (default, the generic contract above), `vercel`, or `cloudflare-pages`. For the latter two it still verifies the commit exists on GitHub first, then POSTs `{ ref, environment, requestId }` straight to the configured deploy-hook `endpoint` — `Authorization: Bearer …` only when `credentialEnv` is configured — and returns the provider's JSON response verbatim under `response`, since Vercel and Cloudflare Pages each shape their own acceptance payload and this runtime does not assert their exact fields. See [Vercel deploy hooks](https://vercel.com/docs/deployments/deploy-hooks) and [Cloudflare Pages deploy hooks](https://developers.cloudflare.com/pages/configuration/deploy-hooks/).
+`cloud.deploy` accepts an optional `target`: `webhook` (default, the generic contract above), `vercel`, or `cloudflare-pages`. For the latter two it still verifies the commit exists on GitHub first, then POSTs `{ ref, environment, requestId }` straight to the deploy-hook URL resolved through `endpointEnv` — `Authorization: Bearer …` only when `credentialEnv` is configured — and returns the provider's JSON response verbatim under `response` (with the resolved hook URL itself redacted, should a provider ever echo it back), since Vercel and Cloudflare Pages each shape their own acceptance payload and this runtime does not assert their exact fields. See [Vercel deploy hooks](https://vercel.com/docs/deployments/deploy-hooks) and [Cloudflare Pages deploy hooks](https://developers.cloudflare.com/pages/configuration/deploy-hooks/).
 
 `creative.generate` first checks for a connected media capability (`ctx.get('media')`, the `@saturnai/dsh-tool-media` contract: `generate({ kind, prompt, provider?, model?, params?, workspace }) → { id, status, assets, cost }`). When present, the request routes there instead of the generic creative webhook, and the returned `cost.estimatedUsd`/`provider`/`model` are retained alongside `assets`. Absent a connected media capability, the tool falls back to the generic webhook contract above unchanged.
 

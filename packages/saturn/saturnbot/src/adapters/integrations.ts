@@ -18,6 +18,14 @@ const requestId = z.string().min(1).max(200)
 const revision = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u)
 const currency = z.string().regex(/^[a-z]{3}$/u)
 const repositoryResource = /^[A-Za-z0-9][A-Za-z0-9_-]*\/(?!\.{1,2}$)[A-Za-z0-9_.-]+$/u
+/** Exact store domain shape; a mistyped or hostile value would otherwise send the Admin API token to that host. */
+const shopifyResource = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/u
+/** Currently supported Shopify Admin API version (Shopify supports each release for ~12 months); revisit before 2027-07. */
+const SHOPIFY_API_VERSION = '2026-07'
+function isHttpsWithoutCredentials(value: string | undefined): boolean {
+  if (value === undefined) return false
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && !url.hash } catch { return false }
+}
 const providerResult = z.object({ id: requestId, status: z.enum(['accepted', 'running', 'completed']), url: link.optional() })
 const prResult = z.object({
   number: z.number().int().positive(), html_url: link, head: z.object({ sha: revision }),
@@ -64,9 +72,12 @@ export function describeBotConnections(config: BotConfig, environment: Readonly<
     if (entry === undefined) message = 'Integration is not configured.'
     else if (!credentialOptional && (!entry.credentialEnv || !environment[entry.credentialEnv])) message = 'Configured credential environment variable is missing.'
     else if (credentialOptional && entry.credentialEnv !== undefined && !environment[entry.credentialEnv]) message = 'Configured credential environment variable is missing.'
-    else if (!endpoints[name] && name !== 'webhook' && !entry.endpoint) message = 'An HTTPS provider endpoint is required.'
+    else if (CREDENTIAL_OPTIONAL.has(name) && (entry.endpointEnv === undefined || !environment[entry.endpointEnv])) message = 'Set the environment variable configured for the deploy hook URL.'
+    else if (CREDENTIAL_OPTIONAL.has(name) && entry.endpointEnv !== undefined && !isHttpsWithoutCredentials(environment[entry.endpointEnv])) message = 'The deploy hook URL environment variable does not hold a valid HTTPS URL without embedded credentials.'
+    else if (!CREDENTIAL_OPTIONAL.has(name) && !endpoints[name] && name !== 'webhook' && !entry.endpoint) message = 'An HTTPS provider endpoint is required.'
     else if ((name === 'github' || name === 'email' || name === 'shopify') && !entry.resource) message = 'Configure the repository, mailbox, or store resource.'
     else if (name === 'github' && (entry.resource === undefined || !repositoryResource.test(entry.resource))) message = 'Configure a GitHub repository as owner/repository.'
+    else if (name === 'shopify' && (entry.resource === undefined || !shopifyResource.test(entry.resource))) message = 'Configure a Shopify store domain as your-store.myshopify.com.'
     else if (entry.endpoint) {
       try {
         const url = new URL(entry.endpoint)
@@ -94,8 +105,8 @@ function shopifyHeaders(token: string): Record<string, string> { return { 'X-Sho
 function shopify(options: BotToolOptions, config: BotConfig): { endpoint: string; token: string; resource: string } {
   const entry = config.integrations['shopify']
   if (entry === undefined) throw new ActionRequiredError('Connect shopify in SaturnBot settings.')
-  if (!entry.resource) throw new ActionRequiredError('Configure the Shopify store domain, e.g. your-store.myshopify.com.')
-  const connected = integration(options, config, 'shopify', `https://${entry.resource}/admin/api/2025-01`)
+  if (!entry.resource || !shopifyResource.test(entry.resource)) throw new ActionRequiredError('Configure the Shopify store domain as your-store.myshopify.com.')
+  const connected = integration(options, config, 'shopify', `https://${entry.resource}/admin/api/${SHOPIFY_API_VERSION}`)
   return { ...connected, resource: entry.resource }
 }
 

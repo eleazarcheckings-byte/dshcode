@@ -109,6 +109,8 @@ export interface BotModelRoute { provider: string; model: string; reasoningEffor
  * mounted). Planner and specialist calls resolve `coordinator` and
  * `specialist` respectively; a router that throws or omits a field is
  * treated as absent for that call, falling back to the configured
- * `provider`/`model`.
+ * `provider`/`model`. A resolved `reasoningEffort` the target model does not
+ * declare is dropped, keeping the resolved `provider`/`model` — it never
+ * hard-fails the call.
  */
 export interface BotModelRouter { resolve(tier: BotModelTier): BotModelRoute }

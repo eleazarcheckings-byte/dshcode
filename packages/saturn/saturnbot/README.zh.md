@@ -1,19 +1,44 @@
+---
+description: "持久化业务任务运行器：基于持久化日志的规划者与四个领域代理，具备角色/审批准入、首次运行向导投影，以及 GitHub、邮件、Stripe、Telegram、Shopify、Vercel/Cloudflare Pages 部署钩子和已连接媒体/模型路由器服务的适配器。"
+kind: "package-reference"
+---
+
 # SaturnBot 运行时
 
 [English](README.md) | 中文
 
+## 概述
+
 SaturnBot 通过规划者和四个领域代理执行可持久化的业务任务。经过身份验证的控制台提供角色对话、执行历史、精确操作审批、报告和本地记忆。Host 插件组合现有的 LLM、Session 持久化、托管子进程以及可选 Web 服务；通过配置好的 `dsh` profile 启动。
 
+## 目录
+
+- [配置](#configuration)
+- [执行与审批](#execution-and-approval)
+- [调度与生命周期](#scheduling-and-lifecycle)
+- [持久化与限制](#persistence-and-limits)
+- [模型体验](#model-experience)
+- [已知限制与遗留工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="configuration"></a>
 ## 配置
 
 首次启动会创建默认停用的 `config.yaml`，其中包含已注册工具及其允许使用的角色。启用调度前，先设置绝对工作区路径、业务目标以及可用的 LLM 提供方和模型。[config.example.yaml](config.example.yaml) 列出了运行时设置。提供方名称对应现有 harness 中注册的提供方；配置名称不会安装提供方或提供凭据。默认选择为 `deepseek-official` / `deepseek-v4-flash`。
 
 每个角色都有 `enabled`、`instructions` 和精确的 `tools` 列表。操作必须同时被角色列表和全局 `allowedTools` 允许，两者都不能超过可信适配器声明的角色权限。规划者根据策略读取当前仓库、记忆、收件箱、工单、Webhook 和财务数据。开发、增长、运营和财务代理随后在各自权限内接收独立任务。连接缺失会明确显示为数据源失败或任务阻塞。`configured` 仅表示配置和凭据变量存在，不代表身份验证成功。
 
-配置使用版本 1 YAML，并通过严格的 Zod 校验。未知字段、可执行或自定义标签、别名、相对工作区路径及超限文档都会明确失败。集成凭据通过 `credentialEnv` 引用环境变量名，实际值由启动进程提供，**或者**放入可选的 `<dataDirectory>/.env` 文件中（该文件从不记录日志，同名的显式进程变量始终优先）。[适配器参考](ADAPTERS.md) 说明提供方设置、精确 HTTP 请求、HMAC 签名的 `/saturnbot/webhook` 路由以及各工具限制。
+配置使用版本 1 YAML，并通过严格的 Zod 校验。未知字段、可执行或自定义标签、别名、相对工作区路径及超限文档都会明确失败。集成凭据通过 `credentialEnv` 引用环境变量名，实际值由启动进程提供，**或者**放入可选的 `<dataDirectory>/.env` 文件中（该文件从不记录日志，同名的显式进程变量始终优先）。Vercel/Cloudflare Pages 部署钩子 URL 本身即是密钥，同样绝不能作为字面量配置值——它通过 `endpointEnv`（与其他凭据相同的环境变量/`.env` 通道）解析。[适配器参考](ADAPTERS.md) 说明提供方设置、精确 HTTP 请求、HMAC 签名的 `/saturnbot/webhook` 路由以及各工具限制。
 
 Host 的 `dataDirectory` 默认为 harness 主目录下的 `saturnbot` 子目录。`configFile` 可指定其他绝对 YAML 路径。控制台配置先原子写入 YAML，再追加日志状态转换。启动时会导入并记录有意修改的 YAML；如果修改影响待处理执行策略，对应审批会被中断。普通配置修改要求当前周期完成或取消。暂停仅修改调度，可以在工作执行期间保存。
 
+控制台的远程 `snapshot()` 还携带面向首次运行向导的 `firstRun` 投影（`{ goal, workspace, provider, credentials: [{ name, env, present }] }`），以及描述每个受支持集成连接表单字段的静态 `integrationCatalog`（`{ name, label, fields: [{ key, label, secret, env }], docsUrl }[]`）——`secret` 字段永远不会回显数值，只会显示向导应引导粘贴到 `.env` 中的环境变量名称。参见 [wizard.ts](src/wizard.ts)。
+
+-----
+
+<a id="execution-and-approval"></a>
 ## 执行与审批
 
 `runNow()` 在记录身份后接受一个后台周期。`message(role, content)` 记录 1–8000 字符的指令并启动对应角色任务，不修改长期业务目标。运行时繁忙时会在存储消息之前拒绝请求，使输入框能够保留草稿。没有可执行的有用工作时，规划者可以选择零项任务；否则最多选择 `maxTasks` 项独立任务，上限为三项。
@@ -26,17 +51,23 @@ Host 的 `dataDirectory` 默认为 harness 主目录下的 `saturnbot` 子目录
 
 [contracts.ts](src/contracts.ts) 中的 `BotModel`、`BotAgent`、`BotOrchestrator`、`BotTool`、`BotExecutionState` 和 `BotScheduler` 描述可替换实现。工具参数结构随角色可见的模型上下文提供；后续提案同时收到该分支成功执行的结果和剩余预算。适配器必须响应取消，并在返回前等待其拥有的资源结束。本包不导出 `./invariant` 安装器：它拥有单一日志投影，并在对应操作中检查租约所有权、角色准入、审批身份和版本匹配。
 
+-----
+
+<a id="scheduling-and-lifecycle"></a>
 ## 调度与生命周期
 
 调度默认停用，间隔为 30 分钟。启用需要同时设置目标和工作区。调度器使用最近周期的开始时间，最多补执行一次逾期周期，并在周期或审批仍活跃时等待。`pause()` 持久化停用后续调度；`cancel()` 中止当前工作并拒绝待处理审批。取消与 Host 销毁会等待适配器和进程树完全结束。
 
 Host 进程必须保持运行，包括原生应用支持的后台或托盘模式（如果可用）。本包不安装操作系统服务，不唤醒睡眠中的机器，也不在 Host 停止时执行。执行租约排斥使用同一本地数据目录的并发写入者；不同目录形成独立运行时，不会协调针对同一外部账户或仓库的操作。
 
+-----
+
+<a id="persistence-and-limits"></a>
 ## 持久化与限制
 
 经过 fsync 的 `events.jsonl` 是执行状态的来源。缓存解析和增量投影避免控制台轮询时反复重放完整日志。读取方获得独立快照。崩溃留下的不完整末行会被忽略，并在持有写入租约时截去；无效的完整记录会导致拒绝加载。SQLite 独立保存记忆、工单和去重后的 Webhook 回执。JSONL 日志与外部服务之间没有分布式事务。
 
-每个模型请求在调用提供方之前写入持久化辅助 Session；随后记录对应的结构化输出、用量或终止错误。模型可见的精确上下文能够重建。执行日志记录公开计划、提案、工具输入和结果、审批以及状态变化，不记录私有思维链。保留的工具事实会进行凭据脱敏，但消息与业务文档仍属于敏感应用数据。
+每个模型请求在调用提供方之前写入持久化辅助 Session；随后记录对应的结构化输出、用量或终止错误。模型可见的精确上下文能够重建。执行日志记录公开计划、提案、工具输入和结果、审批以及状态变化，不记录私有思维链。保留的工具事实会进行凭据脱敏——包括已解析的 Vercel/Cloudflare Pages 部署钩子 URL——但消息与业务文档仍属于敏感应用数据。
 
 周期报告和每日汇总投递至持久化报告收件箱。完整的每日 Markdown 写入 `reports/YYYY-MM-DD.md`；控制台摘要是有界预览。`reportChannel: inbox` 始终生效；`reportChannel: telegram` 还会通过配置的 Telegram 集成额外发送每日摘要。其他任何通道名称都只会产生明确告警，并将报告保留在收件箱，不会向外发送。
 
@@ -44,13 +75,16 @@ Host 进程必须保持运行，包括原生应用支持的后台或托盘模式
 
 只有确认原持有进程已经退出，才会自动恢复租约。不可读的 `execution.lock`，或恢复期间崩溃留下的 `execution.lock.recovery`，要求在所有写入者停止后由操作者检查。不要删除活跃写入者的锁。[适配器隔离限制](ADAPTERS.md#local-tools-and-isolation) 适用于全部验证和发布路径。
 
+-----
+
+<a id="model-experience"></a>
 ## 模型体验
 
 ### 规划与领域代理请求
 
 #### 模型看到的内容
 
-`botModelPrompt`（[src/model.ts](src/model.ts)）为每次规划或领域代理调用组装一条有界的纯文本请求：当前角色的 `instructions`、当前 `goal`/`workspace`、每个已启用角色的说明及其允许工具（含 JSON Schema 参数）、本周期规划者已读取的只读评估数据、最近五个周期的计划/分支状态/摘要/错误、待处理审批，以及——仅限领域代理调用——当前任务，若为继续中的轮次还包括上一轮的实际工具结果。固定的按角色 `outputQuality` 区块（[src/output-quality.ts](src/output-quality.ts)）说明该角色这类交付物的验收标准：规划者关注结果和验收条件，开发者关注可用的暂存产物及界面检查，增长角色关注受众/文案/创意资产纪律，运营角色关注有依据的回复，财务角色关注来源/期间/币种/覆盖范围纪律。周围文字明确将观察数据和历史标注为不可信数据，模型不得将其当作指令遵循。已连接的模型路由器（[contracts.ts](src/contracts.ts) 中的 `BotModelRouter`）可以将该调用重定向到不同的提供方/模型/推理强度分级（规划用 `coordinator`，角色提案用 `specialist`）；它永远不会改变本次请求的内容。
+`botModelPrompt`（[src/model.ts](src/model.ts)）为每次规划或领域代理调用组装一条有界的纯文本请求：当前角色的 `instructions`、当前 `goal`/`workspace`、每个已启用角色的说明及其允许工具（含 JSON Schema 参数）、本周期规划者已读取的只读评估数据、最近五个周期的计划/分支状态/摘要/错误、待处理审批，以及——仅限领域代理调用——当前任务，若为继续中的轮次还包括上一轮的实际工具结果。固定的按角色 `outputQuality` 区块（[src/output-quality.ts](src/output-quality.ts)）说明该角色这类交付物的验收标准：规划者关注结果和验收条件，开发者关注可用的暂存产物及界面检查，增长角色关注受众/文案/创意资产纪律，运营角色关注有依据的回复，财务角色关注来源/期间/币种/覆盖范围纪律。周围文字明确将观察数据和历史标注为不可信数据，模型不得将其当作指令遵循。已连接的模型路由器（[contracts.ts](src/contracts.ts) 中的 `BotModelRouter`）可以将该调用重定向到不同的提供方/模型/推理强度分级（规划用 `coordinator`，角色提案用 `specialist`）；目标模型未声明的已解析推理强度会被丢弃，而不是让调用直接失败；它永远不会改变本次请求的内容。
 
 #### Token 影响
 
@@ -62,10 +96,28 @@ Host 进程必须保持运行，包括原生应用支持的后台或托盘模式
 
 ## 已知限制与遗留工作
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **仅 Telegram 实现了实际生效的 `reportChannel`** —— 其他任何非 `inbox` 的通道名称仍然只会产生应用内提醒，并将报告保留在持久化收件箱中；目前没有邮件、Slack 或短信报告投递。
 - **`cloud.deploy` 的 `webhook` 目标、`social.publish` 以及 `creative.generate` 的 webhook 兜底路径仍需要运营者自行搭建中间件**，实现 [ADAPTERS.md](ADAPTERS.md) 中记录的 JSON 契约；只有 `vercel`/`cloudflare-pages` 部署钩子目标以及已连接的媒体提供方（`ctx.get('media')`）是一等公民支持。
 - **Telegram、Shopify、Vercel 和 Cloudflare Pages 适配器本次会话未针对真实账户验证** —— 请求/响应结构依据截至 2026-09-15 各提供方的公开文档；由于本次会话未实际调用其真实接口，Vercel/Cloudflare 部署钩子的响应被当作不透明 JSON 对象处理，而非逐字段断言。
 - **`<dataDirectory>/.env` 凭据兜底是本包自有的受限加载器**，并非 harness 共享的 `dsh-credentials`/`dsh-launch-environment` 机制；它只读取一个文件，层级位于继承的进程环境之下，且不支持热重载。
 - **`firstRun.credentials` 中的已知提供方凭据是一张人工维护的静态表**（内置及模型路由器分支的免密钥提供方）；自定义或改名的提供方 ID 只会返回空列表，而不会做出猜测。
+- **调用前不做逐层的推理强度校验** —— 目标模型未声明的路由器解析强度会针对该次调用被丢弃，而不会向操作者呈现为路由不匹配的提示。
 
 [已实现的决策记录](../../../.agents/notes/implemented/feature/2026-09-14-saturnbot-durable-specialists.zh.md) 说明持久化与发布的取舍。[tests](tests) 下的定向测试覆盖重启恢复、真实本地适配器、Host 组合、取消、角色限制和持久化模型请求，无需付费凭据。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>面向维护者的工作上下文——点击展开</summary>
+
+本开发备注不具约束力，仅记录维护者的工作上下文：尚未决定的方向与备注。已交付的行为和被采纳的理由记录在上文各节、包代码以及关联的 Agent Note 中。
+
+- Telegram/Shopify/Vercel/Cloudflare Pages 的请求与响应结构仅依据各提供方的公开文档进行断言；首次针对真实账户的实际调用应作为后续 Agent Note 记录，因为此处的结构不匹配会以（比真实接口更严格的模式）失败关闭，而不是悄然通过。
+- 由 `firstRun`/`integrationCatalog` 驱动的客户端"高级 JSON"退路和字段级连接表单是 `packages/client/ui-saturnbot` 的贡献（SPEC §3 C8b），本包不包含；本包只提供这些投影数据。
+
+</details>
+
+**运行时不变量：** 每个数据目录对应一个日志投影，每个进程对应一个执行租约；一个数据目录绝不能被两个活跃写入者安全共享。

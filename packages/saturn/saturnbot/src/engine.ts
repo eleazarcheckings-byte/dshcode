@@ -27,7 +27,8 @@ const timestamp = (): string => new Date().toISOString()
 /** Remove credential fields, configured environment values, and bearer tokens from observable facts. */
 function redacted(value: unknown, config: BotConfig, environment: Readonly<NodeJS.ProcessEnv>): BotJson {
   const secrets = Object.values(config.integrations)
-    .map(item => item.credentialEnv === undefined ? undefined : environment[item.credentialEnv])
+    .flatMap(item => [item.credentialEnv, item.endpointEnv])
+    .map(env => env === undefined ? undefined : environment[env])
     .filter((item): item is string => item !== undefined && item.length > 3)
   const clean = (item: unknown, depth: number): BotJson => {
     if (depth > 20) return '[depth limit]'

@@ -34,6 +34,7 @@ export interface BotConfig {
     tools: string[] }>
   validationCommands: string[][]
   integrations: Record<string, { endpoint?: string
+    endpointEnv?: string
     credentialEnv?: string
     resource?: string }>
   reportChannel: string

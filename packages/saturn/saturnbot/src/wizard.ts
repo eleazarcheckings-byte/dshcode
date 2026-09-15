@@ -91,14 +91,14 @@ export function botIntegrationCatalog(): BotIntegrationCatalogEntry[] {
     {
       name: 'vercel', label: 'Vercel', docsUrl: 'https://vercel.com/docs/deployments/deploy-hooks',
       fields: [
-        { key: 'endpoint', label: 'Deploy hook URL', secret: false },
+        { key: 'endpointEnv', label: 'Deploy hook URL (itself a secret — paste it into .env; this field only names the variable)', secret: true, env: 'SATURN_VERCEL_DEPLOY_HOOK_URL' },
         { key: 'token', label: 'Optional bearer token, only if your hook requires one', secret: true, env: 'SATURN_VERCEL_TOKEN' },
       ],
     },
     {
       name: 'cloudflare-pages', label: 'Cloudflare Pages', docsUrl: 'https://developers.cloudflare.com/pages/configuration/deploy-hooks/',
       fields: [
-        { key: 'endpoint', label: 'Deploy hook URL', secret: false },
+        { key: 'endpointEnv', label: 'Deploy hook URL (itself a secret — paste it into .env; this field only names the variable)', secret: true, env: 'SATURN_CLOUDFLARE_PAGES_DEPLOY_HOOK_URL' },
         { key: 'token', label: 'Optional bearer token, only if your hook requires one', secret: true, env: 'SATURN_CLOUDFLARE_PAGES_TOKEN' },
       ],
     },

@@ -43,9 +43,9 @@ integrations:
     credentialEnv: SATURN_SHOPIFY_TOKEN
     resource: your-store.myshopify.com
   vercel:
-    endpoint: https://api.vercel.com/v1/integrations/deploy/<project>/<hook>
+    endpointEnv: SATURN_VERCEL_DEPLOY_HOOK_URL # 钩子 URL 本身；将其粘贴到 .env 中，切勿写在此处
   cloudflare-pages:
-    endpoint: https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/<hook-id>
+    endpointEnv: SATURN_CLOUDFLARE_PAGES_DEPLOY_HOOK_URL # 同上：钩子 URL 本身，通过 .env 解析
   cloud:
     endpoint: https://deploy.example.com/saturnbot
     credentialEnv: SATURN_DEPLOY_TOKEN
@@ -62,7 +62,7 @@ integrations:
 
 端点覆盖值必须使用 HTTPS，且不得嵌入凭据或片段（查询字符串同样会被拒绝，但 `vercel`/`cloudflare-pages` 的部署钩子 URL 例外，其本身可以合法携带查询字符串）。重定向会被拒绝。远程响应体在解析 JSON 前限制为 128 KiB，随后按提供方响应模式验证。保留的数据会隐去配置的凭据值；传输失败不会保留提供方响应体或异常内容片段。提供方仍可能返回私有业务内容，因此需要保护本地数据目录和仪表盘访问。
 
-`vercel` 和 `cloudflare-pages` 是"必须配置凭据"规则的两个例外：部署钩子 URL 本身即是密钥（平台仅凭该 URL 即可完成认证），因此这两者的 `credentialEnv` 为可选项。若配置了该字段，仍会以 `Authorization: Bearer …` 形式发送。
+`vercel` 和 `cloudflare-pages` 是"必须配置凭据"规则的两个例外——同时也是"`endpoint` 保存 URL"规则的例外：部署钩子 URL 本身即是密钥（平台仅凭该 URL 即可完成认证），因此绝不能以字面量 `endpoint` 值存储——配置会被逐字持久化到日志中，字面量密钥写在那里就会泄漏。应改为配置 `endpointEnv`（环境变量名称，解析方式与 `credentialEnv` 相同）；若在这两个集成上配置了字面量 `endpoint`，会在配置时被拒绝。这两者的 `credentialEnv` 仍为可选项，若配置了该字段，仍会以 `Authorization: Bearer …` 形式发送。
 
 ## 提供方操作
 
@@ -86,7 +86,7 @@ Stripe 默认使用 `https://api.stripe.com/v1`；密钥需要余额和余额交
 
 Telegram 默认使用 `https://api.telegram.org`；机器人令牌携带在请求路径中（`/bot<token>/sendMessage`），而非 `Authorization` 请求头，与 [Bot API](https://core.telegram.org/bots/api#sendmessage) 一致。`telegram.send` 默认发送到配置的 `resource` 聊天 ID，除非调用时提供了 `chatId`。请先通过 [@BotFather](https://core.telegram.org/bots#how-do-i-create-a-bot) 创建机器人并将其加入目标聊天，然后再发送消息。
 
-Shopify 会依据 `resource`（店铺域名）推导端点为 `https://<resource>/admin/api/2025-01`，除非 `endpoint` 覆盖该值；认证方式为 `X-Shopify-Access-Token`，而非 bearer 令牌——参见 [Admin API 访问令牌](https://shopify.dev/docs/api/admin-rest)。`shopify.orders_list`/`shopify.products_list` 只保留商务字段（id、名称/标题、状态、总额、币种、行项目/变体）；客户姓名、邮箱或地址永远不会进入模型可见的数据。`shopify.inventory_update` 需要精确的 `inventoryItemId` 和 `locationId`，并报告提供方确认的 `available` 数量，参见[库存水平](https://shopify.dev/docs/api/admin-rest/2025-01/resources/inventorylevel)。
+Shopify 会依据 `resource`（店铺域名，在发出任何请求前都会校验其形如 `<label>.myshopify.com`——否则拼写错误或恶意值会把 Admin API 令牌发送到该主机）推导端点为 `https://<resource>/admin/api/2026-07`，除非 `endpoint` 覆盖该值；认证方式为 `X-Shopify-Access-Token`，而非 bearer 令牌——参见 [Admin API 访问令牌](https://shopify.dev/docs/api/admin-rest)。截至 2026-09-15，`2026-07` 是 Shopify 当前受支持的 Admin API 版本（每个版本大约支持 12 个月）；应在 2027-07 之前重新评估。`shopify.orders_list`/`shopify.products_list` 只保留商务字段（id、名称/标题、状态、总额、币种、行项目/变体）；客户姓名、邮箱或地址永远不会进入模型可见的数据。`shopify.inventory_update` 需要精确的 `inventoryItemId` 和 `locationId`，并报告提供方确认的 `available` 数量，参见[库存水平](https://shopify.dev/docs/api/admin-rest/2026-07/resources/inventorylevel)。
 
 ## 部署、社交与创意 HTTP 请求
 
@@ -102,7 +102,7 @@ Shopify 会依据 `resource`（店铺域名）推导端点为 `https://<resource
 
 ## 一等公民部署钩子与媒体路由
 
-`cloud.deploy` 接受可选的 `target`：`webhook`（默认，即上述通用契约）、`vercel` 或 `cloudflare-pages`。对于后两者，它仍会先确认提交已存在于 GitHub，然后直接向配置的部署钩子 `endpoint` POST `{ ref, environment, requestId }`——仅当配置了 `credentialEnv` 时才附加 `Authorization: Bearer …`——并将提供方的 JSON 响应原样返回在 `response` 字段中，因为 Vercel 与 Cloudflare Pages 各自的接受响应结构不同，本运行时不对其具体字段做断言。参见 [Vercel 部署钩子](https://vercel.com/docs/deployments/deploy-hooks)与 [Cloudflare Pages 部署钩子](https://developers.cloudflare.com/pages/configuration/deploy-hooks/)。
+`cloud.deploy` 接受可选的 `target`：`webhook`（默认，即上述通用契约）、`vercel` 或 `cloudflare-pages`。对于后两者，它仍会先确认提交已存在于 GitHub，然后直接向通过 `endpointEnv` 解析出的部署钩子 URL POST `{ ref, environment, requestId }`——仅当配置了 `credentialEnv` 时才附加 `Authorization: Bearer …`——并将提供方的 JSON 响应原样返回在 `response` 字段中（若提供方碰巧在响应中回显了钩子 URL 本身，该值也会被隐去），因为 Vercel 与 Cloudflare Pages 各自的接受响应结构不同，本运行时不对其具体字段做断言。参见 [Vercel 部署钩子](https://vercel.com/docs/deployments/deploy-hooks)与 [Cloudflare Pages 部署钩子](https://developers.cloudflare.com/pages/configuration/deploy-hooks/)。
 
 `creative.generate` 首先检查是否已连接媒体能力（`ctx.get('media')`，即 `@saturnai/dsh-tool-media` 契约：`generate({ kind, prompt, provider?, model?, params?, workspace }) → { id, status, assets, cost }`）。若已连接，请求将路由至该处而非通用创意 webhook，返回的 `cost.estimatedUsd`/`provider`/`model` 会与 `assets` 一并保留。若未连接媒体能力，该工具的行为与上述通用 webhook 契约保持不变。
 
