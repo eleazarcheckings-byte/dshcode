@@ -35,6 +35,10 @@ allowedTools:
   - cloud.deploy
   - social.publish
   - creative.generate
+  - telegram.send
+  - shopify.orders_list
+  - shopify.products_list
+  - shopify.inventory_update
 roles:
   orchestrator:
     enabled: true
@@ -47,17 +51,21 @@ roles:
   growth:
     enabled: true
     instructions: ''
-    tools: [email.inbox, email.draft, email.send, memory.search, memory.write, social.publish, creative.generate]
+    tools: [email.inbox, email.draft, email.send, memory.search, memory.write, social.publish, creative.generate, telegram.send]
   operations:
     enabled: true
     instructions: ''
-    tools: [git.status, git.diff, fs.read, email.inbox, email.draft, email.send, memory.search, memory.write, tickets.list, tickets.upsert, webhook.inbox]
+    tools: [git.status, git.diff, fs.read, email.inbox, email.draft, email.send, memory.search, memory.write, tickets.list, tickets.upsert, webhook.inbox, telegram.send, shopify.orders_list, shopify.products_list, shopify.inventory_update]
   finance:
     enabled: true
     instructions: ''
-    tools: [stripe.metrics, memory.search, memory.write]
+    tools: [stripe.metrics, memory.search, memory.write, shopify.orders_list]
 # Set the exact argv arrays for this repository's checks before approving code publication.
 validationCommands: []
 # Add credentialEnv references and provider resources using ADAPTERS.md.
+# telegram: { credentialEnv: SATURN_TELEGRAM_BOT_TOKEN, resource: <default chat id> }
+# shopify: { credentialEnv: SATURN_SHOPIFY_TOKEN, resource: <your-store>.myshopify.com }
+# vercel: { endpoint: https://api.vercel.com/v1/integrations/deploy/<project>/<hook> }
+# cloudflare-pages: { endpoint: https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/<hook-id> }
 integrations: {}
 reportChannel: inbox
