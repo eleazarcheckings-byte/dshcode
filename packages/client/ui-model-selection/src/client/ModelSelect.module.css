@@ -80,11 +80,14 @@
   max-height: min(360px, calc(100vh - 96px));
   overflow: hidden;
   padding: 4px;
-  /* Surface tokens match the Menu primitive card (ui-primitives
-   * Menu.module.css) so every dropdown reads as the same material. */
+  /* Glass material, the same one the Menu primitive card takes
+   * (ui-primitives Menu.module.css), so every dropdown reads alike. */
+  border: 0;
   border-radius: 12px;
-  background: var(--dsw-specific-menu);
-  box-shadow: var(--dsw-shadow-lv3);
+  background: var(--dsw-glass-surface);
+  backdrop-filter: var(--dsw-glass-filter);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
+  box-shadow: var(--dsw-glass-elevation);
   color: var(--dsw-alias-label-primary);
   /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens.
      Declared here rather than on the scrolling `.groups` child so the
@@ -148,7 +151,11 @@
   top: 0;
   z-index: 1;
   padding: 5px 8px 3px;
-  background: var(--dsw-specific-menu);
+  /* The opaque form of the panel's glass fill: a sticky label must mask the
+     rows scrolling under it, so it takes no translucency of its own.
+     --dsw-alias-bg-layer-3 is the layer-3 step the glass fill and its opaque
+     fallback are both built from. */
+  background: var(--dsw-alias-bg-layer-3);
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;

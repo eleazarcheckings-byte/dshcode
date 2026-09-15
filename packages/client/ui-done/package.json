@@ -1,6 +1,6 @@
 {
   "name": "@saturnai/dsh-client-ui-done",
-  "description": "Definition-of-done strip for the composer context stack: the conversation.input.dock seat over the done projection and the /done command channel",
+  "description": "Definition-of-done chip for the Session header: the conversation.session.header.utilities seat over the done projection and the /done command channel, with the turn receipt and checkpoints behind a click",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -67,6 +67,8 @@
     "@saturnai/dsh-checkpoints": "workspace:^",
     "@saturnai/dsh-done": "workspace:^",
     "@types/react": "~18.3.1",
-    "react": "^18.2.0"
+    "@types/react-dom": "~18.3.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }

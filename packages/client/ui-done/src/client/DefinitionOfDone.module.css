@@ -1,53 +1,60 @@
-/* DefinitionOfDone: the head card of the composer context stack (ahead of the
-   todo, goal, and queue cards). Its dock column (card cap minus four insets)
-   and 52px row match that family, and the row's height is FIXED so a one-line
-   contract, a two-line one, an open editor, and the stated → proven flip all
-   occupy the same box: nothing below the card ever moves.
+/* DefinitionOfDone: the Session-header contract chip and the record panel it
+   opens. The chip is chrome, so it is sized to the header's own controls (28px
+   minimum, 12px text) and never grows the bar: the statement is one ellipsised
+   line, and below the width where that line would crowd the header it drops out,
+   leaving the ring, the status label and the chevron.
 
-   Folded under that row, inside the same card, is the turn receipt — the paths
-   this turn changed beside the evidence that met the contract. Its row is a
-   fixed 36px band present in every state, so a path arriving mid-turn moves
-   nothing either; only the reader's own toggle grows the card.
+   The panel is a portal, so the header's clipping and stacking cannot cut it. It
+   takes the shared glass surface: an elevated panel with no border of its own,
+   the hairline coming from the elevation stroke layer, and the reduced-
+   transparency path falling back to the opaque menu surface.
 
-   The ring and status chip use the monochrome accent. Their hollow and filled
-   states distinguish intent from proof; the surrounding rows use the shared
-   surface, border, and label tokens. */
+   The ring and the status label use the monochrome accent. Their hollow and
+   filled states distinguish intent from proof; everything else consumes the
+   shared surface, label, and elevation tokens. */
 
-.dock {
-  box-sizing: border-box;
-  width: calc(
-    100% -
-    var(--dsh-composer-side-clearance) -
-    var(--dsh-composer-side-clearance) -
-    var(--dsh-composer-dock-inset) -
-    var(--dsh-composer-dock-inset) -
-    var(--dsh-composer-dock-inset) -
-    var(--dsh-composer-dock-inset)
-  );
-  margin: 0 auto;
+.root {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
 }
 
-.bar {
-  box-sizing: border-box;
-  display: flex;
+.chip {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 52px;
-  padding: 5px 5px 5px 12px;
+  gap: 6px;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 46ch;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  corner-shape: round;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
 }
 
-/* The card surface around the contract row and the turn receipt folded under
-   it. One card: the receipt's top hairline is the only section boundary, and
-   the surface, radius, and border are declared once here. */
-.card {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: calc(var(--dsh-composer-card-max-width) - 4 * var(--dsh-composer-dock-inset));
-  margin: 0 auto;
-  border: 0.5px solid var(--dsw-alias-border-l1);
-  border-radius: 12px;
-  background: var(--dsw-specific-tip);
+.chip:hover,
+.chip[aria-expanded='true'] {
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-glass-surface);
+  backdrop-filter: var(--dsw-glass-filter);
+}
+
+.chip svg {
+  flex: none;
+}
+
+.chip > svg:last-child {
+  transition: transform 120ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
 }
 
 /* The ring carries the doctrine at a glance: hollow is intent, filled is proof. */
@@ -70,13 +77,13 @@
   background: var(--saturn-accent, #f5f5f5);
 }
 
-/* STATED and PROVEN label the status explicitly; only proof fills the chip. */
-.chip {
+/* STATED and PROVEN label the status explicitly; only proof fills the label. */
+.label {
   display: inline-flex;
   align-items: center;
   flex: none;
-  height: 18px;
-  padding: 0 7px;
+  height: 16px;
+  padding: 0 6px;
   border: 1px solid color-mix(in oklab, var(--saturn-accent, #f5f5f5) 45%, transparent);
   border-radius: 999px;
   corner-shape: round;
@@ -88,24 +95,24 @@
   transition: background-color 160ms ease, color 160ms ease;
 }
 
-.chip[data-status='proven'] {
+.label[data-status='proven'] {
   background: var(--saturn-accent, #f5f5f5);
   color: #000;
 }
 
-/* Reserved for two 13/20 lines and centred, so a one-line contract sits in the
-   same box as a two-line one instead of pulling the card shorter. */
+/* One line in the header, ellipsised: the full statement lives in the panel. */
 .text {
-  display: -webkit-box;
-  flex: 1;
   min-width: 0;
-  height: 40px;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-box-pack: center;
-  -webkit-line-clamp: 2;
-  font: var(--dsw-font-xs-13);
   color: var(--dsw-alias-label-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .text {
+    display: none;
+  }
 }
 
 /* The accented separator divides the statement from its supporting evidence. */
@@ -115,13 +122,68 @@
 
 .evidence::before {
   content: '·';
-  margin: 0 8px;
+  margin: 0 6px;
   color: var(--saturn-accent, #f5f5f5);
 }
 
-.error {
+/* ---- The record panel ---- */
+
+.panel {
+  position: fixed;
+  z-index: 100;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 380px;
+  max-width: min(380px, calc(100vw - 32px));
+  max-height: min(60vh, 480px);
+  padding: 10px;
+  overflow: auto;
+  border: 0;
+  border-radius: 16px;
+  background: var(--dsw-glass-surface);
+  backdrop-filter: var(--dsw-glass-filter);
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
+  box-shadow: var(--dsw-glass-elevation);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.head .marker {
+  margin-top: 3px;
+}
+
+.head .label {
+  margin-top: 1px;
+}
+
+/* The whole statement and its evidence, wrapped: this is the detail view. */
+.panelText {
   flex: 1;
   min-width: 0;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.editor {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.error {
   overflow: hidden;
   color: var(--dsw-alias-state-error-primary);
   font: var(--dsw-font-xxs-12);
@@ -132,7 +194,7 @@
 /* ---- Inline editor (statement or evidence) ---- */
 
 /* No `outline: none`: the skin draws the focus ring globally and this
-   field must keep it. Only the offset is pulled in, so the ring fits the bar. */
+   field must keep it. Only the offset is pulled in, so the ring fits the row. */
 .input {
   flex: 1;
   min-width: 0;
@@ -158,7 +220,7 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   flex: none;
 }
 
@@ -190,8 +252,10 @@
 /* The skin already collapses every transition under reduced motion; stated
    again here so the contract holds if this sheet is read on its own. */
 @media (prefers-reduced-motion: reduce) {
+  .chip,
+  .chip > svg:last-child,
   .marker,
-  .chip {
+  .label {
     transition: none;
   }
 }

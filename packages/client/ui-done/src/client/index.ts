@@ -1,19 +1,21 @@
 /**
- * Definition-of-done strip plugin, browser half: occupies the composer's
- * context-stack dock (`conversation.input.dock`, the declared list seat shared
- * with the todo, goal, and queue cards) with the session's stated contract —
- * and, folded into that same card, the turn receipt joining the paths this turn
- * changed with the evidence that met the contract.
+ * Definition-of-done plugin, browser half: occupies one Session-header utility
+ * seat (`conversation.session.header.utilities`) with the session's stated
+ * contract as a compact chip — ring, status, and the contract in one truncated
+ * line. Clicking the chip opens a glass panel carrying the whole record: the
+ * statement and its evidence, the editor, the turn receipt joining the paths
+ * this turn changed, and the checkpoints a restore can put back. The header
+ * keeps the record visible without spending transcript width on it.
  * State rides the host `done` projection through the standard-kit
  * `useProjection`; the receipt's turn facts ride the Chat target's timeline
  * through the standard-kit `useConversation`. Every verb executes a `/done`
- * command through `remote.commands.execute`, so the strip and the slash command
+ * command through `remote.commands.execute`, so the chip and the slash command
  * share one logged event and one result line — zero client-side contract state.
  */
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-// Type-only: pulls the ui-conversation SlotMap merge (the input.dock seat).
+// Type-only: pulls the ui-conversation SlotMap merge (the header utilities seat).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the Chat target's view snapshot over the turn timeline.
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
@@ -34,7 +36,7 @@ export type { DoneKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** The definition-of-done strip's copy. */
+    /** The definition-of-done chip's copy. */
     done: DoneKey
   }
 }
@@ -42,7 +44,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Dictionary namespace owned by this plugin. */
 const NS = 'done'
 
-/** Injected business face of the composer definition-of-done seat. */
+/** Injected business face of the definition-of-done header seat. */
 export interface DoneDockInjected {
   /**
    * Set or amend the contract by executing /done -- <statement>.
@@ -76,17 +78,17 @@ export interface DoneDockInjected {
 export const inject = ['slots', 'remote', 'remote.commands', 'locale']
 
 /**
- * Client plugin body: register the definition-of-done strip over the command
+ * Client plugin body: register the definition-of-done chip over the command
  * channel.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-done: dictionaries')
 
-  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
-    name: 'conversation.input.dock',
-    // Ahead of the goal card (10): both are contracts, and the outer one — what
-    // this whole piece of work is for — frames the objective under it.
+  ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
+    name: 'conversation.session.header.utilities',
+    /* The right-aligned Session utilities, after the header's own controls: the
+       contract is a standing readout about this Session, not an action on it. */
     id: 'definition-of-done',
     order: 5,
     locale: NS,

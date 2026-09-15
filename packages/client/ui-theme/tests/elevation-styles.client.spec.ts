@@ -16,7 +16,7 @@ import { packageStylesheets, parseRules } from './stylesheet-scan.ts'
 /** Stroke-color indirection components may rebind per surface or state. */
 const STROKE_COLOR = '--dsw-elevation-stroke-color'
 /** Shadow-token references that mark a rule as an elevated surface. */
-const ELEVATED_SHADOW = /--dsw-(?:shadow-lv|elevation-)/
+const ELEVATED_SHADOW = /--dsw-(?:shadow-lv|elevation-|glass-elevation)/
 /** Neutral border tokens; the state palette (--dsw-alias-state-*) stays allowed. */
 const NEUTRAL_BORDER = /--dsw-alias-border-/
 
@@ -48,7 +48,7 @@ describe('elevation tokens', () => {
     // re-substitute against the color each element sees (the same contract
     // scrollbar.css states for --dsh-scrollbar-thumb).
     expect(perElement.get('--dsw-elevation-stroke')).toBe(`0 0 0 0.5px var(${STROKE_COLOR})`)
-    for (const name of ['--dsw-elevation-panel', '--dsw-elevation-prominent', '--dsw-elevation-soft']) {
+    for (const name of ['--dsw-elevation-panel', '--dsw-elevation-prominent', '--dsw-elevation-soft', '--dsw-glass-elevation']) {
       expect(perElement.get(name), name).toMatch(/^var\(--dsw-elevation-stroke\), 0 /)
       expect(bodyOnly.has(name), name).toBe(false)
     }

@@ -19,9 +19,10 @@
   flex-direction: column;
   border: 0;
   border-radius: 20px;
-  background: var(--dsw-specific-menu);
+  background: var(--dsw-glass-surface);
+  backdrop-filter: var(--dsw-glass-filter);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
-  box-shadow: var(--dsw-elevation-prominent);
+  box-shadow: var(--dsw-glass-elevation);
 }
 
 .viewport {

@@ -6,13 +6,15 @@
  * only a `proven` status that carries evidence is green, and every other state
  * (capability absent, no contract, stated only, or a proof claiming status
  * without evidence) is NOT_ASSESSED. The second block renders the disclosure
- * row. The third proves the fold the surface demanded: one card in the composer
- * dock holding the contract row and this receipt, not a fourth card.
+ * row. The third drives the header chip: one ellipsised line in the bar, the
+ * whole record in the panel it opens, and the checkpoint half standing alone
+ * when no contract is stated.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
+import type { CheckpointsProjection } from '@saturnai/dsh-checkpoints/client'
 import type { DoneProjection } from '@saturnai/dsh-done/client'
 import { DefinitionOfDone } from '../src/client/DefinitionOfDone.tsx'
 import { TurnReceipt } from '../src/client/TurnReceipt.tsx'
@@ -54,6 +56,13 @@ function makeReceipt(over: Partial<TurnReceiptValue> = {}): TurnReceiptValue {
     verdict: { kind: 'not-assessed' },
     ...over,
   }
+}
+
+/** A session holding two checkpoints, the newest one opened by turn 4. */
+const CHECKPOINTS: CheckpointsProjection = {
+  count: 2,
+  latest: { id: 'cp-2', createdAt: 1, reason: 'turn', turn: 4, files: 2 },
+  entries: [{ id: 'cp-2', createdAt: 1, reason: 'turn', turn: 4, files: 2 }],
 }
 
 /** The panel the header's aria-controls points at. */
@@ -199,56 +208,180 @@ describe('TurnReceipt', () => {
   })
 })
 
-describe('the receipt folded into the definition-of-done card', () => {
-  /** Render the dock strip over one projection and one chat timeline. */
-  function renderStrip(projection: DoneProjection, timeline: ReceiptTimeline | undefined) {
+describe('the definition-of-done header chip and its record panel', () => {
+  /** Render the header chip over one projection, one chat timeline, and one checkpoint count. */
+  function renderChip(
+    projection: DoneProjection | null,
+    timeline: ReceiptTimeline | undefined,
+    checkpoints?: CheckpointsProjection,
+  ) {
     const bound = { views: { get: (target: string) => (target === 'chat' && timeline !== undefined ? { timeline } : undefined) } }
+    const projections: Record<string, unknown> = { done: projection ?? undefined, checkpoints }
     const props = {
-      useProjection: () => projection,
+      useProjection: (name: string) => projections[name],
       useConversation: (select: (value: typeof bound) => unknown) => select(bound),
       setStatement: vi.fn(async () => null),
       prove: vi.fn(async () => null),
       clear: vi.fn(async () => null),
+      restoreCheckpoint: vi.fn(async () => null),
       t,
     } as unknown as Parameters<typeof DefinitionOfDone>[0]
     render(<DefinitionOfDone {...props} />)
-    const bar = screen.getByRole('group', { name: 'Definition of done' })
-    const receipt = document.querySelector('[data-turn-receipt]')
-    return { bar, receipt }
+    const chip = document.querySelector('[data-done-bar]') as HTMLButtonElement | null
+    return { chip, props }
   }
 
-  it('is one card: the contract row and the receipt, not a fourth card', () => {
-    const { bar, receipt } = renderStrip(
+  /** Click the chip and hand back the record panel it opened. */
+  function openPanel(chip: HTMLButtonElement): HTMLElement {
+    fireEvent.click(chip)
+    const panel = document.querySelector('[data-done-panel]')
+    if (panel === null) throw new Error('the chip opened no panel')
+    return panel as HTMLElement
+  }
+
+  it('renders nothing for a Session with neither a contract nor a checkpoint', () => {
+    const { chip } = renderChip(null, undefined)
+    expect(chip).toBeNull()
+  })
+
+  it('holds the contract on one line and opens the whole record on click', () => {
+    const { chip } = renderChip(
       makeDone({ status: 'proven', evidence: 'grader 15/15' }),
       makeTimeline([['src/a.ts']]),
     )
-    expect(receipt).not.toBeNull()
-    // The receipt is a sibling row inside the row's own card, so both halves are
-    // one surface and only the section hairline separates them.
-    expect(bar.parentElement?.contains(receipt)).toBe(true)
+    expect(chip?.textContent).toContain('Proven')
+    expect(chip?.textContent).toContain('Ship the turn receipt')
+    expect(chip?.getAttribute('aria-expanded')).toBe('false')
+    expect(document.querySelector('[data-done-panel]')).toBeNull()
+
+    const panel = openPanel(chip as HTMLButtonElement)
+    expect(chip?.getAttribute('aria-expanded')).toBe('true')
+    // The header keeps the chip; the receipt and the statement live in the panel.
+    expect(chip?.querySelector('[data-turn-receipt]')).toBeNull()
+    expect(panel.querySelector('[data-turn-receipt]')).not.toBeNull()
+    expect(panel.textContent).toContain('grader 15/15')
     expect(document.querySelectorAll('[data-turn-receipt]')).toHaveLength(1)
   })
 
   it('joins the contract\'s verdict with the timeline\'s changed paths', () => {
-    renderStrip(
+    const { chip } = renderChip(
       makeDone({ status: 'proven', evidence: 'grader 15/15' }),
       makeTimeline([['src/a.ts', 'src/b.ts']]),
     )
-    // Both halves report the same verdict, and the receipt counts the turn.
-    expect(screen.getAllByText('Proven')).toHaveLength(2)
+    const panel = openPanel(chip as HTMLButtonElement)
+    // Both halves report the same verdict — the chip's own label is outside the
+    // panel, so the record itself carries one pair.
+    expect(within(panel).getAllByText('Proven')).toHaveLength(2)
     expect(screen.getByText('2 files changed')).toBeTruthy()
   })
 
   it('keeps a stated contract NOT_ASSESSED in the receipt', () => {
-    renderStrip(makeDone(), makeTimeline([['src/a.ts']]))
-    expect(screen.getByText('Stated')).toBeTruthy()
-    expect(screen.getByText('NOT_ASSESSED')).toBeTruthy()
-    expect(screen.queryByText('Proven')).toBeNull()
+    const { chip } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    const panel = openPanel(chip as HTMLButtonElement)
+    expect(within(panel).getByText('Stated')).toBeTruthy()
+    expect(within(panel).getByText('NOT_ASSESSED')).toBeTruthy()
+    expect(within(panel).queryByText('Proven')).toBeNull()
   })
 
   it('says so when the binding exposes no chat timeline rather than implying no change', () => {
-    renderStrip(makeDone(), undefined)
+    const { chip } = renderChip(makeDone(), undefined)
+    openPanel(chip as HTMLButtonElement)
     expect(screen.getByText('no record')).toBeTruthy()
     expect(screen.queryByText('1 file changed')).toBeNull()
+  })
+
+  it('closes on Escape and hands focus back to the chip', () => {
+    const { chip } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    const panel = openPanel(chip as HTMLButtonElement)
+    fireEvent.keyDown(panel, { key: 'Escape' })
+    expect(document.querySelector('[data-done-panel]')).toBeNull()
+    expect(document.activeElement).toBe(chip)
+  })
+
+  it('leaves Escape to the editor while the editor is open', () => {
+    const { chip } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    const panel = openPanel(chip as HTMLButtonElement)
+    fireEvent.click(screen.getByLabelText('Amend definition of done'))
+    fireEvent.keyDown(screen.getByLabelText('Definition of done statement'), { key: 'Escape' })
+    // The editor closed and the panel stayed: the chip is still expanded.
+    expect(document.querySelector('[data-done-panel]')).toBe(panel)
+    expect(screen.queryByLabelText('Definition of done statement')).toBeNull()
+  })
+
+  it('closes when the pointer goes down outside the chip and the panel', () => {
+    const { chip } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    openPanel(chip as HTMLButtonElement)
+    fireEvent.pointerDown(document.body)
+    expect(document.querySelector('[data-done-panel]')).toBeNull()
+  })
+
+  it('amends the statement through the injected verb', async () => {
+    const { chip, props } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    openPanel(chip as HTMLButtonElement)
+    fireEvent.click(screen.getByLabelText('Amend definition of done'))
+    const field = screen.getByLabelText('Definition of done statement') as HTMLInputElement
+    expect(field.value).toBe('Ship the turn receipt')
+    fireEvent.change(field, { target: { value: 'Ship the header chip' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    expect(props.setStatement).toHaveBeenCalledWith('Ship the header chip')
+    // The verb is asynchronous, so the editor closes on the resolved call.
+    await vi.waitFor(() => {
+      expect(screen.queryByLabelText('Definition of done statement')).toBeNull()
+    })
+  })
+
+  it('records evidence through the prove verb', () => {
+    const { chip, props } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    openPanel(chip as HTMLButtonElement)
+    fireEvent.click(screen.getByLabelText('Record evidence and mark proven'))
+    const field = screen.getByLabelText('The one line of evidence that met it') as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'ui-done 21/21' } })
+    fireEvent.click(screen.getByLabelText('Save'))
+    expect(props.prove).toHaveBeenCalledWith('ui-done 21/21')
+  })
+
+  it('cancels the editor without running a verb', () => {
+    const { chip, props } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    openPanel(chip as HTMLButtonElement)
+    fireEvent.click(screen.getByLabelText('Amend definition of done'))
+    fireEvent.click(screen.getByLabelText('Cancel'))
+    expect(screen.queryByLabelText('Definition of done statement')).toBeNull()
+    expect(props.setStatement).not.toHaveBeenCalled()
+  })
+
+  it('shows the failure line a rejected verb returns', async () => {
+    const { chip, props } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    vi.mocked(props.prove).mockResolvedValueOnce('command failed (E_DONE)')
+    openPanel(chip as HTMLButtonElement)
+    fireEvent.click(screen.getByLabelText('Record evidence and mark proven'))
+    const field = screen.getByLabelText('The one line of evidence that met it')
+    fireEvent.change(field, { target: { value: 'nope' } })
+    fireEvent.click(screen.getByLabelText('Save'))
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toBe('command failed (E_DONE)')
+  })
+
+  it('clears the contract and closes the panel', async () => {
+    const { chip, props } = renderChip(makeDone(), makeTimeline([['src/a.ts']]))
+    openPanel(chip as HTMLButtonElement)
+    fireEvent.click(screen.getByLabelText('Clear definition of done'))
+    await vi.waitFor(() => {
+      expect(props.clear).toHaveBeenCalled()
+    })
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-done-panel]')).toBeNull()
+    })
+  })
+
+  it('stands on the checkpoint half alone when no contract is stated', () => {
+    const { chip } = renderChip(null, undefined, CHECKPOINTS)
+    expect(chip?.textContent).toContain('Checkpoints')
+    expect(chip?.getAttribute('data-status')).toBe('none')
+    const panel = openPanel(chip as HTMLButtonElement)
+    expect(panel.getAttribute('data-status')).toBe('none')
+    expect(panel.textContent).toContain('Checkpoints')
+    // No contract half, so no receipt and no verbs.
+    expect(panel.querySelector('[data-turn-receipt]')).toBeNull()
+    expect(screen.queryByLabelText('Amend definition of done')).toBeNull()
   })
 })

@@ -92,9 +92,10 @@
   overflow: hidden;
   border: 0;
   border-radius: 12px;
-  background: var(--dsw-specific-menu);
+  background: var(--dsw-glass-surface);
+  backdrop-filter: var(--dsw-glass-filter);
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
-  box-shadow: var(--dsw-elevation-prominent);
+  box-shadow: var(--dsw-glass-elevation);
   /* Only `.body` scrolls; the header remains fixed above it. */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);

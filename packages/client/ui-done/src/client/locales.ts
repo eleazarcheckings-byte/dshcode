@@ -1,4 +1,4 @@
-/** `done` namespace dictionaries (the definition-of-done strip's copy). */
+/** `done` namespace dictionaries (the definition-of-done chip's copy). */
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {

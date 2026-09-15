@@ -23,6 +23,26 @@
 - 高层级表面（菜单、浮层、对话框、面板、悬浮按钮、输入框）设 `border: 0` 并使用 `box-shadow: var(--dsw-elevation-panel)`、`var(--dsw-elevation-prominent)` 或输入框专用的 `var(--dsw-elevation-soft)`（更大模糊、更低透明度）：0.5px 发丝描边是第一层投影，`--dsw-elevation-stroke-color` 可按表面或状态重绑或抑制描边。不得将 `--dsw-alias-border-*` border 与 lv/elevation 投影配对——ui-theme 的 elevation spec 会拒绝；状态色 border（warn 面板）保持真 border。
 - 使用中性 `--dsw-alias-border-*` token 的平面边框与分割线一律 `0.5px`——按钮、输入框、卡片、行分割线，以及以填充盒绘制的分隔线（菜单分隔、对话标题栏接缝、markdown `hr`、竖向轨道线）共用发丝线粗细，Chromium 将其绘制为一个设备像素。dashed 记号与状态色 border 保持 1px；spinner 圆环经 spec 的显式豁免保留原宽度。更宽的中性 solid border 会被 ui-theme elevation spec 拒绝。
 
+<a id="glass-surfaces"></a>
+## 玻璃表面
+
+玻璃是应用为悬浮于内容之上的层级所用的分层材质：克制的半透明填充、背景模糊，以及与高层级表面相同的 0.5px elevation 描边。它绝不是为半透明而半透明的填充——不悬浮的表面保持其平面填充。
+
+这三个 token 只存在于 [`ui-theme` 的 `gradient-shadow-text.css`](../packages/client/ui-theme/src/styles/gradient-shadow-text.css)：`--dsw-glass-surface`（主题的 layer-3 表面、alpha 为 0.72，由同一张也分支线性渐变的样式表按明暗分支）、`--dsw-glass-filter`（`blur(14px) saturate(140%)`）与 `--dsw-glass-elevation`（elevation 描边加两层柔光）。表面通过消费这些 token 来采用该材质——绝不通过声明它们、写入颜色字面量或添加自带引擎前缀的 filter：
+
+```css
+border: 0;
+background: var(--dsw-glass-surface);
+backdrop-filter: var(--dsw-glass-filter);
+box-shadow: var(--dsw-glass-elevation);
+```
+
+`border: 0` 由上面的 elevation 规则推出：玻璃 elevation 以发丝描边开头，因此与它并列的 border 会把轮廓画两遍。ui-theme 的 elevation spec 把 `--dsw-glass-elevation` 计入 elevation 投影，并拒绝与其配对的中性 `--dsw-alias-border-*` border；ui-theme 的 glass spec 拒绝缺少 `--dsw-glass-filter` 的玻璃填充，因为没有 filter 的半透明填充会与未模糊的内容合成。
+
+嵌套在玻璃面板内部、且必须遮住从其下方滚过的内容的表面——例如吸顶的组标签、钉住的行——取不透明的 layer-3 层级色（`--dsw-alias-bg-layer-3`），而不是再叠一层模糊：两层半透明相叠会同时放大开销与糊影，而不透明层级色正是玻璃填充及其降级填充所用的同一色阶，因此读起来仍是一种材质。
+
+减少透明度在 ui-theme 内部解析，因此消费表面不携带自己的回退：`@media (prefers-reduced-transparency: reduce)` 把填充解析为不透明的 layer-3 层级色、把 filter 解析为 `none`，`@supports not (backdrop-filter: blur(1px))` 以同样的方式解析填充，因为不受支持的 filter 会让半透明填充与未模糊的内容合成。两条路径都保持 `--dsw-glass-elevation` 不变，因此要求减少透明度的读者失去的是半透明与模糊，而不是表面。若某个表面自身的样式表必须在没有自定义属性的引擎上存活，它仍可以写一个不透明的 `var()` 回退，例如 `var(--dsw-glass-surface, var(--dsw-specific-menu))`。
+
 ## 变更系统
 
 在所属 `ui-theme` 样式表中添加或修改共享 token，然后在功能包中使用其语义别名。公共样式约定发生变化时，更新所属包的参考文档。视觉行为遵循[测试策略](testing.zh.md)；[样式系统 Agent Note](../.agents/notes/implemented/process/2026-07-19-web-styling-system.zh.md) 记录框架依据。

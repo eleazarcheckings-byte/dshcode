@@ -17,6 +17,14 @@ body {
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l4);
   /* blur filter */
   --dsw-mask-blur: blur(2px);
+  /* Glass material. The fill is the layer-3 surface at reduced alpha, so a
+     glass panel composites with the blurred content behind it instead of
+     replacing it; the dark counterpart below reads the dark layer-3 step. The
+     opaque forms declared under the fallback rules at the end of this sheet are
+     the same surface at full alpha: glass falls back to the flat layer-3 fill,
+     never to a washed-out translucent one. */
+  --dsw-glass-surface: rgba(255, 255, 255, 0.72);
+  --dsw-glass-filter: blur(14px) saturate(140%);
 }
 
 /* 派生 elevation 值逐元素声明而非从 body 继承：继承传下来的是在 body 上就
@@ -32,11 +40,42 @@ body * {
     var(--dsw-elevation-stroke), 0 3px 8px 0 rgba(0, 0, 0, 0.04), 0 0 20px 0 rgba(0, 0, 0, 0.05);
   --dsw-elevation-soft:
     var(--dsw-elevation-stroke), 0 4px 16px 0 rgba(0, 0, 0, 0.03), 0 0 24px 0 rgba(0, 0, 0, 0.03);
+  --dsw-glass-elevation:
+    var(--dsw-elevation-stroke), 0 6px 20px 0 rgba(0, 0, 0, 0.06), 0 0 16px 0 rgba(0, 0, 0, 0.02);
 }
 
 body[data-ds-dark-theme] {
   --dsw-linear-gradient-think: linear-gradient(180deg, #151517 20.19%, rgba(21, 21, 23, 0) 100%);
   --dsw-linear-think-select: linear-gradient(180deg, #232325 20.19%, rgba(35, 35, 37, 0) 100%);
+  /* Dark glass fill: the dark layer-3 step at the same alpha as the light one. */
+  --dsw-glass-surface: rgba(53, 54, 56, 0.72);
+}
+
+/* Glass fallbacks. Both keep the surface and drop only what the reader asked
+   to drop: the translucent fill resolves to its opaque layer-3 counterpart and
+   the blur to none, while --dsw-glass-elevation (the stroke plus soft layers)
+   stays exactly as declared, so a glass panel keeps its outline and separation.
+   The dark overrides repeat the dark selector on purpose — a bare `body`
+   override loses to the `body[data-ds-dark-theme]` fill above. */
+@media (prefers-reduced-transparency: reduce) {
+  body {
+    --dsw-glass-surface: var(--dsw-static-neutral-bluish-00);
+    --dsw-glass-filter: none;
+  }
+  body[data-ds-dark-theme] {
+    --dsw-glass-surface: var(--dsw-static-neutral-bluish-800);
+  }
+}
+
+/* Without backdrop-filter support the fill would composite with unblurred
+   content behind it, so the surface falls back to the opaque fill as well. */
+@supports not (backdrop-filter: blur(1px)) {
+  body {
+    --dsw-glass-surface: var(--dsw-static-neutral-bluish-00);
+  }
+  body[data-ds-dark-theme] {
+    --dsw-glass-surface: var(--dsw-static-neutral-bluish-800);
+  }
 }
 
 /* ---------- 字体 ---------- */
