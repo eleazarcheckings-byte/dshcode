@@ -64,6 +64,12 @@ The roster shows every member with its role (`lead` or `teammate`) and current s
 
 Only the Lead can create teammates or interrupt them.
 
+### Isolated teammates
+
+A teammate works in the Lead's own directory by default, where its edits are visible to everyone the moment they land. Ask for `worktree` isolation instead when the work rewrites files other members are reading: the teammate gets a private checkout of the current commit under `<DSH_HOME>/worktrees`, its edits stay invisible until they are merged, and the Lead's own edits stay invisible to it. This needs a git repository with at least one commit; a workspace that cannot host a checkout refuses the request before anything is recorded, leaving the name free.
+
+Merging is the way back, and the only one. It reports every file in the teammate's diff, refuses the whole diff when another member holds a claim on any of those files — naming each blocked path and its holder — and otherwise applies the patch whole. A checkout is removed when the Team runtime disposes.
+
 ### Messages between teammates
 
 Any member can send a message to any other member or to the Lead. A live member receives it immediately; an offline member's messages queue and arrive when it resumes. Messages are never lost and never delivered twice.
@@ -193,7 +199,9 @@ Peer messages append after the target's reusable history prefix. Cold resume reu
 These limits describe what a team cannot do yet or what needs special operational care. They are current package constraints, not a comparison with other coordination mechanisms.
 
 - **Process-local coordination only** — every Team guarantee is retry plus de-duplication inside one process; a team cannot span two harness processes or two checkouts.
-- **One process and one shared checkout** — members share cwd and observe edits immediately; this package provides no worktree, remote member, merge, or filesystem lock.
+- **One process, one repository** — members share a harness process and a repository; a teammate can take a private checkout of that repository, but a team cannot span two harness processes or two repositories.
+- **Merge is manual and whole-diff** — an isolated teammate's work reaches the Lead only when the Lead merges it, and a merge that any claim refuses applies nothing rather than part of the diff.
+- **Orphaned checkouts after an abrupt exit** — a process that dies without disposing its Team leaves its checkouts under the harness home; their paths stay on the durable roster.
 - **Advisory write scopes** — Bash, formatters, code generators, and direct external writers can bypass filesystem version checks; Leads must coordinate ownership and review the final diff.
 - **Flat immutable roster** — only the Lead creates direct teammates; there is no nested Team, rename, deletion, or name reuse.
 - **No automatic ownership release** — idle, interruption, process exit, and failed work do not release a task owner.

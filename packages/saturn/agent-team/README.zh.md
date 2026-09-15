@@ -64,6 +64,12 @@ roster 显示每个成员的职责（`lead` 或 `teammate`）与当前状态：`
 
 只有 Lead 可以创建 teammate 或中断它们。
 
+### 隔离的 teammate
+
+teammate 默认在 Lead 自己的目录中工作，其改动一旦落盘即对所有人可见。当工作会重写其他成员正在读取的文件时，请改用 `worktree` 隔离：teammate 会在 `<DSH_HOME>/worktrees` 下获得当前提交的私有检出，其改动在被 merge 之前对外不可见，Lead 自己的改动对它同样不可见。这需要一个至少有一次提交的 git 仓库；无法承载检出的 workspace 会在记录任何内容之前拒绝该请求，名字因此仍然可用。
+
+merge 是回程，而且是唯一的回程。它会报告 teammate diff 中的每个文件；若其中任何文件被别的成员 claim 占有，则拒绝整个 diff，并指名每个被阻断的路径及其持有者；否则整体应用补丁。检出会在 Team 运行时释放时删除。
+
 ### teammate 之间的消息
 
 任何成员都可以向任何其他成员或 Lead 发送消息。live 成员会立即收到；离线成员的消息会排队，并在其恢复后到达。消息不会丢失，也绝不会重复投递。
@@ -193,7 +199,9 @@ Peer 消息追加在 target 可复用历史前缀之后。冷恢复会先复用�
 这些限制说明一支团队目前不能做什么、或何时需要特别运维。它们是当前包约束，不是与其他协作机制的对比。
 
 - **仅限进程内协作**——所有 Team 保证都只是单进程内的 retry 加去重；一支团队无法跨越两个 harness 进程或两个 checkout。
-- **单进程、共享 checkout**——成员共享 cwd，修改立即可见；本包不提供 worktree、远端成员、merge 或文件锁。
+- **单进程、单仓库** — 成员共享一个 harness 进程与一个仓库；teammate 可以取得该仓库的私有检出，但 team 无法跨两个 harness 进程或两个仓库。
+- **merge 是手动且整体的** — 被隔离 teammate 的工作只有在 Lead 执行 merge 时才会抵达；被任何 claim 拒绝的 merge 不会应用 diff 的任何一部分。
+- **异常退出会留下孤立检出** — 未释放 Team 即退出的进程会把其检出留在 harness home 下；它们的路径保留在持久 roster 上。
 - **write scope 仅作提示**——Bash、formatter、代码生成器与直接外部写入可以绕过文件版本检查；Lead 必须协调 owner 并检查最终 diff。
 - **扁平且不可变的 roster**——只有 Lead 可以创建直接 teammate；不支持嵌套 Team、重命名、删除或名字复用。
 - **不会自动释放 owner**——idle、interrupt、进程退出与工作失败都不会释放任务 owner。

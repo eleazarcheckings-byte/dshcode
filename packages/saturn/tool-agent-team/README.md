@@ -56,7 +56,8 @@ Try it by asking the Lead model: "create a teammate named reviewer to check the 
 
 The ten tools group into four capabilities:
 
-- **Create a teammate** — `spawn_teammate` takes a name, a description, and the initial task; only the Lead can call it.
+- **Create a teammate** — `spawn_teammate` takes a name, a description, the initial task, and optionally `isolation`; only the Lead can call it. `isolation: worktree` gives the teammate a private checkout of the current commit instead of the Lead's directory.
+- **Merge an isolated teammate** — `merge_teammate` reports every file in that teammate's diff and applies the whole diff, or none of it when another member's claim owns one of those files. A refusal arrives as a failed call naming each blocked path and its holder, because a denial the model reads as an ordinary result is a denial it will act as though it never got.
 - **Send messages** — `send_message` delivers information without waking an idle teammate; `followup_task` makes the message the recipient's next turn and wakes it when needed.
 - **See and wait** — `list_agents` shows the roster with live status; `wait_agent` waits for the next team change; `interrupt_agent` stops a teammate's current turn (Lead only).
 - **Manage the task board** — `team_task_create`, `team_task_list`, `team_task_get`, and `team_task_update` add, browse, read, and update shared tasks.
@@ -125,7 +126,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 #### What the model sees
 
-One stable policy section states the exact Team role/name/id, the session multi-task policy, shared-cwd behavior, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, quiet versus waking delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. The ten Team schemas from `spawn_teammate` through `team_task_update` appear only in Team member scopes.
+One stable policy section states the exact Team role/name/id, the session multi-task policy, shared-cwd behavior, when to reach for an isolated checkout and how its work comes back, filesystem stale-version recovery, Bash/formatter/codegen risk, task and write-scope coordination, quiet versus waking delivery, the no-retry mailbox rule, and the Lead's duty to wait before answering. The ten Team schemas from `spawn_teammate` through `team_task_update` appear only in Team member scopes.
 
 #### Token effect
 
