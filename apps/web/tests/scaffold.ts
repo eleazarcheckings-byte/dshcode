@@ -651,7 +651,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
         op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION,
       }])
     }
-    if (options.firstLightPending !== true) {
+    if (options.firstLightPending !== true
+      && ctx.settings.describe().some(namespace => namespace.ns === FIRST_LIGHT_SETTINGS_NAMESPACE)) {
       await ctx.settings.mutate(FIRST_LIGHT_SETTINGS_NAMESPACE, [{
         op: 'set', path: [FIRST_LIGHT_COMPLETE_FIELD], value: FIRST_LIGHT_VERSION,
       }])
