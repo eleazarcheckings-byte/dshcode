@@ -6,9 +6,72 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { NS } from './locales.ts'
 
+/**
+ * One credential the runtime resolved (or did not) for the current configuration
+ * (SPEC "SaturnBot snapshot" contract, C8a -> C8b). Local mirror: C8a has not shipped
+ * this field on `BotSnapshot` yet, so it stays optional here and the orchestrator
+ * reconciles any drift once the runtime's own type carries it.
+ */
+export interface SaturnBotFirstRunCredential {
+  readonly name: string
+  readonly env: string
+  readonly present: boolean
+}
+
+/**
+ * First-run guidance the wizard uses to resume at the right step and to explain
+ * what is missing (SPEC §3 C8a item 7). Optional on `BotSnapshot` for the same
+ * reason as `SaturnBotFirstRunCredential`.
+ */
+export interface SaturnBotFirstRun {
+  readonly goal: string
+  readonly workspace: string
+  readonly provider: string
+  readonly credentials: readonly SaturnBotFirstRunCredential[]
+  /**
+   * Path a resolved credential's value should be pasted into (e.g. `<dataDirectory>/.env`).
+   * Not named in the SPEC §4 contract; until C8a's snapshot carries it, the connect
+   * forms fall back to naming only the environment variable (see `connect.envHint`
+   * in locales.ts). Declared as a deviation in the Agent Note.
+   */
+  readonly envPath?: string
+}
+
+/** One BotConfig.integrations field key the runtime's fixed integration record admits. */
+export type SaturnBotIntegrationFieldKey = 'endpoint' | 'credentialEnv' | 'resource'
+
+/** One field of a generated connect form (SPEC §3 C8a item 7 / §3 C8b). */
+export interface SaturnBotIntegrationField {
+  readonly key: SaturnBotIntegrationFieldKey
+  readonly label: string
+  /** Secret fields never carry an editable value; only the required env var name is shown. */
+  readonly secret: boolean
+  /** Environment variable name to set (meaningful, non-empty, only when `secret`). */
+  readonly env: string
+}
+
+/** One integration's generated connect form (matches a `BotConfig.integrations` key). */
+export interface SaturnBotIntegrationCatalogEntry {
+  readonly name: string
+  readonly label: string
+  readonly fields: readonly SaturnBotIntegrationField[]
+  readonly docsUrl: string
+}
+
+/**
+ * `BotSnapshot` as SPEC §3 C8a item 7 extends it. Both members stay optional: this
+ * package is coded against the documented shape ahead of C8a landing it, and older
+ * snapshots (or a snapshot from a harness build predating C8a) simply omit them —
+ * every reader in this package degrades to the pre-wizard behavior in that case.
+ */
+export type SaturnBotSnapshot = BotSnapshot & {
+  readonly firstRun?: SaturnBotFirstRun
+  readonly integrationCatalog?: readonly SaturnBotIntegrationCatalogEntry[]
+}
+
 /** Latest server projection and transport presentation state. */
 export interface SaturnBotViewState {
-  readonly snapshot: BotSnapshot | null
+  readonly snapshot: SaturnBotSnapshot | null
   readonly events: readonly BotEvent[]
   readonly loading: boolean
   readonly error: string | null

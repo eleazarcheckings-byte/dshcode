@@ -27,14 +27,27 @@ The controller serializes mutations and refreshes, shares overlapping refresh re
 
 Settings submit an explicit configuration draft: workspace, business goal, model/provider IDs, schedule, action policy, per-role instructions and exact tool allowlists, command limits, validation command arrays, and integration environment-variable references. The Host owns validation, permitted tools, scheduling, persistence, and execution. First-run actions open configuration until the required setup exists.
 
+## Guided setup, connect forms, and the status strip
+
+Settings opens a five-step guided setup (objective, workspace, model, connections, schedule) whenever the runtime reports `needs-setup`, resuming at the first field the Host has not filled in; each Continue persists only that step, so closing mid-setup keeps progress. A status strip states exactly what still blocks a run — a blank required field, or a credential the Host could not resolve — or states plainly that SaturnBot can run. Either surface links back to advanced configuration and back again.
+
+Connections are field-level forms generated from the Host's integration catalog, one per integration: an ordinary text input for a non-secret field (a repository slug, an endpoint URL), and for a secret field only the exact required environment variable name with a copy action and the file to paste it into — never an input a secret value could be typed into. An "Advanced JSON" disclosure keeps the raw integrations object reachable underneath the generated forms.
+
+This package is coded against the `firstRun`/`integrationCatalog` snapshot fields ahead of the Host runtime package (`@saturnai/dsh-saturnbot`) landing them, through a local widened type (`SaturnBotSnapshot` in `contracts.ts`) that keeps both members optional. Every reader in this package degrades to the pre-wizard behavior — the status strip falls back to the four config-derived checks, and connect forms show their empty state — when a snapshot omits them, so the two packages can land in either order.
+
 ## Model Experience
 
 This package creates no model sessions or prompts. Its message command sends the selected role and the operator's text to the SaturnBot Host. Published proposals, outcomes, and digests come from durable Host records. It introduces no synthetic activity, success metrics, unread counts, or screen feed.
 
 ## Known Limitations and Deferred Work
 
-This surface manages one configured workspace instance. It does not implement multi-tenant billing or account isolation. The recent tool journal is bounded at 1,000 records, while the Host supplies bounded run/message/report history. Full journal export and older-message pagination are not exposed here. Connection configuration indicates presence, not a health probe. Message drafts are local to the open window and are not durable across closing it. Desktop popup admission and native window behavior belong to the desktop package.
+- This surface manages one configured workspace instance. It does not implement multi-tenant billing or account isolation.
+- The recent tool journal is bounded at 1,000 records, while the Host supplies bounded run/message/report history. Full journal export and older-message pagination are not exposed here.
+- Connection configuration indicates presence, not a health probe. Message drafts are local to the open window and are not durable across closing it. Desktop popup admission and native window behavior belong to the desktop package.
+- The guided setup's model step offers a static, keyless list of common provider identifiers as quick picks; it is not a live query against the harness's configured-provider directory (`@saturnai/dsh-model-router`), so the field stays freeform and never blocks an unlisted provider.
+- The connect form's `.env` path hint falls back to generic copy when a snapshot's `firstRun` omits `envPath` — the SPEC's documented snapshot contract does not name this field; wiring it through is a small follow-up on the Host side.
+- The workspace step reuses the existing harness workspace list rather than opening a separate native file-system picker dialog.
 
-## Dev Note
+### Dev Note
 
-Run `pnpm exec vitest run packages/client/ui-saturnbot/tests --maxWorkers=2` for messenger, approval, record, controller-ordering, window-lifecycle, and canvas checks. Run `pnpm exec tsc -p packages/client/ui-saturnbot --noEmit` after the generated Host Remote is built. The dictionaries own English and Simplified Chinese product copy; the UI i18n gate reports no hard-coded strings in this package. Build and native/browser smoke validation use the assembled application.
+Run `pnpm exec vitest run packages/client/ui-saturnbot/tests --maxWorkers=2` for messenger, approval, record, controller-ordering, window-lifecycle, canvas, guided-setup, connect-form, and status-strip checks. Run `pnpm exec tsc -p packages/client/ui-saturnbot --noEmit` after the generated Host Remote is built. The dictionaries own English and Simplified Chinese product copy; the UI i18n gate reports no hard-coded strings in this package. Build and native/browser smoke validation use the assembled application.

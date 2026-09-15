@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import type {} from '../src/client/mount.ts'
 import type { BotBranch, BotConfig, BotId, BotSnapshot } from '@saturnai/dsh-saturnbot/client'
-import type { SaturnBotActions, SaturnBotViewState } from '../src/client/contracts.ts'
+import type { SaturnBotActions, SaturnBotFirstRun, SaturnBotIntegrationCatalogEntry, SaturnBotSnapshot, SaturnBotViewState } from '../src/client/contracts.ts'
 
 export const at = '2026-09-14T12:00:00.000Z'
 export const id = (value: string): BotId => value as BotId
@@ -29,6 +29,26 @@ export function snapshot(patch: Partial<BotSnapshot> = {}): BotSnapshot {
     config, status: 'disabled', activeCycle: null, cycles: [], approvals: [], reports: [], alerts: [], cursor: 0,
     nextRunAt: null, tools: [], messages: [], connections: [], ...patch,
   }
+}
+export const integrationCatalog: SaturnBotIntegrationCatalogEntry[] = [
+  { name: 'github', label: 'GitHub', docsUrl: 'https://docs.github.com/rest', fields: [
+    { key: 'resource', label: 'Repository (owner/name)', secret: false, env: '' },
+    { key: 'credentialEnv', label: 'Personal access token', secret: true, env: 'SATURN_GITHUB_TOKEN' },
+  ] },
+  { name: 'stripe', label: 'Stripe', docsUrl: 'https://stripe.com/docs/api', fields: [
+    { key: 'credentialEnv', label: 'Secret key', secret: true, env: 'SATURN_STRIPE_KEY' },
+  ] },
+]
+export const firstRun: SaturnBotFirstRun = {
+  goal: '', workspace: '', provider: '', envPath: 'C:/Users/izzy/.dsh/saturnbot/.env',
+  credentials: [
+    { name: 'GitHub', env: 'SATURN_GITHUB_TOKEN', present: false },
+    { name: 'Stripe', env: 'SATURN_STRIPE_KEY', present: true },
+  ],
+}
+/** A snapshot widened with the C8a wizard fields, seeded from the plain `snapshot()` fixture. */
+export function wizardSnapshot(patch: Partial<SaturnBotSnapshot> = {}): SaturnBotSnapshot {
+  return { ...snapshot(), firstRun, integrationCatalog, ...patch }
 }
 export function state(value = snapshot()): SaturnBotViewState {
   return { snapshot: value, events: [], loading: false, error: null, memory: [], tickets: [], webhooks: [], recordsLoading: false }

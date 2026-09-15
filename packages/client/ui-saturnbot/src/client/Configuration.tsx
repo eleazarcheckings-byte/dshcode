@@ -2,7 +2,9 @@
 import { useState, type FormEvent } from 'react'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { BotConfig, BotRole, BotSnapshot } from '@saturnai/dsh-saturnbot/client'
+import type { SaturnBotSnapshot } from './contracts.ts'
 import { Avatar } from './Avatar.tsx'
+import { IntegrationConnectForms, safeParseIntegrations } from './ConnectForms.tsx'
 import { PanelHeading, Status, type BotTranslate } from './ui.tsx'
 import css from './Dashboard.module.css'
 
@@ -29,7 +31,7 @@ export function parseAdvanced(commandsText: string, integrationsText: string): P
 
 /** User-edited draft state stays local until one configure command succeeds. */
 export function Configuration({ snapshot, workspaces, save, busy, t }: {
-  snapshot: BotSnapshot
+  snapshot: SaturnBotSnapshot
   workspaces: readonly WorkspaceView[]
   save: (patch: Partial<BotConfig>) => Promise<void>
   busy: boolean
@@ -67,12 +69,23 @@ export function Configuration({ snapshot, workspaces, save, busy, t }: {
     <section className={css.panel}><PanelHeading title={t('settings.policy')} />
       {([['requireWriteApproval', 'settings.writeApproval'], ['requirePrApproval', 'settings.prApproval'], ['requireDeployApproval', 'settings.deployApproval'], ['autoDispatchEmail', 'settings.emailDispatch']] as const).map(([key, label]) => <label key={key} className={css.check}><input type="checkbox" checked={draft[key]} onChange={(event) => { update(key, event.target.checked) }} />{t(label)}</label>)}
     </section>
+    <section className={css.panel}><PanelHeading title={t('nav.connections')} /><p className={css.muted}>{t('wizard.step.connections.detail')}</p>
+      <IntegrationConnectForms
+        catalog={snapshot.integrationCatalog ?? []}
+        values={safeParseIntegrations(integrations)}
+        onChange={(next) => { setIntegrations(JSON.stringify(next, null, 2)); setSaved(false) }}
+        envPath={snapshot.firstRun?.envPath}
+        t={t}
+      />
+      <details className={css.disclosure}><summary>{t('connect.advancedJson')}</summary>
+        <label className={css.field}>{t('settings.integrations')}<textarea className={css.codeInput} rows={6} value={integrations} onChange={(event) => { setIntegrations(event.target.value); setSaved(false) }} /><small>{t('settings.integrationsHint')}</small></label>
+      </details>
+    </section>
     <details className={css.panel}><summary className={css.configSummary}>{t('settings.advanced')}</summary><div className={css.formGrid}>
       {([['maxTasks', 'settings.maxTasks'], ['maxActionsPerTask', 'settings.maxActions'], ['toolTimeoutMs', 'settings.toolTimeout'], ['modelTimeoutMs', 'settings.modelTimeout'], ['maxInputBytes', 'settings.maxInput'], ['maxOutputTokens', 'settings.maxOutput']] as const).map(([key, label]) => <label key={key} className={css.field}>{t(label)}<input type="number" min="1" value={key.endsWith('Ms') ? draft[key] / 1000 : draft[key]} onChange={(event) => { update(key, event.target.valueAsNumber * (key.endsWith('Ms') ? 1000 : 1)) }} required /></label>)}
     </div>
     <label className={css.field}>{t('settings.tools')}<textarea className={css.codeInput} rows={5} value={draft.allowedTools.join('\n')} onChange={(event) => { update('allowedTools', [...new Set(event.target.value.split('\n').map(name => name.trim()).filter(Boolean))]) }} /><small>{t('settings.toolsHint')}</small></label>
     <label className={css.field}>{t('settings.validation')}<textarea className={css.codeInput} rows={4} value={commands} onChange={(event) => { setCommands(event.target.value); setSaved(false) }} /><small>{t('settings.validationHint')}</small></label>
-    <label className={css.field}>{t('settings.integrations')}<textarea className={css.codeInput} rows={6} value={integrations} onChange={(event) => { setIntegrations(event.target.value); setSaved(false) }} /><small>{t('settings.integrationsHint')}</small></label>
     </details>
     {error && <p className={css.error} role="alert">{error}</p>}{saved && <p role="status" className={css.success}>{t('state.saved')}</p>}
     <div className={css.formFooter}><button type="submit" disabled={busy} className={css.primary}>{busy ? t('action.saving') : t('action.save')}</button></div>

@@ -230,3 +230,21 @@
 
 .memorySearch { display: flex; gap: 8px; margin-bottom: 15px; }
 .memorySearch input { flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid var(--saturn-stroke-strong); border-radius: 8px; background: var(--saturn-void); color: var(--saturn-ink); }
+
+.statusStrip { display: flex; flex-direction: column; gap: 8px; max-width: 760px; margin-bottom: 20px; padding: 15px 18px; border: 1px solid var(--saturn-stroke); border-radius: 12px; background: var(--saturn-surface); }
+.statusStrip[data-state='ready'] { border-color: color-mix(in srgb, var(--dsw-static-green-400) 30%, var(--saturn-stroke)); }
+.statusStrip[data-state='ready'] .eyebrow { color: var(--dsw-static-green-400); }
+.statusStrip p { margin: 0; }
+.statusGapList { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.statusGapList li { font-size: 12px; line-height: 19px; }
+.statusGapList button { padding: 0; border: 0; background: transparent; color: var(--saturn-ink); font-size: 12px !important; text-align: left; text-decoration: underline; text-decoration-color: var(--saturn-stroke-strong); text-underline-offset: 3px; cursor: pointer; }
+.statusGapList button:hover { color: var(--saturn-accent, var(--saturn-ink)); }
+.wizardSteps { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 4px; padding: 0; list-style: none; }
+.wizardStepButton { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px 7px 8px; border: 1px solid var(--saturn-stroke); border-radius: 999px; background: transparent; color: var(--saturn-muted); font-size: 11px !important; cursor: pointer; }
+.wizardStepButton:hover { border-color: var(--saturn-stroke-strong); color: var(--saturn-ink); }
+.wizardStepButton[aria-current] { border-color: color-mix(in srgb, var(--saturn-accent, var(--saturn-ink)) 45%, transparent); color: var(--saturn-ink); background: color-mix(in srgb, var(--saturn-accent, var(--saturn-ink)) 6%, transparent); }
+.wizardStepNumber { display: inline-grid; width: 16px; height: 16px; place-items: center; border-radius: 50%; corner-shape: round; background: var(--saturn-stroke-strong); color: var(--saturn-void); font-family: var(--ds-font-family-code); font-size: 9px; }
+.wizardStepButton[aria-current] .wizardStepNumber { background: var(--saturn-accent, var(--saturn-ink)); }
+.envRow { display: flex; align-items: center; gap: 10px; }
+.envRow code { flex: 1; min-width: 0; overflow-wrap: anywhere; padding: 9px 11px; border: 1px solid var(--saturn-stroke); border-radius: 8px; background: var(--saturn-void); }
+.envRow button { flex: none; padding: 0; border: 0; background: transparent; color: var(--saturn-accent, var(--saturn-ink)); font-size: 10px !important; cursor: pointer; }

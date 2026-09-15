@@ -7,6 +7,8 @@ import { Avatar } from './Avatar.tsx'
 import { Configuration, Connections, RoleConfiguration } from './Configuration.tsx'
 import { Activity, Approvals, Memory, ReportBody, Runs } from './History.tsx'
 import { ExecutionCanvas } from './ExecutionCanvas.tsx'
+import { StatusStrip } from './StatusStrip.tsx'
+import { FirstRunWizard, type SaturnBotWizardStep } from './Wizard.tsx'
 import { allCycles, BranchCard, Empty, PanelHeading, Status, timeLabel, type BotTranslate } from './ui.tsx'
 import css from './Dashboard.module.css'
 
@@ -46,6 +48,8 @@ export function Dashboard({ state, workspaces, actions, t }: DashboardProps) {
   const [error, setError] = useState<string | null>(null)
   const [inspector, setInspector] = useState(() => window.innerWidth >= 1100)
   const [visualizationMotion, setVisualizationMotion] = useState(true)
+  const [wizardOverride, setWizardOverride] = useState<boolean | null>(null)
+  const [wizardStep, setWizardStep] = useState<SaturnBotWizardStep | undefined>(undefined)
   const timeline = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
   const composer = useRef<HTMLTextAreaElement>(null)
@@ -80,6 +84,8 @@ export function Dashboard({ state, workspaces, actions, t }: DashboardProps) {
   const running = snapshot !== null && snapshot.activeCycle !== null
   const configured = snapshot !== null && snapshot.config.workspace !== '' && snapshot.config.provider !== '' && snapshot.config.model !== ''
   const readyToSchedule = configured && snapshot.config.goal.trim() !== '' && snapshot.status !== 'needs-setup'
+  const wizardActive = wizardOverride ?? (snapshot !== null && snapshot.status === 'needs-setup')
+  const goToWizardStep = (step: SaturnBotWizardStep): void => { setWizardOverride(true); setWizardStep(step); setSurface('settings') }
   const canSend = configured && !running && busy === null && draft.trim() !== '' && snapshot.config.roles[role].enabled
   const submit = (event?: FormEvent): void => {
     event?.preventDefault()
@@ -134,7 +140,15 @@ export function Dashboard({ state, workspaces, actions, t }: DashboardProps) {
         {surface === 'runs' && <><Runs snapshot={snapshot} events={state.events} t={t} /><button className={css.linkButton} disabled={busy !== null} onClick={() => { execute('events', actions.loadMoreEvents) }}>{t('action.loadMore')}</button></>}
         {surface === 'memory' && <Memory snapshot={snapshot} records={state} search={(query) => { execute('records', () => actions.loadRecords(query)) }} t={t} />}
         {surface === 'approvals' && <Approvals snapshot={snapshot} busy={busy !== null} decide={(id, allowed) => { execute(`approval:${id}`, () => actions.approve(id, allowed)) }} t={t} />}
-        {surface === 'settings' && <Configuration snapshot={snapshot} workspaces={workspaces} save={save} busy={busy !== null} t={t} />}
+        {surface === 'settings' && <div className={css.pageStack}>
+          <StatusStrip snapshot={snapshot} t={t} onFix={goToWizardStep} />
+          {wizardActive
+            ? <FirstRunWizard key={wizardStep ?? 'resume'} snapshot={snapshot} workspaces={workspaces} save={save} busy={busy !== null} t={t} initialStep={wizardStep} onExit={() => { setWizardOverride(false); setWizardStep(undefined) }} />
+            : <>
+              <Configuration snapshot={snapshot} workspaces={workspaces} save={save} busy={busy !== null} t={t} />
+              <button type="button" className={css.linkButton} onClick={() => { setWizardOverride(true); setWizardStep(undefined) }}>{t('wizard.restart')}</button>
+            </>}
+        </div>}
         {surface === 'agents' && <RoleConfiguration key={role} role={role} snapshot={snapshot} save={save} busy={busy !== null} t={t} />}
         {surface === 'connections' && <Connections snapshot={snapshot} t={t} />}
       </div>}
