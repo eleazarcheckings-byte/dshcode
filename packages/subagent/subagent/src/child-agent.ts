@@ -130,20 +130,30 @@ export function resolveChildAgentOptions(
  * makes a child's history reconstructable: without it a cold read of the child
  * resolves the deployment default and rebuilds turns under a tool set the
  * child never had.
+ * The workspace is the parent's unless the caller names one. A caller that
+ * names one owns a directory the child is meant to work in instead of the
+ * parent's — an isolated checkout, for instance — and the child's durable
+ * header is the only place that choice survives, because every workspace-aware
+ * tool reads it back from there rather than from the delegating call. Omitting
+ * it, or passing an empty string, keeps the inherited workspace, so no existing
+ * caller changes behavior.
  * @param parent - the delegating parent agent.
  * @param childDepth - the resolved delegation depth to persist.
  * @param isSeeded - whether this child inherits a parent-log prefix, including an explicitly empty one.
+ * @param cwd - optional absolute workspace for the child, overriding the parent's.
  * @returns the `meta` for `ctx.agents.create()`.
  */
 export function childSessionMeta(
   parent: Agent,
   childDepth: number,
   isSeeded: boolean,
+  cwd?: string,
 ): NonNullable<CreateAgentOptions['meta']> {
   const parentHeader = parent.session.header
   const agentPreset = parent.ctx.get('agentPresets')?.composedPreset(parent.ctx)
+  const workspace = cwd === undefined || cwd === '' ? parentHeader.cwd : cwd
   return {
-    ...parentHeader.cwd !== undefined ? { cwd: parentHeader.cwd } : {},
+    ...workspace !== undefined ? { cwd: workspace } : {},
     ...agentPreset === undefined ? {} : { agentPreset },
     parentSession: parentHeader.id,
     isSeeded,

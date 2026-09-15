@@ -46,9 +46,15 @@ import {
 } from './ledger.ts'
 import type { Claim, ClaimBaseline, ClaimLedger, ClaimView, ScopeConflict } from './types.ts'
 import { claimStore, statIdentity, type ClaimStore } from './store.ts'
+import { ClaimsAccess } from './service.ts'
+import { installShellGuard } from './shell-guard.ts'
+import { claimWorkspace } from './workspace.ts'
 import { canonicalConflicts, installWriteGuard } from './write-guard.ts'
 
 export type { Claim, ClaimBaseline, ClaimLedger, ClaimView, DriftFinding, ScopeConflict } from './types.ts'
+export type { ClaimCheckRequest, ClaimPathConflict } from './service.ts'
+export { ClaimsAccess } from './service.ts'
+export { claimWorkspace, resetClaimWorkspaces } from './workspace.ts'
 export { DEFAULT_TTL_MS, MAX_TTL_MS, MIN_TTL_MS, ROOT_SCOPE } from './ledger.ts'
 export { CLAIM_STORE_DIR, workspaceKey } from './store.ts'
 
@@ -82,7 +88,8 @@ const POLICY = [
   '2. IMMEDIATELY BEFORE EACH WRITE BURST, call claim_check on your claim. If it reports a file as moved, that file changed since the ledger last observed it: re-read it and rebase before writing. Never write a buffer you read minutes ago.',
   '3. RELEASE YOUR CLAIM with release_scope the moment your unit verifies. Claims also lapse on their own when the lease expires (two hours by default), so an abandoned lane frees itself without a human.',
   '4. ONE WRITER PER SURFACE. If you and another agent both need a file, the second should ask the first to hand the surface over. There is no shared write, and a scope you did not claim is not yours.',
-  '5. First-party write, edit, and str_replace_editor calls cannot modify another session\'s active claimed scope. Shell commands, formatters, code generators, and external editors need explicit coordination; never use them to bypass a denied write. Preserve the user\'s commit and review preferences.',
+  '5. First-party write, edit, and str_replace_editor calls cannot modify another session\'s active claimed scope, and neither can a bash, pwsh, and terminal command whose arguments name a claimed file: a redirection target, or an operand of rm, mv, cp, sed -i, Set-Content, Remove-Item and their kin, is checked against the ledger before the command runs. What the arguments cannot show, this cannot guard — a formatter, a code generator, or a build script that writes files still needs explicit coordination, and is never a way around a denied write. Preserve the user\'s commit and review preferences.',
+  '6. A claim names a surface in the REPOSITORY, not only in your own checkout. Every linked git worktree of one repository shares one ledger, so an isolated teammate still coordinates with everyone else through the same lanes.',
 ].join('\n')
 
 /** One canonical output schema with compact model-facing JSON. */
@@ -130,7 +137,9 @@ const DRIFT_SCHEMA = {
 /** Mount enforced workspace claims: the ledger tools and the standing policy. */
 export function apply(ctx: Context): void {
   const store = claimStore()
+  new ClaimsAccess(ctx, store)
   installWriteGuard(ctx, store)
+  installShellGuard(ctx, store)
 
   ctx.systemPrompt.section({
     name: CLAIMS_SECTION,
@@ -165,7 +174,7 @@ export function apply(ctx: Context): void {
     } as const),
     async execute(args, exec) {
       const now = Date.now()
-      const workspace = workspaceOf(exec)
+      const workspace = await workspaceOf(exec)
       const sessionId = sessionIdOf(exec)
       const lane = checkedText(args.lane, 'lane', MAX_LANE)
       const holder = args.holder === undefined
@@ -220,7 +229,7 @@ export function apply(ctx: Context): void {
     } as const),
     async execute(args, exec) {
       const now = Date.now()
-      const workspace = workspaceOf(exec)
+      const workspace = await workspaceOf(exec)
       const id = checkedText(args.claim_id, 'claim_id', 64)
       return await store.mutate(workspace, (raw): { ledger: ClaimLedger; result: { released: ClaimView } } => {
         const swept = expireClaims(raw, now)
@@ -252,7 +261,7 @@ export function apply(ctx: Context): void {
     } as const),
     async execute(_args, exec) {
       const now = Date.now()
-      const workspace = workspaceOf(exec)
+      const workspace = await workspaceOf(exec)
       return await store.mutate(workspace, (raw) => {
         const swept = expireClaims(raw, now)
         return {
@@ -290,7 +299,7 @@ export function apply(ctx: Context): void {
     } as const),
     async execute(args, exec) {
       const now = Date.now()
-      const workspace = workspaceOf(exec)
+      const workspace = await workspaceOf(exec)
       const id = checkedText(args.claim_id, 'claim_id', 64)
       const requested = args.paths === undefined ? null : normalizeScopes(args.paths)
       if (requested !== null && requested.rejected.length > 0) {
@@ -459,8 +468,9 @@ async function baselineFor(
 
 /** Release every claim one departing session holds. */
 async function releaseSessionClaims(store: ClaimStore, session: Session): Promise<void> {
-  const workspace = session.header.cwd
-  if (workspace === undefined || workspace === '') return
+  const cwd = session.header.cwd
+  if (cwd === undefined || cwd === '') return
+  const workspace = await claimWorkspace(cwd)
   const now = Date.now()
   await store.mutate(workspace, (raw) => {
     const swept = expireClaims(raw, now)
@@ -474,13 +484,16 @@ async function releaseSessionClaims(store: ClaimStore, session: Session): Promis
   })
 }
 
-/** The workspace a claim tool call operates in. */
-function workspaceOf(exec: ToolExecutionInput): string {
+/**
+ * The claim space one tool call operates in: its session's workspace, or the
+ * repository's main worktree when that workspace is a linked checkout.
+ */
+async function workspaceOf(exec: ToolExecutionInput): Promise<string> {
   const cwd = exec.agent?.session.header.cwd
   if (cwd === undefined || cwd === '') {
     throw new Error('claim tools require an owning agent session with a workspace')
   }
-  return cwd
+  return await claimWorkspace(cwd)
 }
 
 /** The claiming session's id, which also scopes the release-on-exit sweep. */

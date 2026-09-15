@@ -4,6 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { FileSystem, FsTarget } from '@deepseek-ai/dsh-fs'
 import type { ToolExecutionInput } from '@deepseek-ai/dsh-tools'
 import { expireClaims, remainingMs } from './ledger.ts'
+import { claimWorkspace } from './workspace.ts'
 import type { Claim, ScopeConflict } from './types.ts'
 import type { ClaimStore } from './store.ts'
 
@@ -65,13 +66,18 @@ export function installWriteGuard(ctx: Context, store: ClaimStore): void {
     fsCtx.on('tools/execute', async (exec, next) => {
       const path = mutationPath(exec)
       const session = exec.agent?.session
-      const workspace = session?.header.cwd
-      if (path === undefined || session === undefined || workspace === undefined || workspace === '') return await next()
+      const cwd = session?.header.cwd
+      if (path === undefined || session === undefined || cwd === undefined || cwd === '') return await next()
+      // The ledger and the claimed scopes live in claim space; the path the
+      // model named is relative to the session's own checkout. Resolving each
+      // in its own root is what lets an isolated teammate write freely inside
+      // its worktree while the shared surface stays owned.
+      const workspace = await claimWorkspace(cwd)
       return await store.mutate(workspace, async (raw) => {
         exec.signal.throwIfAborted()
         const now = Date.now()
         const swept = expireClaims(raw, now).ledger
-        const target = await fsCtx.fs.resolve(path, { cwd: workspace, signal: exec.signal })
+        const target = await fsCtx.fs.resolve(path, { cwd, signal: exec.signal })
         const peers = swept.claims.filter(claim => claim.sessionId !== session.id)
         const conflicts = await canonicalConflicts(fsCtx.fs, workspace, peers, [target], now, exec.signal)
         if (conflicts.length > 0) {

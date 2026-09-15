@@ -105,6 +105,13 @@ export interface ContinuableStartSpec {
    * the durable descriptor, and composes the child itself.
    */
   readonly request: Omit<SubagentStartRequest, 'label' | 'signal' | 'outputSchema'>
+  /**
+   * Optional absolute workspace for the child, stamped on its durable header
+   * instead of the parent's. A caller that isolates a child's filesystem — an
+   * Agent Teams worktree teammate, for instance — supplies the directory here;
+   * omitting it keeps the parent's workspace.
+   */
+  readonly cwd?: string
   /** Caller cancellation, owning the operation only until inbox acceptance. */
   readonly signal: AbortSignal
 }
@@ -484,7 +491,7 @@ export class SubagentContinuationManager {
         parent,
         create: {
           seed,
-          meta: childSessionMeta(parent, childDepth, prepared.seed !== undefined),
+          meta: childSessionMeta(parent, childDepth, prepared.seed !== undefined, spec.cwd),
           inheritedEventCount,
           delegatedPolicies,
         },
