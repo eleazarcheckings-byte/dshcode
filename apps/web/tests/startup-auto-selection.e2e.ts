@@ -41,11 +41,10 @@ describe('web e2e: startup auto-selection', () => {
   it('keeps the resident Hero and composer nodes when the first Workspace session appears', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-first-workspace-stable-tree'))
     await page.locator(`${ROOT_PHASE}[data-phase="hero"]`).waitFor({ timeout: 15_000 })
-    const headline = page.getByText('Build something extraordinary.', { exact: true })
     // The eyebrow mark is the resident hero brand seat: it must render the
     // Saturn accent the mark's own token resolves to (the ambient canvas owns
     // the hero's motion, so the mark itself is a still).
-    const mark = headline.locator('xpath=preceding-sibling::div[1]//svg')
+    const mark = page.locator('[data-saturn-anchor] + div svg')
     const [markColor, markAccent] = await mark.evaluate((node) => {
       const style = getComputedStyle(node)
       return [style.color, style.getPropertyValue('--saturn-accent')]
