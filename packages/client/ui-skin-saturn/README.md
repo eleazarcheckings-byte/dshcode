@@ -7,8 +7,22 @@ kind: "package-reference"
 
 English | [中文](README.zh.md)
 
-Saturn Premium is the dark application skin: neutral black surfaces, white text, fine gray borders, and white accents for brand, focus, and primary actions. The complete static token scales remain ordered from light to dark so upstream semantic aliases keep their meaning. Status colors retain their own aliases.
+## Summary
 
+Saturn Premium is the dark application skin: neutral black surfaces, white text, fine gray borders, and white accents for brand, focus, and primary actions. The complete static token scales remain ordered from light to dark so upstream semantic aliases keep their meaning. Status colors retain their own aliases. The skin also self-hosts the Saturn type system — Instrument Sans (variable, display + body) and Commit Mono (mono) — and carries the shared -18deg signature ring into the favicon.
+
+## Table of Contents
+
+- [Use](#use)
+- [Application tokens](#application-tokens)
+- [Type system](#type-system)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="use"></a>
 ## Use
 
 Mount as a `dsh.client` row in a web profile. The effect holds the upstream dark-theme attribute and browser color scheme while the skin is mounted, applies the Saturn body attribute and favicon, and restores those values when disposed. The scoped stylesheet remains inert without the Saturn attribute.
@@ -21,10 +35,16 @@ Mount as a `dsh.client` row in a web profile. The effect holds the upstream dark
 
 `skin.json` identifies `saturn-premium`. The skin ships as a workspace package and is not staged into the skin-center picker.
 
+-----
+
+<a id="application-tokens"></a>
 ## Application tokens
 
 The body scope publishes `--saturn-void`, `--saturn-surface`, `--saturn-surface-raised`, `--saturn-surface-hover`, `--saturn-stroke`, `--saturn-stroke-strong`, `--saturn-ink`, `--saturn-muted`, `--saturn-accent`, `--saturn-accent-dim`, and `--saturn-accent-secondary`. Motion uses `--saturn-ease` and `--saturn-duration`. Components consume these with upstream alias fallbacks. The skin owns no canvas or animation clock; components own their visual state, visibility checks, and cleanup. The reduced-motion media rule suppresses CSS transitions and repeating animations.
 
+-----
+
+<a id="type-system"></a>
 ## Type system
 
 The skin self-hosts one variable display/body family and one mono family, and re-points the two upstream font variables so every existing component inherits them without an edit:
@@ -40,6 +60,9 @@ Both families are **OFL**, not the MIT the original brief assumed for Commit Mon
 
 Commit Mono's official repository ships no `woff2`, only `.otf`/`.ttf`; the two weights here were compiled with `fontTools` from the upstream `v1.143` release without altering any outline or metric.
 
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this package only changes browser presentation.
@@ -50,7 +73,19 @@ None. The skin does not construct model requests.
 
 ## Known Limitations and Deferred Work
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **Light appearance is not supported.** The skin enforces dark appearance while mounted; light appearance would require a complete alternate palette and theme policy.
 - **This package's own code is MIT** (see `package.json`); the fonts it self-hosts are not — both Instrument Sans and Commit Mono are OFL (see Licensing above).
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>
 
 **Runtime invariant:** No companion is published. Token polarity and contrast are verified by the package's palette tests, and the skin owns no independent runtime data views.

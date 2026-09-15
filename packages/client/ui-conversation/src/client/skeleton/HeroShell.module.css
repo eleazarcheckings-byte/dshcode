@@ -55,6 +55,8 @@
   max-width: 580px;
   margin: 17px 0 0;
   color: var(--saturn-ink, var(--dsw-alias-label-primary));
+  font-family: var(--saturn-font-display, inherit);
+  font-variation-settings: var(--saturn-font-display-variation, 'wdth' 100);
   font-size: clamp(29px, 3.6vw, 43px);
   font-weight: 450;
   letter-spacing: -0.045em;

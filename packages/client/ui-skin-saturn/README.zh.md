@@ -7,8 +7,22 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-Saturn Premium 是深色应用皮肤（skin）：中性黑色表面、白色文字、细灰色边框，品牌、焦点与主操作均使用白色强调色。完整的静态色阶保持从浅到深的顺序，使上游语义别名（alias）保持其原有含义。状态色保留各自的别名。
+## 概述
 
+Saturn Premium 是深色应用皮肤（skin）：中性黑色表面、白色文字、细灰色边框，品牌、焦点与主操作均使用白色强调色。完整的静态色阶保持从浅到深的顺序，使上游语义别名（alias）保持其原有含义。状态色保留各自的别名。该皮肤同时自托管 Saturn 字体系统——Instrument Sans（可变字体，display + body）与 Commit Mono（等宽）——并将共享的 -18 度签名圆环带入 favicon。
+
+## 目录
+
+- [使用本包](#use)
+- [Application tokens（应用 token）](#application-tokens)
+- [Type system（字体系统）](#type-system)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="use"></a>
 ## 使用本包
 
 作为 web profile 中的一个 `dsh.client` 行挂载。该 effect 在皮肤挂载期间保持上游的深色主题属性与浏览器 color scheme，应用 Saturn 的 body 属性与 favicon，并在释放（dispose）时还原这些值。若缺少 Saturn 属性，该作用域样式表保持无效（inert）。
@@ -21,10 +35,16 @@ Saturn Premium 是深色应用皮肤（skin）：中性黑色表面、白色文�
 
 `skin.json` 标识为 `saturn-premium`。该皮肤以 workspace 包形式提供，不会进入皮肤中心（skin-center）选择器。
 
+-----
+
+<a id="application-tokens"></a>
 ## Application tokens（应用 token）
 
 body 作用域发布 `--saturn-void`、`--saturn-surface`、`--saturn-surface-raised`、`--saturn-surface-hover`、`--saturn-stroke`、`--saturn-stroke-strong`、`--saturn-ink`、`--saturn-muted`、`--saturn-accent`、`--saturn-accent-dim` 与 `--saturn-accent-secondary`。动效使用 `--saturn-ease` 与 `--saturn-duration`。各组件消费这些 token 并保留上游别名作为回退（fallback）。该皮肤不拥有任何 canvas 或动画时钟；各组件自行拥有其视觉状态、可见性检测与清理逻辑。reduced-motion 媒体规则会抑制 CSS transition 与重复动画。
 
+-----
+
+<a id="type-system"></a>
 ## Type system（字体系统）
 
 该皮肤自托管一个可变（variable）display/body 字体族与一个等宽（mono）字体族，并重新指向两个上游字体变量，使所有既有组件无需改动即可继承它们：
@@ -40,6 +60,9 @@ body 作用域发布 `--saturn-void`、`--saturn-surface`、`--saturn-surface-ra
 
 Commit Mono 的官方仓库不提供 `woff2`，只提供 `.otf`/`.ttf`；此处的两个字重是用 `fontTools` 从上游 `v1.143` 发行版编译而来，未改动任何轮廓（outline）或度量（metric）。
 
+-----
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无。本包仅改变浏览器呈现。
@@ -50,7 +73,19 @@ Commit Mono 的官方仓库不提供 `woff2`，只提供 `.otf`/`.ttf`；此处�
 
 ## 已知限制与延期工作
 
+<a id="known-limitations-and-deferred-work"></a>
+
 - **不支持浅色外观。** 该皮肤在挂载期间强制深色外观；浅色外观需要一套完整的替代调色板与主题策略。
 - **本包自身代码为 MIT**（见 `package.json`）；它所自托管的字体并非如此——Instrument Sans 与 Commit Mono 均为 OFL（见上文 Licensing）。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者工作上下文——点击展开</summary>
+
+无。
+
+</details>
 
 **Runtime invariant:** 不发布任何 companion。token 极性（polarity）与对比度由本包的调色板测试验证，该皮肤不拥有任何独立的运行时数据视图。
