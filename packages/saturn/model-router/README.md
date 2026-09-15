@@ -100,13 +100,9 @@ saturn-model-router:
 
 None, as this package resolves routing and mount decisions for other Host plugins and never contributes prompt text, tool schemas, or model-visible content of its own.
 
-### Token effect
+#### KV Cache effect
 
-Zero-direct: nothing here reaches a model request. A tier's resolved `provider`/`model` selects which adapter and model id a consumer's own request uses, so its context effect belongs entirely to that consumer.
-
-### KV Cache effect
-
-Independent: this package holds no per-request or per-session state, and changing a tier's route is a consumer-level change (a different model, sometimes a different provider) whose cache effect belongs to that consumer's own adapter, not to this router.
+Independent: this package holds no per-request or per-session state and reaches zero model requests directly. A tier's resolved `provider`/`model` selects which adapter and model id a consumer's own request uses, and changing a tier's route is a consumer-level change (a different model, sometimes a different provider) whose cache effect belongs entirely to that consumer's own adapter, not to this router.
 
 ## Known Limitations and Deferred Work
 

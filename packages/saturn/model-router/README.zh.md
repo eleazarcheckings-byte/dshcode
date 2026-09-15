@@ -100,13 +100,9 @@ saturn-model-router:
 
 None, as this package resolves routing and mount decisions for other Host plugins and never contributes prompt text, tool schemas, or model-visible content of its own.
 
-### Token effect
+#### KV Cache effect
 
-Zero-direct:此处的任何内容都不会进入模型请求。某个分级解析出的 `provider`/`model` 决定了消费者自身请求使用哪个适配器与模型 id,因此其上下文影响完全归属于该消费者。
-
-### KV Cache effect
-
-Independent:本包不持有任何按请求或按会话的状态,而更改某个分级的路由是消费者层面的变化(有时是不同的模型,有时是不同的提供方),其缓存影响归属于该消费者自身的适配器,而非本路由器。
+Independent:本包不持有任何按请求或按会话的状态,且不会直接触及任何模型请求。某个分级解析出的 `provider`/`model` 决定了消费者自身请求使用哪个适配器与模型 id;更改某个分级的路由是消费者层面的变化(有时是不同的模型,有时是不同的提供方),其缓存影响完全归属于该消费者自身的适配器,而非本路由器。
 
 ## Known Limitations and Deferred Work
 
