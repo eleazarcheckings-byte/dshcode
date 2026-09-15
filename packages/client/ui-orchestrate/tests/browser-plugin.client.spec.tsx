@@ -115,11 +115,8 @@ describe('ui-orchestrate browser apply', () => {
 
     // A cold apply after the hole already exists (declared-before-apply) fills
     // it exactly once — no duplicate registration from replaying the effect.
-    const after = await bench(false)
+    const after = await bench(true)
     await after.ctx.plugin({ inject: [...inject], apply }).await()
-    expect(after.slots.entries(HOLE)).toHaveLength(0)
-    after.declare()
-    await Promise.resolve()
     expect(after.slots.entries(HOLE)).toHaveLength(1)
   })
 })
