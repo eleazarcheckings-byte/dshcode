@@ -31,3 +31,13 @@
 ## 后果
 
 任何持有真正 `dsh-agent` `Agent` 的消费者,现在都可以通过 `ctx.media.withAgent(agent)` 完全按 SPEC §4 固定的方式使用 `ctx.media`。SaturnBot 的 `creative.generate` 具体仍未接通,等待编排者/C8a 负责人在上述三个方案中做出决定——这是一个已知、已报告的缺口,而非悄悄隐瞒的缺口。`tsc -p packages/saturn/tool-media/tsconfig.json --noEmit` 干净通过,`vitest run packages/saturn/tool-media` 为 62/62 全绿(相比本轮之前的 59,新增了 `with-agent.spec.ts` 的三个测试)。本包 README 上的 `doc-quick` 结果与本轮之前相同,只有一项此前已知的发现(`docs/tool-catalog.md#saturnaidsh-tool-media` 锚点,只有仓库级的 `doc-sync` 才能重新生成),没有新增问题。
+
+## 第三轮补充(同日)——上文"阻塞性"的缺口本可避免,现已解决
+
+第二次全新上下文的 Mars 评审(本轮修复的"round 2")发现,上文记录的 `integration_needs` 其实并不需要编排者做决定:`ctx.userQuestions`(`packages/interaction/user-questions`,`UserQuestionService.ask()`)把 `agent` 参数声明为**可选**,在未提供时本就会以不限定范围的方式发问(`ctx.waterfall('user-questions/request', request, noAnswerer)`)——完全在本包自身的 IN 范围之内,而且正是 SPEC §3 C7 早已点名的那个"interaction/approval 能力"。
+
+**已应用的修复:** `requireSpendApproval`(`src/index.ts`)在调用携带 `Agent` 时仍优先走 `ctx.approval`(与上文修复 1 的 `withAgent` 绑定行为一致,未变),没有 `Agent` 时则改走新增的 `requireSpendApprovalViaUserQuestions`——通过 `ctx.userQuestions.ask()` 发出一个是/否问题,携带与优先路线完全相同的预估成本行,在人类应答之前零网络请求,并在拒绝、发问被中止/超时,或没有应答者被装配(`NO_PROVIDER`)时保持关闭失败——与优先路线的关闭失败保证完全一致。由新文件 `tests/agentless-spend-approval.spec.ts`(先提交 RED)证明:(a)成本行出现在问题的 `detail` 中,(b)应答之前零请求,(c)拒绝→零请求+被拒绝的结果,(d)没有应答者装配→依然关闭失败,但信息不同。SaturnBot 的 `creative.generate` 调用点(`BotMediaService` 定义于 `packages/saturn/saturnbot/src/contracts.ts`;调用本身在 `src/adapters/integrations.ts`)现在无需 SaturnBot 拥有任何 `Agent` 对象即可解通——上文修复 1 中那项阻塞性的 `integration_needs` 已经真正解决,而不只是换一种方式重新描述。
+
+同一轮 Mars 评审中还修复了:本包 README 开发者说明里那处"被错误归并的提交"现已写明确切哈希(`78a06d26b1`);README 与本笔记中对 SaturnBot 的引用均改为按符号引用(`BotMediaService`、`creative.generate` 调用点),而不是按行号——因为第一轮记录的行号到第二轮评审时已经过期。
+
+`tsc -p packages/saturn/tool-media/tsconfig.json --noEmit` 依然干净通过(为此在本包的 `tsconfig.json` 中新增了一条 `packages/interaction/user-questions` 的项目引用,并在 `package.json` 中新增了对应的 `workspace:^` 依赖);`vitest run packages/saturn/tool-media` 为 65/65 全绿(62 + 新增 3 个)。本 cell 未运行 `pnpm install`(被禁止)——为了让新依赖眼下就能在测试/`tsc` 中解析,手动创建了一个 `node_modules` 目录联接(junction),但一次真正的 `pnpm install` 仍需要运行,`pnpm-lock.yaml` 才能正确记录这条依赖边;已在 `integration_needs` 中报告。
