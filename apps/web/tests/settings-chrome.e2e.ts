@@ -234,6 +234,11 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.getByRole('button', { name: '设置', exact: true }).click()
     const initialDialog = page.getByRole('dialog', { name: '设置' })
     const darkCube = initialDialog.getByRole('button', { name: '深色' })
+    // Dark is the shipped default, so clicking it directly is a no-op that
+    // writes nothing; pick light first so the dark pick is a real persisted
+    // change the reload below reads back.
+    await initialDialog.getByRole('button', { name: '浅色' }).click()
+    await expect.poll(() => darkCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('false')
     await darkCube.click()
     await expect.poll(() => darkCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
@@ -328,29 +333,29 @@ describe('web e2e: settings modal and General preferences', () => {
       expect(state.background).not.toBe('rgba(0, 0, 0, 0)')
       expect(state.themeColor).toBe(state.background)
     }
-    // Pin the OS scheme to light so the default `system` preference resolves
-    // light and the dark flip below is unambiguously the gesture's doing.
-    await page.emulateMedia({ colorScheme: 'light' })
-    const light = await readState()
-    expect(light.attr).toBe(false)
-    expectThemeColorSynchronized(light)
+    // The shipped preference is dark regardless of the OS scheme, so the
+    // light flip below is unambiguously the gesture's doing.
+    await page.emulateMedia({ colorScheme: 'dark' })
+    const initial = await readState()
+    expect(initial.attr).toBe(true)
+    expectThemeColorSynchronized(initial)
 
     await page.getByRole('button', { name: '设置', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
-    const darkCube = dialog.getByRole('button', { name: '深色' })
-    expect(await darkCube.getAttribute('aria-pressed')).toBe('false')
-    await darkCube.click()
+    const lightCube = dialog.getByRole('button', { name: '浅色' })
+    expect(await lightCube.getAttribute('aria-pressed')).toBe('false')
+    await lightCube.click()
     // The full cascade: pressed state, Host-backed preference, body attribute,
     // alias token flip — all from one real user gesture.
-    await expect.poll(() => darkCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
-    const dark = await readState()
-    expect(dark.attr).toBe(true)
-    expect(dark.legacy).toBeNull()
-    expect(dark.token).not.toBe(light.token)
-    expectThemeColorSynchronized(dark)
+    await expect.poll(() => lightCube.getAttribute('aria-pressed'), { timeout: 5_000 }).toBe('true')
+    const light = await readState()
+    expect(light.attr).toBe(false)
+    expect(light.legacy).toBeNull()
+    expect(light.token).not.toBe(initial.token)
+    expectThemeColorSynchronized(light)
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
-      .toMatch(/ui-theme:\n\s+preference: dark/)
+      .toMatch(/ui-theme:\n\s+preference: light/)
     await page.keyboard.press('Escape')
 
     // Reload: the preference survives the background Host read + presenter update.
@@ -358,24 +363,24 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.reload({ waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
-    await page.emulateMedia({ colorScheme: 'light' })
-    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(true)
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(false)
     const reloaded = await readState()
     expect(reloaded.legacy).toBeNull()
     expectThemeColorSynchronized(reloaded)
 
     // A second live Host binds another ephemeral port but shares the same
     // user-settings home. Its fresh origin has no theme localStorage and still
-    // converges to dark before the settings dialog opens.
+    // converges to light before the settings dialog opens.
     const second = await launchWebScaffold({ harnessHome: scaffold.harnessHome })
     const secondPage = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     const secondTripwire = watchConsole(secondPage)
     try {
       expect(second.baseUrl).not.toBe(scaffold.baseUrl)
-      await secondPage.emulateMedia({ colorScheme: 'light' })
+      await secondPage.emulateMedia({ colorScheme: 'dark' })
       await secondPage.goto(second.authenticatedUrl, { waitUntil: 'load' })
       await secondPage.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-      await expect.poll(async () => (await readState(secondPage)).attr, { timeout: 5_000 }).toBe(true)
+      await expect.poll(async () => (await readState(secondPage)).attr, { timeout: 5_000 }).toBe(false)
       const secondState = await readState(secondPage)
       expect(secondState.legacy).toBeNull()
       expectThemeColorSynchronized(secondState)
@@ -386,7 +391,8 @@ describe('web e2e: settings modal and General preferences', () => {
       await second.close()
     }
 
-    // `system` follows the emulated OS scheme (dark stays dark, light clears).
+    // `system` follows the emulated OS scheme (light stays light, dark clears
+    // to dark).
     await page.getByRole('button', { name: '设置', exact: true }).click()
     const systemCube = page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '跟随系统' })
     await systemCube.click()
@@ -396,10 +402,10 @@ describe('web e2e: settings modal and General preferences', () => {
     await page.emulateMedia({ colorScheme: 'dark' })
     await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(true)
     expectThemeColorSynchronized(await readState())
-    // Restore for the specs that follow: light preference beats the emulated
-    // dark OS scheme, leaving the shared page in the light default.
-    await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '浅色' }).click()
-    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(false)
+    // Restore for the specs that follow: the shipped dark preference, so the
+    // shared page stays on the default the following sections assume.
+    await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '深色' }).click()
+    await expect.poll(async () => (await readState()).attr, { timeout: 5_000 }).toBe(true)
     expectThemeColorSynchronized(await readState())
     await page.keyboard.press('Escape')
     expect(tripwire.pageErrors).toEqual([])
@@ -634,7 +640,7 @@ describe('web e2e: settings modal and General preferences', () => {
       await dialog.getByRole('tab', { name: PLUGIN_STATUS_TAB.en, exact: true }).click()
       const presetSwitcher = dialog.getByRole('button', { name: 'Choose the agent preset to inspect' })
       await presetSwitcher.waitFor({ timeout: 10_000 })
-      expect(await presetSwitcher.textContent()).toBe('Standard mode (default)')
+      expect(await presetSwitcher.textContent()).toBe('Agent (default)')
       // This page has no closing inventory spec to sweep its console, so the
       // scenario clears both tripwire channels itself.
       expect(enTripwire.pageErrors).toEqual([])
@@ -662,7 +668,7 @@ describe('web e2e: settings modal and General preferences', () => {
       await dialog.waitFor({ timeout: 10_000 })
       await dialog.getByRole('button', { name: '中文' }).waitFor({ timeout: 10_000 })
       // A locale-owned nav label proves the dictionaries resolved to zh.
-      await dialog.getByRole('button', { name: 'Agent 预设' }).waitFor({ timeout: 10_000 })
+      await dialog.getByRole('button', { name: '模式' }).waitFor({ timeout: 10_000 })
       // The markup already ships `zh`, so this alone cannot prove the sync ran
       // — the en scenario above is the discriminating half. Asserted here too
       // so a future change that resolves zh but writes the wrong tag is caught.
