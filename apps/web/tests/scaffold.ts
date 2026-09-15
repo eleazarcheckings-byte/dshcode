@@ -80,10 +80,10 @@ import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { REPO_ROOT, requireDist } from './support.ts'
 
 // Host-side web e2e cannot import a browser package: doing so would pull that
-// package's complete TS project into this graph. Mirrored from the welcome
-// locale block in packages/client/ui-settings-models/src/client/locales.ts;
-// drift makes the default pre-acknowledgement stop suppressing the notice and
-// fails loudly.
+// package's complete TS project into this graph. Mirrored from
+// packages/client/ui-settings-models/src/onboarding-copy.ts (First Light) and
+// the welcome locale block in src/client/locales.ts; drift makes the default
+// pre-acknowledgement stop suppressing a step and fails loudly.
 // import {
 //   WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_SETTINGS_NAMESPACE,
 //   WELCOME_NOTICE_VERSION, WELCOME_NOTICE_COPY,
@@ -98,6 +98,10 @@ export const WELCOME_NOTICE_COPY = {
     continueLabel: '继续',
   },
 } as const
+
+export const FIRST_LIGHT_SETTINGS_NAMESPACE = 'ui-first-light'
+export const FIRST_LIGHT_COMPLETE_FIELD = 'complete'
+export const FIRST_LIGHT_VERSION = '2026-09-14.1'
 
 /** Snapshot mode for the lane, from $DSH_SNAPSHOT (same vocabulary as the other snapshot suites). */
 export type WebSnapshotMode = 'replay' | 'record' | 'refresh'
@@ -305,6 +309,8 @@ export interface LaunchOptions {
   deepSeekMissingCredential?: boolean
   /** Leave the current welcome notice pending; ordinary scenarios pre-acknowledge it before browser boot. */
   welcomeNoticePending?: boolean
+  /** Leave the First Light setup sequence pending; ordinary scenarios pre-seal it before browser boot. */
+  firstLightPending?: boolean
   /**
    * Patch the shipped DeepSeek search row to a deterministic endpoint and
    * credential reference. Browser search scenarios keep the real provider and
@@ -643,6 +649,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     if (options.welcomeNoticePending !== true) {
       await ctx.settings.mutate(WELCOME_NOTICE_SETTINGS_NAMESPACE, [{
         op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION,
+      }])
+    }
+    if (options.firstLightPending !== true) {
+      await ctx.settings.mutate(FIRST_LIGHT_SETTINGS_NAMESPACE, [{
+        op: 'set', path: [FIRST_LIGHT_COMPLETE_FIELD], value: FIRST_LIGHT_VERSION,
       }])
     }
     const boundPort = ctx.get('webServer')?.port
