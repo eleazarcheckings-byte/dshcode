@@ -26,13 +26,19 @@ const FILE_REFERENCE_PROMPT = fileURLToPath(new URL(
 
 /**
  * The plugin_* management quartet, registered at the global tool layer by
- * plugin-installer (one authority shared with the browser panel).
+ * plugin-installer, plus the workspace file-claim quintet registered by the
+ * shipped claims service. Both authorities are shared with the browser panel.
  */
 const GLOBAL_TOOLS = [
+  'claim_check',
+  'claim_list',
+  'claim_scope',
   'plugin_install',
   'plugin_search',
   'plugin_status',
   'plugin_uninstall',
+  'release_scope',
+  'set_definition_of_done',
 ]
 
 /**
@@ -41,15 +47,19 @@ const GLOBAL_TOOLS = [
  * gaps: the `cordis_*` toolset executes model-written JavaScript that no
  * sandbox row confines, and `mcp_*` servers spawn outside `ctx.shell`.
  * `web_fetch` is present because public-address enforcement and one-shot
- * approval now confine its model-selected request target. The composition
- * Agent Note owns the rationale and its sources.
+ * approval now confine its model-selected request target. The shell tool is
+ * the platform's own (the shipped preset swaps bash for pwsh on Windows); the
+ * Agent Teams and file-claim tools are mounted by the shipped composition.
+ * The composition Agent Note owns the rationale and its sources.
  */
+const SHELL_TOOL = process.platform === 'win32' ? 'pwsh' : 'bash'
 const EXPECTED_TOOLS = [
   'ask_user_question',
-  'bash',
+  SHELL_TOOL,
   'create_goal',
   'edit',
   'exit_plan_mode',
+  'followup_task',
   'get_goal',
   'interrupt_agent',
   'job_kill',
@@ -62,10 +72,16 @@ const EXPECTED_TOOLS = [
   'read_image',
   'send_message',
   'skill',
+  'spawn_teammate',
   'subagent',
   'subagent_fork',
+  'team_task_create',
+  'team_task_get',
+  'team_task_list',
+  'team_task_update',
   'todo_write',
   'update_goal',
+  'wait_agent',
   'web_fetch',
   'web_search',
   'workflow',
@@ -165,7 +181,7 @@ it('assembles the shipped Web transport, catalog, guidance, and defaults', async
   })
   try {
     const names = ctx.tools.schemas(handle.agent).map(schema => schema.name).sort()
-    expect(names.filter(name => !RIPGREP_TOOLS.includes(name))).toEqual(EXPECTED_TOOLS)
+    expect(names.filter(name => !RIPGREP_TOOLS.includes(name))).toEqual([...EXPECTED_TOOLS].sort())
     // The packaged ripgrep binary ships with the dependency, so the pair is a
     // fixed roster member on every host.
     expect(names.filter(name => RIPGREP_TOOLS.includes(name))).toEqual(RIPGREP_TOOLS)
@@ -231,15 +247,21 @@ it('lets a preset producer reach the background-job registry', async () => {
   })
   try {
     const signal = new AbortController().signal
-    // `tool-bash` is a preset row and `tasks` is a host registry; the producer
-    // resolves it with `ctx.get`, so a registry hidden behind a preset realm
-    // fails here — with every task control still listed in the catalog above.
+    // `tool-bash`/`tool-pwsh` is a preset row and `tasks` is a host registry;
+    // the producer resolves it with `ctx.get`, so a registry hidden behind a
+    // preset realm fails here — with every task control still listed in the
+    // catalog above. The preset swaps shells by platform, so the probe runs
+    // the platform's own tool.
+    const shellCommand = process.platform === 'win32'
+      ? 'Write-Output SHIPPED_BACKGROUND_OK'
+      : 'printf SHIPPED_BACKGROUND_OK'
+    const jobLabel = `${SHELL_TOOL}-1`
     const started = await ctx.tools.execute({
       signal,
       callId: ToolCallId('shipped-bash-background'),
-      name: 'bash',
+      name: SHELL_TOOL,
       arguments: {
-        command: 'printf SHIPPED_BACKGROUND_OK',
+        command: shellCommand,
         description: 'shipped background probe',
         run_in_background: true,
       },
@@ -247,7 +269,7 @@ it('lets a preset producer reach the background-job registry', async () => {
     })
     expect({ isError: started.isError, content: started.content }).toEqual({
       isError: false,
-      content: [{ type: 'text', text: 'started background job bash-1' }],
+      content: [{ type: 'text', text: `started background job ${jobLabel}` }],
     })
 
     // The controller reads what the producer started: same registry, one
@@ -261,7 +283,7 @@ it('lets a preset producer reach the background-job registry', async () => {
     })
     expect(listed.isError).toBe(false)
     expect(listed.content).toEqual([
-      { type: 'text', text: expect.stringContaining('bash-1 [bash]') as unknown as string },
+      { type: 'text', text: expect.stringContaining(`${jobLabel} [${SHELL_TOOL}]`) as unknown as string },
     ])
 
     // The full round trip: the output a host-plane producer wrote is collected
@@ -270,7 +292,7 @@ it('lets a preset producer reach the background-job registry', async () => {
       signal,
       callId: ToolCallId('shipped-task-output'),
       name: 'job_output',
-      arguments: { job_id: 'bash-1', wait: true },
+      arguments: { job_id: jobLabel, wait: true },
       agent: handle.agent,
     })
     expect(collected.isError).toBe(false)

@@ -26,10 +26,11 @@ it('ships install metadata with the built web application', async () => {
   })
 })
 
-it('ships the gold Saturn mark as the favicon', async () => {
+it('ships the light Saturn mark on the near-black tile as the favicon', async () => {
   const favicon = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
-  // The mark is a single gold-tinted SVG; both fill and stroke use the accent.
-  expect(favicon).toContain('fill="#DDA43A"')
-  expect(favicon).toContain('stroke="#DDA43A"')
-  expect(favicon).toContain('viewBox="0 0 64 64"')
+  // The mark is the light-tinted ringed planet on the near-black tile; both
+  // fill and stroke use the shared light token.
+  expect(favicon).toContain('fill="#F5F5F5"')
+  expect(favicon).toContain('stroke="#F5F5F5"')
+  expect(favicon).toContain('viewBox="0 0 1024 1024"')
 })

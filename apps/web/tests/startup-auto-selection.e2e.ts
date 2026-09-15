@@ -42,12 +42,15 @@ describe('web e2e: startup auto-selection', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-first-workspace-stable-tree'))
     await page.locator(`${ROOT_PHASE}[data-phase="hero"]`).waitFor({ timeout: 15_000 })
     const headline = page.getByText('Build something extraordinary.', { exact: true })
-    const fishHitbox = headline.locator('xpath=preceding-sibling::span[1]')
-    const fish = fishHitbox.locator('svg')
-    expect(await fish.evaluate(node => getComputedStyle(node).color))
-      .toBe(await headline.evaluate(node => getComputedStyle(node).color))
-    await fishHitbox.hover()
-    expect(await fish.evaluate(node => getComputedStyle(node).animationName)).not.toBe('none')
+    // The eyebrow mark is the resident hero brand seat: it must render the
+    // Saturn accent the mark's own token resolves to (the ambient canvas owns
+    // the hero's motion, so the mark itself is a still).
+    const mark = headline.locator('xpath=preceding-sibling::div[1]//svg')
+    const [markColor, markAccent] = await mark.evaluate((node) => {
+      const style = getComputedStyle(node)
+      return [style.color, style.getPropertyValue('--saturn-accent')]
+    })
+    expect(markColor).toBe(markAccent)
     await page.evaluate(() => {
       const refs = {
         root: document.querySelector('div[data-phase="hero"]'),
