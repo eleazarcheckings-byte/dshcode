@@ -83,6 +83,10 @@ describe('target-neutral Conversation apply wiring', () => {
     const control = b.runtime.slots.entries('shell.overlay')[0]?.inject?.() as unknown as AmbientMotionInjected
     expect(sky.hooks.ambientMotion).toBe(control.hooks.ambientMotion)
     expect(sky.setAmbientMotion).toBe(control.setAmbientMotion)
+    const peak = b.runtime.slots.entries('shell.overlay')[1]?.inject?.() as {
+      hooks: { selectedProvider: { getSnapshot: () => string | null } }
+    }
+    expect(peak.hooks.selectedProvider.getSnapshot()).toBeNull()
     await b.runtime.dispose()
   })
 

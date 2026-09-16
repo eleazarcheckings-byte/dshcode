@@ -1,0 +1,16 @@
+/* Quiet session-token figures in the composer trailing row. No bar. */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 22px;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}

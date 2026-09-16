@@ -42,6 +42,31 @@ it('reserves the main header space and invokes the separate-window launcher', as
   expect(frame?.style.getPropertyValue('--dsh-shell-trailing-inset')).toBe('')
 })
 
+it('follows its own box: re-measures on resize and releases the inset when the sheet hides it', () => {
+  // jsdom has no ResizeObserver; capture the callback so the test can fire it.
+  let observe: ResizeObserverCallback | undefined
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: ResizeObserverCallback) { observe = callback }
+    observe() {}
+    disconnect() { observe = undefined }
+  })
+  stubLauncherWidth(120)
+  const view = render(<div data-frame=""><div data-shell-overlay=""><SaturnBotEntry {...props(false)} /></div></div>)
+  const frame = view.container.querySelector<HTMLElement>('[data-frame]')
+  expect(frame?.style.getPropertyValue('--dsh-shell-trailing-inset')).toBe('150px')
+  vi.restoreAllMocks()
+  stubLauncherWidth(96)
+  observe?.([], {} as ResizeObserver)
+  expect(frame?.style.getPropertyValue('--dsh-shell-trailing-inset')).toBe('126px')
+  vi.restoreAllMocks()
+  stubLauncherWidth(0)
+  observe?.([], {} as ResizeObserver)
+  expect(frame?.style.getPropertyValue('--dsh-shell-trailing-inset')).toBe('')
+  view.unmount()
+  expect(observe).toBeUndefined()
+  vi.unstubAllGlobals()
+})
+
 it('reserves nothing while the phone sheet hides the launcher', () => {
   stubLauncherWidth(0)
   const view = render(<div data-frame=""><div data-shell-overlay=""><SaturnBotEntry {...props(false)} /></div></div>)

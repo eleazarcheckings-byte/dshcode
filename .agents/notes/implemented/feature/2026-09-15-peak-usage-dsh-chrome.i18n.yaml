@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-15-peak-usage-dsh-chrome.md
+2026-09-15-peak-usage-dsh-chrome.md: d518fa3a831ccbea8beb658e0b13541a025fee5b
+2026-09-15-peak-usage-dsh-chrome.zh.md: ad17b7398c8fafcb8f29fa6a8e115828c4223ba2

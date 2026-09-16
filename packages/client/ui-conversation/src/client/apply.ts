@@ -32,6 +32,7 @@ import { InputBar } from './skeleton/InputBar.tsx'
 import { AmbientSky, AmbientMotionControl } from './skeleton/AmbientSky.tsx'
 import { PeakRail } from './skeleton/PeakChip.tsx'
 import { createAmbientMotion } from './skeleton/ambient-motion.ts'
+import { watchSelectedProvider } from './skeleton/selected-provider.ts'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { resolveActiveView } from './view-selection.ts'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
@@ -198,6 +199,11 @@ export function apply(ctx: Context): void {
   })
 
   const ambientMotion = createAmbientMotion()
+  const selectedProvider = createSnapshotStore<string | null>(null)
+  ctx.effect(
+    () => watchSelectedProvider(sessions, selectedProvider),
+    'ui-conversation: selected provider',
+  )
   ctx.slots.inject('shell.background', () => ctx.slots.register({
     name: 'shell.background',
     inject: () => ambientMotion,
@@ -209,15 +215,16 @@ export function apply(ctx: Context): void {
     locale: NS,
     inject: () => ambientMotion,
   }, AmbientMotionControl))
-  // The DeepSeek pricing lamp: frame chrome in the top-right rail beside the
-  // SaturnBot launcher, visible on the hero and in every session. Overlay
-  // seats position themselves, so `order` only fixes DOM order: it follows the
-  // ambient-motion control, which stays the overlay's first entry.
+  // DeepSeek engine-capacity lamp: frame chrome in the top-right rail beside
+  // the SaturnBot launcher. Overlay seats position themselves, so `order`
+  // only fixes DOM order: it follows the ambient-motion control. The seat
+  // hides itself when the selected provider is not DeepSeek.
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'deepseek-peak',
     order: 110,
     locale: NS,
+    inject: () => ({ hooks: { selectedProvider } }),
   }, PeakRail))
 
   const registerConversationRoot = () => slots.register({

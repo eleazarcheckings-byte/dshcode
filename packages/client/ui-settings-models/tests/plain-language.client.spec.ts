@@ -32,4 +32,13 @@ describe('plain-language copy gate', () => {
       expect(value, `zh.${key}`).not.toMatch(/MCP/i)
     }
   })
+
+  it('leads First Light with a model engine, not DeepSeek as the product', () => {
+    expect(en.onboardingDescription).not.toMatch(/^Connect DeepSeek/i)
+    expect(en.onboardingDescription).toMatch(/model engine/i)
+    expect(en.onboardingDescription).toMatch(/DeepSeek/)
+    expect(en.firstLightModelUnavailable).not.toMatch(/DeepSeek setup/i)
+    expect(zh.onboardingDescription).not.toMatch(/^在此连接 DeepSeek/)
+    expect(zh.onboardingDescription).toMatch(/模型引擎/)
+  })
 })

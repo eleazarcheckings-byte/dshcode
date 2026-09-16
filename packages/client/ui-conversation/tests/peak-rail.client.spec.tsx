@@ -10,10 +10,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
-import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { en } from '../src/client/locales.ts'
 import { PeakRail, PEAK_RAIL_GAP } from '../src/client/skeleton/PeakChip.tsx'
 import type { PeakRailProps } from '../src/client/skeleton/PeakChip.tsx'
+import { DEEPSEEK_PROVIDER_ID } from '../src/client/skeleton/selected-provider.ts'
 
 /** 2024-01-01 is a Monday: 01:00 UTC sits inside the first weekday peak window. */
 const MONDAY_PEAK = Date.UTC(2024, 0, 1, 1, 0)
@@ -27,7 +29,7 @@ let overlay: HTMLDivElement
 /** Width the stubbed layout reports for the rail; 0 mimics `display: none` under the phone sheet. */
 let railWidth = RAIL_WIDTH
 
-function mountRail(now: number, previousInset?: string) {
+function mountRail(now: number, previousInset?: string, provider: string | null = DEEPSEEK_PROVIDER_ID) {
   vi.setSystemTime(now)
   frame = document.createElement('div')
   frame.setAttribute('data-shell-frame', '')
@@ -36,8 +38,15 @@ function mountRail(now: number, previousInset?: string) {
   overlay.setAttribute('data-shell-overlay', '')
   frame.appendChild(overlay)
   document.body.appendChild(frame)
-  const props = { t: makeTranslate(en) } as PeakRailProps
-  return render(<PeakRail {...props} />, { container: overlay })
+  const selectedProvider = createSnapshotStore<string | null>(provider)
+  const props = {
+    t: makeTranslate(en),
+    useSelectedProvider: bindSnapshotSelector(selectedProvider),
+  } as PeakRailProps
+  return {
+    view: render(<PeakRail {...props} />, { container: overlay }),
+    selectedProvider,
+  }
 }
 
 beforeEach(() => {
@@ -63,7 +72,7 @@ afterEach(() => {
 
 describe('PeakRail', () => {
   it('renders the pricing lamp as one named image node in the rail', () => {
-    const view = mountRail(MONDAY_PEAK)
+    const { view } = mountRail(MONDAY_PEAK)
     const rail = view.container.querySelector('[data-peak-rail]')
     expect(rail).not.toBeNull()
     const lamp = view.getByRole('img')
@@ -74,21 +83,21 @@ describe('PeakRail', () => {
   })
 
   it('reads the off-peak tier on a weekend', () => {
-    const view = mountRail(SUNDAY_OFF_PEAK)
+    const { view } = mountRail(SUNDAY_OFF_PEAK)
     const lamp = view.getByRole('img')
     expect(lamp.getAttribute('aria-label')).toMatch(/^Off-peak pricing/)
     expect(lamp.textContent).toBe('Off-peak')
   })
 
   it('reserves its measured width plus the gap in the frame trailing inset, and releases it on unmount', () => {
-    const view = mountRail(MONDAY_PEAK)
+    const { view } = mountRail(MONDAY_PEAK)
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe(`${RAIL_WIDTH + PEAK_RAIL_GAP}px`)
     view.unmount()
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('')
   })
 
   it('restores a pre-existing reservation when it leaves', () => {
-    const view = mountRail(MONDAY_PEAK, '40px')
+    const { view } = mountRail(MONDAY_PEAK, '40px')
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe(`${RAIL_WIDTH + PEAK_RAIL_GAP}px`)
     view.unmount()
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('40px')
@@ -96,7 +105,7 @@ describe('PeakRail', () => {
 
   it('reserves nothing while it has no box (the phone sheet hides the rail)', () => {
     railWidth = 0
-    const view = mountRail(MONDAY_PEAK, '40px')
+    const { view } = mountRail(MONDAY_PEAK, '40px')
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('40px')
     view.unmount()
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('40px')
@@ -105,7 +114,7 @@ describe('PeakRail', () => {
   it('stays out of the SaturnBot window and reserves nothing there', () => {
     // The guard reads only `location.search`; a URL carries that shape.
     vi.spyOn(window, 'location', 'get').mockReturnValue(new URL('http://localhost/?saturnbot=1') as unknown as Location)
-    const view = mountRail(MONDAY_PEAK)
+    const { view } = mountRail(MONDAY_PEAK)
     expect(view.container.querySelector('[data-peak-rail]')).toBeNull()
     expect(view.queryByRole('img')).toBeNull()
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('')
@@ -113,10 +122,33 @@ describe('PeakRail', () => {
 
   it('follows the tier switch on its minute tick', () => {
     // Monday 03:59 UTC: last minute of the first peak window.
-    const view = mountRail(Date.UTC(2024, 0, 1, 3, 59))
+    const { view } = mountRail(Date.UTC(2024, 0, 1, 3, 59))
     expect(view.getByRole('img').textContent).toBe('Peak')
     // The minute tick lands outside React's event path; act() flushes it.
     act(() => { vi.advanceTimersByTime(60_000) })
     expect(view.getByRole('img').textContent).toBe('Off-peak')
+  })
+
+  it('hides when the selected provider is not DeepSeek', () => {
+    const { view } = mountRail(MONDAY_PEAK, undefined, 'openai')
+    expect(view.container.querySelector('[data-peak-rail]')).toBeNull()
+    expect(view.queryByRole('img')).toBeNull()
+    expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('')
+  })
+
+  it('hides when no provider is selected', () => {
+    const { view } = mountRail(MONDAY_PEAK, undefined, null)
+    expect(view.container.querySelector('[data-peak-rail]')).toBeNull()
+    expect(view.queryByRole('img')).toBeNull()
+  })
+
+  it('hides and releases its reservation when the session leaves DeepSeek', () => {
+    const { view, selectedProvider } = mountRail(MONDAY_PEAK)
+    expect(view.getByRole('img')).toBeTruthy()
+    expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe(`${RAIL_WIDTH + PEAK_RAIL_GAP}px`)
+    act(() => { selectedProvider.set('anthropic') })
+    expect(view.queryByRole('img')).toBeNull()
+    expect(view.container.querySelector('[data-peak-rail]')).toBeNull()
+    expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('')
   })
 })

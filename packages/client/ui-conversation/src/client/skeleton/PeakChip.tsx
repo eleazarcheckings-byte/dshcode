@@ -1,27 +1,25 @@
 /**
- * PeakChip — the DeepSeek API pricing-tier lamp, and PeakRail, its seat in
- * the frame's top-right rail.
+ * PeakChip — DeepSeek's engine capacity window (peak / off-peak pricing),
+ * and PeakRail, its seat in the frame's top-right rail.
+ *
+ * This is not Saturn identity. The rail mounts only while the selected
+ * provider is the official DeepSeek adapter; any other engine (or none)
+ * hides the lamp and releases its header reservation.
  *
  * The lamp is frame chrome, not composer chrome: it occupies one
- * `shell.overlay` seat beside the SaturnBot launcher, so it reads the same on
- * the blank hero and inside every session, and it never moves with the
- * composer. It used to sit in the InputBar's trailing row; izzy asked for it
- * at the top of the UI.
- *
- * State: pure client-side UTC clock; no network call, no store.
- * Updates once per minute via `setInterval`.
+ * `shell.overlay` seat beside the SaturnBot launcher. State is a pure
+ * client-side UTC clock; no network call.
  *
  * Copy is driven by the `conversation` locale namespace — two keys per locale:
  *   pricing.peak / pricing.offPeak     — chip label (short)
  *   pricing.tooltip.peak / .offPeak    — tooltip with next-switch time
- *
- * A steady status lamp reinforces the label without suggesting agent activity.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale, PropsRuntime, Translate } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, InjectFace, PropsLocale, PropsRuntime, Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import { isPeakHour, nextTransition, formatTransitionTime } from './deepseek-peak.ts'
+import { isDeepSeekProvider } from './selected-provider.ts'
 import css from './PeakChip.module.css'
 
 // ─── types ───────────────────────────────────────────────────────────────────
@@ -35,8 +33,17 @@ export interface PeakChipProps {
   t: Translate
 }
 
-/** Full rail-seat props: root overlay runtime and the Conversation locale seat. */
-export type PeakRailProps = PropsRuntime<'shell.overlay'> & PropsLocale<'conversation'>
+/** Overlay inject: the current session's selected model-engine id. */
+export interface PeakRailInjected {
+  /** The renderer turns the observable into useSelectedProvider. */
+  hooks: { selectedProvider: HostObservable<string | null> }
+}
+
+/** Full rail-seat props: root overlay runtime, locale, and selected engine. */
+export type PeakRailProps =
+  & PropsRuntime<'shell.overlay'>
+  & PropsLocale<'conversation'>
+  & InjectFace<PeakRailInjected>
 
 /**
  * Breathing room the rail reserves after its own width, so the Session
@@ -126,16 +133,18 @@ export function PeakChip({ t }: PeakChipProps) {
  * header utilities (the definition-of-done chip) never slide under the lamp.
  * The two properties are independent, so the seats can mount in any order.
  *
- * @param props - Root overlay runtime and the Conversation locale seat.
- * @returns the lamp for the main harness; nothing in the SaturnBot window.
+ * @param props - Root overlay runtime, Conversation locale, and selected engine.
+ * @returns the lamp while DeepSeek is selected in the main harness; nothing otherwise.
  */
-export function PeakRail({ t }: PeakRailProps) {
+export function PeakRail({ t, useSelectedProvider }: PeakRailProps) {
+  const provider = useSelectedProvider(value => value)
+  const visible = isDeepSeekProvider(provider)
   const seat = useRef<HTMLDivElement>(null)
   const [standalone] = useState(isSaturnBotWindow)
 
   useEffect(() => {
     const node = seat.current
-    if (standalone || node === null) return
+    if (standalone || !visible || node === null) return
     const frame = node.closest('[data-shell-overlay]')?.parentElement
     if (frame === null || frame === undefined) return
     const previous = frame.style.getPropertyValue(TRAILING_EXTRA)
@@ -160,9 +169,9 @@ export function PeakRail({ t }: PeakRailProps) {
       observer?.disconnect()
       release()
     }
-  }, [standalone])
+  }, [standalone, visible])
 
-  if (standalone) return null
+  if (standalone || !visible) return null
   return (
     <div ref={seat} className={css.rail} data-peak-rail="">
       <PeakChip t={t as Translate} />
