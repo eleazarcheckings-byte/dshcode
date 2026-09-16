@@ -133,6 +133,31 @@ interface Workspace {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxclaims--claimsaccess"></a>
+
+### `ctx.claims` — `ClaimsAccess`
+
+Read access to the durable claim ledger.
+
+```ts cordis-catalog
+/**
+ * Resolve the directory a working directory's claims are recorded against.
+ * Every linked checkout of one repository shares one claim space.
+ * @param cwd - a session's working directory.
+ * @returns the claim space governing it.
+ */
+async workspaceFor(cwd: string): Promise<string>
+
+/**
+ * Report every requested path a peer's live lease owns.
+ * @param request - the workspace, the paths, and the sessions to disregard.
+ * @returns one entry per owned path; empty when the whole set is free.
+ */
+async conflictsFor(request: ClaimCheckRequest): Promise<ClaimPathConflict[]>
+```
+
+Source: [`packages/saturn/claims/src/service.ts`](../../packages/saturn/claims/src/service.ts)
+
 <a id="ctxdirectorypicker--directorypicker-abstract-seam"></a>
 
 ### `ctx.directoryPicker` — `DirectoryPicker` (abstract seam)

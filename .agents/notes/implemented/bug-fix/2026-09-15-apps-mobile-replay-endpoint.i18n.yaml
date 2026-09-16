@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-apps-mobile-replay-endpoint.md
-2026-09-15-apps-mobile-replay-endpoint.md: 11207d1a5288da6bdd655d1175513415c2fe0c19
-2026-09-15-apps-mobile-replay-endpoint.zh.md: 2ec59c0cba0ffc72eb14c4ef883ce4c1c4406749
+2026-09-15-apps-mobile-replay-endpoint.md: 345d455ff9aec3530139e37ac7722787e9a49e7c
+2026-09-15-apps-mobile-replay-endpoint.zh.md: 74984217ff25dd77890ab32b4addcad9bd916db7

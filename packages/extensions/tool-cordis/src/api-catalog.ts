@@ -368,6 +368,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the active roster row.',
       },
       {
+        signature: 'async mergeTeammate(caller: Agent, request: MergeTeammateRequest): Promise<MergeTeammateResult>',
+        description: 'Apply one isolated teammate\'s work into the Lead workspace.',
+        parameters: [{ name: 'caller', description: 'exact live Lead Agent.' }, { name: 'request', description: 'target teammate name, dry-run flag, and cancellation.' }],
+        returns: 'the applied paths, or the owned paths that refused the merge.',
+      },
+      {
         signature: 'async sendMessage(caller: Agent, request: SendTeamMessageRequest): Promise<SendTeamMessageResult>',
         description: 'Queue one durable peer message, then attempt immediate delivery.',
         parameters: [{ name: 'caller', description: 'exact live sending Team member.' }, { name: 'request', description: 'target name, content, scheduling mode, and pre-queue cancellation.' }],
@@ -545,6 +551,25 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'request', description: 'the key, the method, the surface, and the cancel signal.' }],
         returns: '`authorized` once the flow\'s record is committed during this attempt and observed, or `cancelled` when the human declined or the caller withdrew.',
         throws: ['{AuthorizationError} code `NO_FLOW` when nothing claims the key, `UNKNOWN_METHOD` when the named method is not one the flow offers, `ALREADY_IN_FLIGHT` when an attempt is already running for the key, or `NOT_COMMITTED` when the flow resolved without committing a record during the attempt.'],
+      },
+    ],
+  },
+  {
+    key: 'claims',
+    summary: 'Read access to the durable claim ledger.',
+    description: 'Read access to the durable claim ledger.',
+    methods: [
+      {
+        signature: 'async workspaceFor(cwd: string): Promise<string>',
+        description: 'Resolve the directory a working directory\'s claims are recorded against. Every linked checkout of one repository shares one claim space.',
+        parameters: [{ name: 'cwd', description: 'a session\'s working directory.' }],
+        returns: 'the claim space governing it.',
+      },
+      {
+        signature: 'async conflictsFor(request: ClaimCheckRequest): Promise<ClaimPathConflict[]>',
+        description: 'Report every requested path a peer\'s live lease owns.',
+        parameters: [{ name: 'request', description: 'the workspace, the paths, and the sessions to disregard.' }],
+        returns: 'one entry per owned path; empty when the whole set is free.',
       },
     ],
   },
@@ -772,6 +797,32 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Prepare every currently registered field from one immutable base request. Preparation failures reject before HTTP dispatch. Field values are cloned and frozen; providers retain no mutable alias to the outgoing request.',
         parameters: [{ name: 'request', description: 'exact serialized request facts before extension fields.' }],
         returns: 'detached fields and their idempotent joint acceptance transaction.',
+      },
+    ],
+  },
+  {
+    key: 'designBrain',
+    summary: 'Own a single opt-in MCP fiber while preserving independently configured profile rows.',
+    description: 'Own a single opt-in MCP fiber while preserving independently configured profile rows.',
+    methods: [
+      {
+        signature: '@Remote(\'status\') status(): DesignBrainStatus',
+        description: 'Read actual Host registration state without opening a connection or invoking a tool.',
+        parameters: [],
+        returns: 'Current model tool names and who owns the connection.',
+      },
+      {
+        signature: '@Remote(\'connect\') connect(): Promise<DesignBrainStatus>',
+        description: 'Persist opt-in and await real MCP tool registration, or inspect the existing profile connection.',
+        parameters: [],
+        returns: 'Connected only when tools are registered; failures remain explicit and retryable.',
+      },
+      {
+        signature: '@Remote(\'disconnect\') disconnect(): Promise<DesignBrainStatus>',
+        description: 'Persist opt-out, close the managed connection, and remove its tools.',
+        parameters: [],
+        returns: 'Disabled state after connection disposal completes.',
+        throws: ['RemoteError when an independent profile row owns the connection.'],
       },
     ],
   },
@@ -1219,6 +1270,31 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'media',
+    summary: '`ctx.media`: resolves a provider per call, gates every billable request behind the spend Gate (`ctx.approval` when the call has an `Agent`, `ctx.userQuestions` when it does not), writes results under the caller\'s workspace, and tracks non-terminal jobs for `status()`.',
+    description: '`ctx.media`: resolves a provider per call, gates every billable request behind the spend Gate (`ctx.approval` when the call has an `Agent`, `ctx.userQuestions` when it does not), writes results under the caller\'s workspace, and tracks non-terminal jobs for `status()`.\n\n`generate()` matches the `{ generate(req): Promise<Job>; status(id): Promise<Job> }` interface SPEC §4 pins between this package and its consumers (C8a) exactly — a caller may call `generate(req)` with only the pinned single-object shape, no second argument, and it runs. What varies is which route the spend Gate takes: an optional second `exec` parameter (or MediaService.withAgent\'s binding) carries an `Agent`, and when one is present `ctx.approval` is the preferred route (it fundamentally requires an `Agent` to attach its prompt/audit trail to). SaturnBot\'s real `creative.generate` call site — the pinned shape\'s only known consumer — has no `Agent` anywhere in its own execution model, so for a call with no `exec.agent` the Gate falls back to `ctx.userQuestions` instead, which accepts an undefined agent and asks unscoped; both routes carry the same estimated-cost line and both fail the call closed (never silently spend) when their respective service isn\'t composed, has no answerer, or the human declines. See requireSpendApproval for the exact preference order, and the README Known Limitations for the fuller rationale.',
+    methods: [
+      {
+        signature: 'withAgent(agent: Agent, defaults: Omit<MediaExecContext, \'agent\'> = {}): BoundMediaService',
+        description: 'Bind this service to one calling Agent, producing a BoundMediaService that matches SPEC §4\'s pinned single-argument `generate(req)`/`status(id)` shape exactly — the answer to a consumer that holds an `Agent` up front (e.g. once per composition) and wants to hand the pinned interface to code that has no `exec` parameter to thread through, rather than calling the raw `generate(req, exec)` on every request. Spend approval still runs exactly as it would for the raw call — `agent` here becomes `exec.agent` — so a rejected/cancelled/unavailable approval still throws the same distinct errors, and there is still no free path for any provider in this package.',
+        parameters: [{ name: 'agent', description: 'the identity `ctx.approval` routes this binding\'s prompts through.' }, { name: 'defaults', description: 'additional `exec` fields (`callId`, `signal`, `toolName`) applied to every call made through the binding; `toolName` defaults to `\'media\'` when omitted, matching direct `ctx.media` use.' }],
+        returns: 'a `{ generate, status }` pair with `agent` and `defaults` already closed over, so callers invoke `generate(request)` / `status(id)` without threading `exec` themselves.',
+      },
+      {
+        signature: 'async generate(request: MediaGenerateRequest, exec: MediaExecContext = {}): Promise<MediaJob>',
+        description: 'Resolve one generation request to a terminal (`\'done\'`/`\'failed\'`) job, gating the billable network call behind approval first. See the class doc for the `exec` extension rationale.',
+        parameters: [{ name: 'request', description: 'the kind, prompt, target provider (or the configured default for `request.kind` when omitted), workspace, and provider-specific params for the generation; `request.workspace` must be an absolute path and `request.prompt` must be non-empty.' }, { name: 'exec', description: 'the calling `Agent` (routes the spend-approval prompt through `ctx.approval` when present, else `ctx.userQuestions`) plus optional `callId`, `signal`, and `toolName`; defaults to `{}`, which fails the call closed if no approval route is composed.' }],
+        returns: 'the terminal job, its produced assets, and the metered cost once approval and the provider call both succeed; throws on an empty prompt, an unknown provider, a rejected or unavailable approval, or a provider-side failure.',
+      },
+      {
+        signature: 'async status(id: string): Promise<MediaJob>',
+        description: 'Re-read a job\'s last known result. Every job this package produces is already terminal by the time `generate()` returns (see the README Known Limitations), so this is a cache read, not a fresh poll.',
+        parameters: [{ name: 'id', description: 'the `MediaJob.id` returned by an earlier `generate()` call.' }],
+        returns: 'the cached terminal job for `id`; throws when `id` is unknown to this service instance (jobs do not persist across process restarts).',
+      },
+    ],
+  },
+  {
     key: 'messageFeedback',
     summary: 'Storage-domain sidecar service.',
     description: 'Storage-domain sidecar service. It inspects persisted Session history and never creates or resumes an Agent or Session.',
@@ -1240,6 +1316,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Delete one feedback item. Absence is successful regardless of the supplied version; an existing item requires an exact version match.',
         parameters: [{ name: 'request', description: 'Session, message, and observed item version.' }],
         returns: 'the stable absent postcondition, or an explicit failure.',
+      },
+    ],
+  },
+  {
+    key: 'modelRouter',
+    summary: 'Owns the `saturn-model-router` settings namespace and answers tier and external-harness questions for subagent spawns, SaturnBot, and the Bundle rows that mount native product providers.',
+    description: 'Owns the `saturn-model-router` settings namespace and answers tier and external-harness questions for subagent spawns, SaturnBot, and the Bundle rows that mount native product providers.',
+    methods: [
+      {
+        signature: 'resolve(tier: ModelTier): TierRoute',
+        description: 'Resolve one tier to a concrete route. A tier left at `\'default\'` follows `agentDefaultModel` when a Host mounts one, then the packaged fallback.',
+        parameters: [{ name: 'tier', description: 'the routing tier a caller is spawning or dispatching work for.' }],
+        returns: 'the provider, model, and optional reasoning effort to use.',
+      },
+      {
+        signature: 'externalHarnessesEnabled(): boolean',
+        description: 'Whether the deployment has opted into native product subagent providers.',
+        parameters: [],
+        returns: 'the current `externalHarnesses` config flag; independent of whether any harness CLI actually resolves on disk.',
+      },
+      {
+        signature: 'harnessAvailable(harness: ExternalHarness): boolean',
+        description: 'Whether `harness`\'s package-local platform CLI is installed. Cached per process: package presence does not change while a process is running.',
+        parameters: [{ name: 'harness', description: 'the native product subagent to probe.' }],
+        returns: 'true only when both the harness\'s wrapper package AND the actual CLI dependency bundled inside it resolve.',
+      },
+      {
+        signature: 'externalHarnessMounted(harness: ExternalHarness): boolean',
+        description: 'Whether a host-plane row for `harness` should mount: the deployment opted in AND the harness\'s package-local CLI is actually installed. This is the single check a Bundle row\'s `disabled` expression and a preset\'s tool row both gate on, so enabling the toggle alone can never surface a tool with nothing behind it.',
+        parameters: [{ name: 'harness', description: 'the native product subagent a row is gating.' }],
+        returns: 'true only when the deployment enabled external harnesses AND this specific harness\'s CLI resolves; false otherwise.',
       },
     ],
   },
@@ -1297,6 +1404,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Select whether plan mode should be active. Between turns the method appends the change immediately because no in-turn pre-step will run until another prompt starts a turn. The open-turn fold is the idle signal: agent status stays `running` through post-turn checkpointing, when no further in-turn pre-step runs. During an open turn the selection remains pending until the next accepted in-turn pre-step. Repeated selection of the current or already-pending state is a no-op.',
         parameters: [{ name: 'agent', description: 'The agent to switch.' }, { name: 'active', description: 'Whether plan mode should be active.' }],
         returns: 'what happened: `committed` (logged now), `queued` (awaiting the next accepted in-turn pre-step), `cancelled` (an opposite pending selection was cleared; the logged state already matches), or `noop` (already in that state).',
+      },
+    ],
+  },
+  {
+    key: 'remoteAccess',
+    summary: 'The remote-access owner: one optional listener, one device ledger, one notification bus, and the journal that records what changed.',
+    description: 'The remote-access owner: one optional listener, one device ledger, one notification bus, and the journal that records what changed.',
+    methods: [
+      {
+        signature: '@Remote(\'status\') status(): RemoteStatus',
+        description: 'The listener\'s current state, its address, and the devices that may reach it.',
+        parameters: [],
+        returns: 'the full status the Settings card renders.',
+      },
+      {
+        signature: '@Remote(\'enable\') async enable(mode: RemoteMode): Promise<RemoteStatus>',
+        description: 'Open the listener in one mode and remember the choice.',
+        parameters: [{ name: 'mode', description: '`lan` for a pinned certificate on the local network, `tunnel` for cloudflared.' }],
+        returns: 'the status after the attempt; a failure is reported, not thrown.',
+      },
+      {
+        signature: '@Remote(\'disable\') async disable(): Promise<RemoteStatus>',
+        description: 'Close the listener; paired devices stay paired and reconnect when it reopens.',
+        parameters: [],
+        returns: 'the status after the listener is down.',
+      },
+      {
+        signature: '@Remote(\'pairingCode\') async pairingCode(): Promise<RemotePairingPayload>',
+        description: 'Mint a fresh pairing code for the QR. Any code issued earlier stops working.',
+        parameters: [],
+        returns: 'the payload the phone scans.',
+        throws: ['{RemoteError} when the listener is not open.'],
+      },
+      {
+        signature: '@Remote(\'revokeDevice\') async revokeDevice(deviceId: string): Promise<RemoteStatus>',
+        description: 'Revoke one paired device; its token stops working at once.',
+        parameters: [{ name: 'deviceId', description: 'the ledger row id from {@link status}.' }],
+        returns: 'the status with the device gone.',
+      },
+      {
+        signature: 'publish(event: RemoteEventInput): void',
+        description: 'Publish one notification to every attached device. Other Saturn packages reach this duck-typed (`ctx.get(\'remoteAccess\')?.publish(...)`), so a composition without remote access costs them nothing.',
+        parameters: [{ name: 'event', description: 'the frame\'s type and copy.' }],
       },
     ],
   },
@@ -3780,7 +3930,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'BotConfig',
-    declaration: 'export interface BotConfig {\n    version: 1;\n    enabled: boolean;\n    goal: string;\n    workspace: string;\n    intervalMinutes: number;\n    provider: string;\n    model: string;\n    maxTasks: number;\n    maxActionsPerTask: number;\n    toolTimeoutMs: number;\n    modelTimeoutMs: number;\n    maxInputBytes: number;\n    maxOutputTokens: number;\n    requirePrApproval: boolean;\n    autoDispatchEmail: boolean;\n    requireDeployApproval: boolean;\n    requireWriteApproval: boolean;\n    allowedTools: string[];\n    roles: Record<BotRole, {\n        enabled: boolean;\n        instructions: string;\n        tools: string[];\n    }>;\n    validationCommands: string[][];\n    integrations: Record<string, {\n        endpoint?: string;\n        credentialEnv?: string;\n        resource?: string;\n    }>;\n    reportChannel: string;\n}',
+    declaration: 'export interface BotConfig {\n    version: 1;\n    enabled: boolean;\n    goal: string;\n    workspace: string;\n    intervalMinutes: number;\n    provider: string;\n    model: string;\n    maxTasks: number;\n    maxActionsPerTask: number;\n    toolTimeoutMs: number;\n    modelTimeoutMs: number;\n    maxInputBytes: number;\n    maxOutputTokens: number;\n    requirePrApproval: boolean;\n    autoDispatchEmail: boolean;\n    requireDeployApproval: boolean;\n    requireWriteApproval: boolean;\n    allowedTools: string[];\n    roles: Record<BotRole, {\n        enabled: boolean;\n        instructions: string;\n        tools: string[];\n    }>;\n    validationCommands: string[][];\n    integrations: Record<string, {\n        endpoint?: string;\n        endpointEnv?: string;\n        credentialEnv?: string;\n        resource?: string;\n    }>;\n    reportChannel: string;\n}',
   },
   {
     name: 'BotCycle',
@@ -3799,8 +3949,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface BotEventPage {\n    events: BotEvent[];\n    cursor: number;\n    hasMore: boolean;\n}',
   },
   {
+    name: 'BotFirstRun',
+    declaration: 'export interface BotFirstRun {\n    goal: string;\n    workspace: string;\n    provider: string;\n    credentials: BotFirstRunCredential[];\n}',
+  },
+  {
+    name: 'BotFirstRunCredential',
+    declaration: 'export interface BotFirstRunCredential {\n    name: string;\n    env: string;\n    present: boolean;\n}',
+  },
+  {
     name: 'BotId',
     declaration: 'export type BotId = Branded<\'SaturnBotId\'>;',
+  },
+  {
+    name: 'BotIntegrationCatalogEntry',
+    declaration: 'export interface BotIntegrationCatalogEntry {\n    name: string;\n    label: string;\n    fields: BotIntegrationField[];\n    docsUrl: string;\n}',
+  },
+  {
+    name: 'BotIntegrationField',
+    declaration: 'export interface BotIntegrationField {\n    key: string;\n    label: string;\n    secret: boolean;\n    env?: string;\n}',
   },
   {
     name: 'BotJson',
@@ -3824,7 +3990,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'BotSnapshot',
-    declaration: 'export interface BotSnapshot {\n    config: BotConfig;\n    status: \'needs-setup\' | \'disabled\' | \'idle\' | \'running\' | \'awaiting-approval\';\n    activeCycle: BotCycle | null;\n    cycles: BotCycle[];\n    approvals: BotApproval[];\n    reports: BotReport[];\n    alerts: BotAlert[];\n    cursor: number;\n    nextRunAt: string | null;\n    tools: {\n        name: string;\n        description: string;\n        roles: BotRole[];\n        effect: string;\n        enabled: boolean;\n    }[];\n    connections: {\n        id: string;\n        status: \'configured\' | \'unconfigured\';\n        detail: string;\n    }[];\n    messages: BotMessage[];\n}',
+    declaration: 'export interface BotSnapshot {\n    config: BotConfig;\n    status: \'needs-setup\' | \'disabled\' | \'idle\' | \'running\' | \'awaiting-approval\';\n    activeCycle: BotCycle | null;\n    cycles: BotCycle[];\n    approvals: BotApproval[];\n    reports: BotReport[];\n    alerts: BotAlert[];\n    cursor: number;\n    nextRunAt: string | null;\n    tools: {\n        name: string;\n        description: string;\n        roles: BotRole[];\n        effect: string;\n        enabled: boolean;\n    }[];\n    connections: {\n        id: string;\n        status: \'configured\' | \'unconfigured\';\n        detail: string;\n    }[];\n    messages: BotMessage[];\n    firstRun: BotFirstRun;\n    integrationCatalog: BotIntegrationCatalogEntry[];\n}',
   },
   {
     name: 'BotStage',
@@ -3847,6 +4013,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface BotWebhookRecord {\n    deliveryId: string;\n    source: string;\n    payload: BotJson;\n    receivedAt: string;\n}',
   },
   {
+    name: 'BoundMediaService',
+    declaration: 'export interface BoundMediaService {\n    generate(request: MediaGenerateRequest): Promise<MediaJob>;\n    status(id: string): Promise<MediaJob>;\n}',
+  },
+  {
     name: 'Branded',
     declaration: 'export type Branded<B extends string> = string & {\n    readonly [BRAND]: B;\n};',
   },
@@ -3861,6 +4031,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ChunkRowEvent',
     declaration: 'export type ChunkRowEvent = {\n    [Kind in ChunkRow[\'type\']]: {\n        readonly type: `chunkrow/${Kind}`;\n        readonly seq: number;\n        readonly time: number;\n        readonly data: Extract<ChunkRow, {\n            readonly type: Kind;\n        }>[\'data\'];\n    };\n}[ChunkRow[\'type\']];',
+  },
+  {
+    name: 'ClaimCheckRequest',
+    declaration: 'export interface ClaimCheckRequest {\n    readonly workspace: string;\n    readonly paths: readonly string[];\n    readonly ignoreSessionIds?: readonly string[];\n}',
+  },
+  {
+    name: 'ClaimPathConflict',
+    declaration: 'export interface ClaimPathConflict {\n    readonly path: string;\n    readonly claimId: string;\n    readonly lane: string;\n    readonly holder: string;\n    readonly remainingMs: number;\n    readonly scopes: readonly string[];\n}',
   },
   {
     name: 'ClientArtifactBaseline',
@@ -3984,7 +4162,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ContinuableStartSpec',
-    declaration: 'export interface ContinuableStartSpec {\n    readonly provider: string;\n    readonly label: string;\n    readonly childId?: SessionId;\n    readonly request: Omit<SubagentStartRequest, \'label\' | \'signal\' | \'outputSchema\'>;\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface ContinuableStartSpec {\n    readonly provider: string;\n    readonly label: string;\n    readonly childId?: SessionId;\n    readonly request: Omit<SubagentStartRequest, \'label\' | \'signal\' | \'outputSchema\'>;\n    readonly cwd?: string;\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'ContinuableSubagentDescriptorData',
@@ -4119,6 +4297,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type DeepSeekLlmApiJson = null | boolean | number | string | DeepSeekLlmApiJson[] | {\n    [key: string]: DeepSeekLlmApiJson;\n};',
   },
   {
+    name: 'DesignBrainStatus',
+    declaration: 'export interface DesignBrainStatus {\n    state: \'disabled\' | \'connecting\' | \'connected\' | \'unavailable\';\n    enabled: boolean;\n    source: \'managed\' | \'profile\';\n    endpoint: string | null;\n    tools: string[];\n    issue: \'none\' | \'connection-failed\' | \'timeout\' | \'profile-disabled\' | \'profile-unavailable\' | \'incomplete-tools\';\n}',
+  },
+  {
     name: 'DiffCallView',
     declaration: 'export interface DiffCallView {\n    card: \'diff\';\n    title: string;\n    diffs: FileDiff[];\n    locations?: FileLocation[];\n}',
   },
@@ -4233,6 +4415,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
+  },
+  {
+    name: 'ExternalHarness',
+    declaration: 'export type ExternalHarness = \'codex\' | \'claude-code\';',
   },
   {
     name: 'FiberState',
@@ -4643,6 +4829,46 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ManualCompactAgentContext extends CompactionAgentContext {\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n}',
   },
   {
+    name: 'MediaAsset',
+    declaration: 'export interface MediaAsset {\n    path: string;\n    mimeType: string;\n    url?: string;\n}',
+  },
+  {
+    name: 'MediaCost',
+    declaration: 'export interface MediaCost {\n    estimatedUsd: number;\n    provider: MediaProviderId;\n    model: string;\n}',
+  },
+  {
+    name: 'MediaExecContext',
+    declaration: 'export interface MediaExecContext {\n    readonly agent?: Agent;\n    readonly callId?: ToolCallId;\n    readonly signal?: AbortSignal;\n    readonly toolName?: string;\n}',
+  },
+  {
+    name: 'MediaGenerateRequest',
+    declaration: 'export interface MediaGenerateRequest {\n    readonly kind: MediaKind;\n    readonly prompt: string;\n    readonly provider?: MediaProviderId;\n    readonly model?: string;\n    readonly params?: Readonly<Record<string, unknown>>;\n    readonly workspace: string;\n}',
+  },
+  {
+    name: 'MediaJob',
+    declaration: 'export interface MediaJob {\n    id: string;\n    status: MediaJobStatus;\n    assets: MediaAsset[];\n    cost: MediaCost;\n    error?: string;\n}',
+  },
+  {
+    name: 'MediaJobStatus',
+    declaration: 'export type MediaJobStatus = \'queued\' | \'running\' | \'done\' | \'failed\';',
+  },
+  {
+    name: 'MediaKind',
+    declaration: 'export type MediaKind = \'image\' | \'video\' | \'audio\' | \'motion-transfer\';',
+  },
+  {
+    name: 'MediaProviderId',
+    declaration: 'export type MediaProviderId = \'gemini\' | \'openai\' | \'higgsfield\';',
+  },
+  {
+    name: 'MergeTeammateRequest',
+    declaration: 'export interface MergeTeammateRequest {\n    readonly target: string;\n    readonly dryRun?: boolean;\n    readonly signal: AbortSignal;\n}',
+  },
+  {
+    name: 'MergeTeammateResult',
+    declaration: 'export interface MergeTeammateResult {\n    readonly target: string;\n    readonly status: \'merged\' | \'unchanged\' | \'denied\' | \'previewed\';\n    readonly files: string[];\n    readonly conflicts: TeamMergeConflict[];\n}',
+  },
+  {
     name: 'Message',
     declaration: 'export interface Message {\n    readonly id: MessageId;\n    readonly role: \'system\' | \'user\' | \'assistant\';\n    readonly content: ContentBlock[];\n    readonly source: MessageSource;\n}',
   },
@@ -4769,6 +4995,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ModelReasoningEffort',
     declaration: 'export interface ModelReasoningEffort {\n    readonly id: string;\n    readonly name: string;\n    readonly description?: string;\n}',
+  },
+  {
+    name: 'ModelTier',
+    declaration: 'export type ModelTier = \'coordinator\' | \'specialist\' | \'bulk\' | \'vision\';',
   },
   {
     name: 'ObjectJsonSchema',
@@ -4919,6 +5149,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface RedactedSecret {\n    path: string[];\n    set: boolean;\n}',
   },
   {
+    name: 'RemoteDeviceRecord',
+    declaration: 'export interface RemoteDeviceRecord {\n    id: string;\n    name: string;\n    platform: string;\n    pairedAt: string;\n    lastSeenAt: string | null;\n}',
+  },
+  {
     name: 'RemoteError',
     declaration: 'export class RemoteError<Code extends RemoteErrorCode = RemoteErrorCode> extends Error {\n    readonly isDSHRemoteError: true;\n    constructor(readonly code: Code, message: string, readonly details: RemoteErrorDetailsMap[Code], options?: ErrorOptions);\n}',
   },
@@ -4933,6 +5167,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RemoteEventHostInfo',
     declaration: 'export interface RemoteEventHostInfo {\n    readonly home: string;\n}',
+  },
+  {
+    name: 'RemoteEventInput',
+    declaration: 'export interface RemoteEventInput {\n    type: RemoteEventType;\n    title: string;\n    body: string;\n    sessionId?: string;\n}',
+  },
+  {
+    name: 'RemoteEventType',
+    declaration: 'export type RemoteEventType = \'approval\' | \'verdict\' | \'fleet\' | \'saturnbot\';',
+  },
+  {
+    name: 'RemoteJournalEntry',
+    declaration: 'export interface RemoteJournalEntry {\n    at: string;\n    action: string;\n    detail?: string;\n}',
+  },
+  {
+    name: 'RemoteStatus',
+    declaration: 'export interface RemoteStatus {\n    state: RemoteState;\n    mode: RemoteMode;\n    url: string | null;\n    fingerprint: string | null;\n    devices: RemoteDeviceRecord[];\n    tunnelAvailable: boolean;\n    issue: RemoteIssue;\n    journal: RemoteJournalEntry[];\n}',
   },
   {
     name: 'ReplayEnvelope',
@@ -5672,7 +5922,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SpawnTeammateRequest',
-    declaration: 'export interface SpawnTeammateRequest {\n    readonly name: string;\n    readonly description: string;\n    readonly prompt: ContentBlock[];\n    readonly context: \'fresh\' | \'fork\';\n    readonly provider: string;\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface SpawnTeammateRequest {\n    readonly name: string;\n    readonly description: string;\n    readonly prompt: ContentBlock[];\n    readonly context: \'fresh\' | \'fork\';\n    readonly provider: string;\n    readonly isolation?: TeamIsolation;\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'SpawnTeammateResult',
@@ -5883,12 +6133,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type TeamId = Branded<\'TeamId\'>;',
   },
   {
+    name: 'TeamIsolation',
+    declaration: 'export type TeamIsolation = \'shared\' | \'worktree\';',
+  },
+  {
     name: 'TeamMembership',
     declaration: 'export interface TeamMembership {\n    readonly root: Agent;\n    readonly id: TeamId;\n    readonly role: \'lead\' | \'teammate\';\n    readonly name: string;\n}',
   },
   {
     name: 'TeamMemberView',
-    declaration: 'export interface TeamMemberView {\n    readonly id: SessionId;\n    readonly name: string;\n    readonly role: \'lead\' | \'teammate\';\n    readonly status: \'running\' | \'idle\' | \'inactive\' | \'provisioning\' | \'failed\';\n    readonly description?: string;\n    readonly provider?: string;\n    readonly context?: \'fresh\' | \'fork\';\n    readonly model?: string;\n    readonly diagnostics: string[];\n}',
+    declaration: 'export interface TeamMemberView {\n    readonly id: SessionId;\n    readonly name: string;\n    readonly role: \'lead\' | \'teammate\';\n    readonly status: \'running\' | \'idle\' | \'inactive\' | \'provisioning\' | \'failed\';\n    readonly description?: string;\n    readonly provider?: string;\n    readonly context?: \'fresh\' | \'fork\';\n    readonly model?: string;\n    readonly isolation?: TeamIsolation;\n    readonly worktree?: TeamWorktreeSnapshot;\n    readonly diagnostics: string[];\n}',
+  },
+  {
+    name: 'TeamMergeConflict',
+    declaration: 'export interface TeamMergeConflict {\n    readonly path: string;\n    readonly holder: string;\n    readonly lane: string;\n    readonly claimId: string;\n}',
   },
   {
     name: 'TeamMessageId',
@@ -5921,6 +6179,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TeamWaitResult',
     declaration: 'export interface TeamWaitResult {\n    readonly timedOut: boolean;\n}',
+  },
+  {
+    name: 'TeamWorktreeSnapshot',
+    declaration: 'export interface TeamWorktreeSnapshot {\n    readonly path: string;\n    readonly baseRevision: string;\n}',
   },
   {
     name: 'TerminalBackend',
@@ -6001,6 +6263,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TerminalWaitReason',
     declaration: 'export type TerminalWaitReason = \'stdin_read\' | \'inferred_idle\' | \'timeout\' | \'session_exit\';',
+  },
+  {
+    name: 'TierRoute',
+    declaration: 'export interface TierRoute {\n    provider: string;\n    model: string;\n    reasoningEffort?: string;\n}',
   },
   {
     name: 'TokenMeasurement',

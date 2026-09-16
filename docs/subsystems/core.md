@@ -792,6 +792,52 @@ roots(): Agent[]
 
 Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
 
+<a id="ctxmodelrouter--modelrouterservice"></a>
+
+### `ctx.modelRouter` — `ModelRouterService`
+
+Owns the `saturn-model-router` settings namespace and answers tier and external-harness questions for subagent spawns, SaturnBot, and the Bundle rows that mount native product providers.
+
+```ts cordis-catalog
+/**
+ * Resolve one tier to a concrete route. A tier left at `'default'` follows
+ * `agentDefaultModel` when a Host mounts one, then the packaged fallback.
+ * @param tier - the routing tier a caller is spawning or dispatching work for.
+ * @returns the provider, model, and optional reasoning effort to use.
+ */
+resolve(tier: ModelTier): TierRoute
+
+/**
+ * Whether the deployment has opted into native product subagent providers.
+ * @returns the current `externalHarnesses` config flag; independent of
+ *   whether any harness CLI actually resolves on disk.
+ */
+externalHarnessesEnabled(): boolean
+
+/**
+ * Whether `harness`'s package-local platform CLI is installed. Cached per
+ * process: package presence does not change while a process is running.
+ * @param harness - the native product subagent to probe.
+ * @returns true only when both the harness's wrapper package AND the
+ *   actual CLI dependency bundled inside it resolve.
+ */
+harnessAvailable(harness: ExternalHarness): boolean
+
+/**
+ * Whether a host-plane row for `harness` should mount: the deployment opted
+ * in AND the harness's package-local CLI is actually installed. This is the
+ * single check a Bundle row's `disabled` expression and a preset's tool row
+ * both gate on, so enabling the toggle alone can never surface a tool with
+ * nothing behind it.
+ * @param harness - the native product subagent a row is gating.
+ * @returns true only when the deployment enabled external harnesses AND
+ *   this specific harness's CLI resolves; false otherwise.
+ */
+externalHarnessMounted(harness: ExternalHarness): boolean
+```
+
+Source: [`packages/saturn/model-router/src/index.ts`](../../packages/saturn/model-router/src/index.ts)
+
 <a id="agent-events"></a>
 
 ### `agent/*` events

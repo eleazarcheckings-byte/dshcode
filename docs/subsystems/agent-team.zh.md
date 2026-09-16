@@ -122,6 +122,14 @@ listMembers(agent: Agent): TeamMemberView[]
 async spawnTeammate(caller: Agent, request: SpawnTeammateRequest): Promise<SpawnTeammateResult>
 
 /**
+ * Apply one isolated teammate's work into the Lead workspace.
+ * @param caller - exact live Lead Agent.
+ * @param request - target teammate name, dry-run flag, and cancellation.
+ * @returns the applied paths, or the owned paths that refused the merge.
+ */
+async mergeTeammate(caller: Agent, request: MergeTeammateRequest): Promise<MergeTeammateResult>
+
+/**
  * Queue one durable peer message, then attempt immediate delivery.
  * @param caller - exact live sending Team member.
  * @param request - target name, content, scheduling mode, and pre-queue cancellation.

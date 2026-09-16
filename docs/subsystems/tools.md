@@ -475,6 +475,89 @@ The full presentation field docs live in [`packages/core/tools/src/presentation.
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxdesignbrain--designbrainservice"></a>
+
+### `ctx.designBrain` — `DesignBrainService`
+
+Own a single opt-in MCP fiber while preserving independently configured profile rows.
+
+```ts cordis-catalog
+/**
+ * Read actual Host registration state without opening a connection or invoking a tool.
+ * @returns Current model tool names and who owns the connection.
+ */
+@Remote('status') status(): DesignBrainStatus
+
+/**
+ * Persist opt-in and await real MCP tool registration, or inspect the existing profile connection.
+ * @returns Connected only when tools are registered; failures remain explicit and retryable.
+ */
+@Remote('connect') connect(): Promise<DesignBrainStatus>
+
+/**
+ * Persist opt-out, close the managed connection, and remove its tools.
+ * @returns Disabled state after connection disposal completes.
+ * @throws RemoteError when an independent profile row owns the connection.
+ */
+@Remote('disconnect') disconnect(): Promise<DesignBrainStatus>
+```
+
+Source: [`packages/saturn/design-brain/src/index.ts`](../../packages/saturn/design-brain/src/index.ts)
+
+<a id="ctxmedia--mediaservice"></a>
+
+### `ctx.media` — `MediaService`
+
+`ctx.media`: resolves a provider per call, gates every billable request behind the spend Gate (`ctx.approval` when the call has an `Agent`, `ctx.userQuestions` when it does not), writes results under the caller's workspace, and tracks non-terminal jobs for `status()`.
+
+`generate()` matches the `{ generate(req): Promise<Job>; status(id): Promise<Job> }` interface SPEC §4 pins between this package and its consumers (C8a) exactly — a caller may call `generate(req)` with only the pinned single-object shape, no second argument, and it runs. What varies is which route the spend Gate takes: an optional second `exec` parameter (or MediaService.withAgent's binding) carries an `Agent`, and when one is present `ctx.approval` is the preferred route (it fundamentally requires an `Agent` to attach its prompt/audit trail to). SaturnBot's real `creative.generate` call site — the pinned shape's only known consumer — has no `Agent` anywhere in its own execution model, so for a call with no `exec.agent` the Gate falls back to `ctx.userQuestions` instead, which accepts an undefined agent and asks unscoped; both routes carry the same estimated-cost line and both fail the call closed (never silently spend) when their respective service isn't composed, has no answerer, or the human declines. See requireSpendApproval for the exact preference order, and the README Known Limitations for the fuller rationale.
+
+```ts cordis-catalog
+/**
+ * Bind this service to one calling {@link Agent}, producing a {@link BoundMediaService} that
+ * matches SPEC §4's pinned single-argument `generate(req)`/`status(id)` shape exactly — the answer
+ * to a consumer that holds an `Agent` up front (e.g. once per composition) and wants to hand the
+ * pinned interface to code that has no `exec` parameter to thread through, rather than calling the
+ * raw `generate(req, exec)` on every request. Spend approval still runs exactly as it would for the
+ * raw call — `agent` here becomes `exec.agent` — so a rejected/cancelled/unavailable approval still
+ * throws the same distinct errors, and there is still no free path for any provider in this package.
+ * @param agent - the identity `ctx.approval` routes this binding's prompts through.
+ * @param defaults - additional `exec` fields (`callId`, `signal`, `toolName`) applied to every call
+ *   made through the binding; `toolName` defaults to `'media'` when omitted, matching direct `ctx.media` use.
+ * @returns a `{ generate, status }` pair with `agent` and `defaults` already closed over, so callers
+ *   invoke `generate(request)` / `status(id)` without threading `exec` themselves.
+ */
+withAgent(agent: Agent, defaults: Omit<MediaExecContext, 'agent'> = {}): BoundMediaService
+
+/**
+ * Resolve one generation request to a terminal (`'done'`/`'failed'`) job, gating the billable
+ * network call behind approval first. See the class doc for the `exec` extension rationale.
+ * @param request - the kind, prompt, target provider (or the configured default for `request.kind`
+ *   when omitted), workspace, and provider-specific params for the generation; `request.workspace`
+ *   must be an absolute path and `request.prompt` must be non-empty.
+ * @param exec - the calling `Agent` (routes the spend-approval prompt through `ctx.approval` when
+ *   present, else `ctx.userQuestions`) plus optional `callId`, `signal`, and `toolName`; defaults
+ *   to `{}`, which fails the call closed if no approval route is composed.
+ * @returns the terminal job, its produced assets, and the metered cost once approval and the
+ *   provider call both succeed; throws on an empty prompt, an unknown provider, a rejected or
+ *   unavailable approval, or a provider-side failure.
+ */
+async generate(request: MediaGenerateRequest, exec: MediaExecContext = {}): Promise<MediaJob>
+
+/**
+ * Re-read a job's last known result. Every job this package produces is already terminal by the
+ * time `generate()` returns (see the README Known Limitations), so this is a cache read, not a fresh poll.
+ * @param id - the `MediaJob.id` returned by an earlier `generate()` call.
+ * @returns the cached terminal job for `id`; throws when `id` is unknown to this service instance
+ *   (jobs do not persist across process restarts).
+ */
+async status(id: string): Promise<MediaJob>
+```
+
+Types: [Agent](core.md)
+
+Source: [`packages/saturn/tool-media/src/index.ts`](../../packages/saturn/tool-media/src/index.ts)
+
 <a id="ctxtools--toolruntime"></a>
 
 ### `ctx.tools` — `ToolRuntime`

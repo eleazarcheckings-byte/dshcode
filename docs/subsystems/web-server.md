@@ -60,6 +60,57 @@ A request whose handling throws (a malformed %-escape hitting `decodeURIComponen
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxremoteaccess--remoteaccessservice"></a>
+
+### `ctx.remoteAccess` — `RemoteAccessService`
+
+The remote-access owner: one optional listener, one device ledger, one notification bus, and the journal that records what changed.
+
+```ts cordis-catalog
+/**
+ * The listener's current state, its address, and the devices that may reach it.
+ * @returns the full status the Settings card renders.
+ */
+@Remote('status') status(): RemoteStatus
+
+/**
+ * Open the listener in one mode and remember the choice.
+ * @param mode - `lan` for a pinned certificate on the local network, `tunnel` for cloudflared.
+ * @returns the status after the attempt; a failure is reported, not thrown.
+ */
+@Remote('enable') async enable(mode: RemoteMode): Promise<RemoteStatus>
+
+/**
+ * Close the listener; paired devices stay paired and reconnect when it reopens.
+ * @returns the status after the listener is down.
+ */
+@Remote('disable') async disable(): Promise<RemoteStatus>
+
+/**
+ * Mint a fresh pairing code for the QR. Any code issued earlier stops working.
+ * @returns the payload the phone scans.
+ * @throws {RemoteError} when the listener is not open.
+ */
+@Remote('pairingCode') async pairingCode(): Promise<RemotePairingPayload>
+
+/**
+ * Revoke one paired device; its token stops working at once.
+ * @param deviceId - the ledger row id from {@link status}.
+ * @returns the status with the device gone.
+ */
+@Remote('revokeDevice') async revokeDevice(deviceId: string): Promise<RemoteStatus>
+
+/**
+ * Publish one notification to every attached device. Other Saturn packages
+ * reach this duck-typed (`ctx.get('remoteAccess')?.publish(...)`), so a
+ * composition without remote access costs them nothing.
+ * @param event - the frame's type and copy.
+ */
+publish(event: RemoteEventInput): void
+```
+
+Source: [`packages/saturn/remote-access/src/index.ts`](../../packages/saturn/remote-access/src/index.ts)
+
 <a id="ctxwebserver--webserver"></a>
 
 ### `ctx.webServer` — `WebServer`
