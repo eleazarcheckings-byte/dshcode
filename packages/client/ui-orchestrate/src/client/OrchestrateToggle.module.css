@@ -95,6 +95,11 @@
 .pending[data-target='on'] {
   outline-color: var(--saturn-accent, #dda43a);
 }
+/* A queued OFF target must read as strongly as a queued ON: the resting .off
+   hairline is 10-12% alpha, so the ring borrows the secondary label ink. */
+.pending[data-target='off'] {
+  outline-color: var(--dsw-alias-label-secondary);
+}
 
 .icon {
   display: inline-flex;
