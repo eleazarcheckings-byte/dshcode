@@ -1,5 +1,6 @@
 import { SaturnLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SidebarBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import { en } from './locales.ts'
 
 /**
  * Render the official mark with the presentation requested by its host surface.
@@ -15,5 +16,5 @@ export function OfficialBrandMark({ size }: SidebarBrandMarkOwnerProps) {
  * @returns the official name span.
  */
 export function OfficialBrandName() {
-  return <span>Saturn AI</span>
+  return <span>{en.name}</span>
 }

@@ -11,6 +11,7 @@
 import type { ReactNode } from 'react'
 import { SaturnLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './DesktopTitleBar.module.css'
+import { shellText } from './shell-locale.ts'
 
 /** Minimal face of the desktop preload bridge (defined in apps/desktop). */
 export interface DesktopBridge {
@@ -60,8 +61,8 @@ export function DesktopTitleBar(props: { children?: ReactNode; context?: string 
           <button
             type="button"
             className={css.menu}
-            aria-label={`${bridge.productName} menu`}
-            title={`${bridge.productName} menu`}
+            aria-label={shellText('menuLabel', { product: bridge.productName })}
+            title={shellText('menuLabel', { product: bridge.productName })}
             onClick={() => { bridge.showMenu() }}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">

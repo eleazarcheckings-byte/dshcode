@@ -67,6 +67,8 @@ const t = (key: string, params?: Record<string, string>): string => {
     copied: '已复制',
     safeModeBanner: '安全模式：用户插件配置已跳过，插件开关不可用。',
     exitSafeMode: '恢复正常模式并重启',
+    repairMessage: '插件「{pluginId}」上次启动失败，当前已被禁用。请修复它。\n\n失败详情：\n{message}\n\n原始堆栈：\n{stack}\n\n插件安装目录：{installPath}\n\n请检查并修复该插件；修复完成后告诉我如何重新启用。',
+    installRepairMessage: '插件安装失败，请帮我诊断并修复。\n\n安装目标：{spec}\n\n错误信息：\n{reason}\n\n请检查该插件并重新安装；完成后告诉我结果。',
   }
   let text = copy[key] ?? key
   for (const [name, replacement] of Object.entries(params ?? {})) {

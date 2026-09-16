@@ -55,6 +55,8 @@ export const zh = {
   copied: '已复制',
   safeModeBanner: '安全模式：用户插件配置已跳过，插件开关不可用。',
   exitSafeMode: '恢复正常模式并重启',
+  repairMessage: '插件「{pluginId}」上次启动失败，当前已被禁用。请修复它。\n\n失败详情：\n{message}\n\n原始堆栈：\n{stack}\n\n插件安装目录：{installPath}\n\n请检查并修复该插件；修复完成后告诉我如何重新启用。',
+  installRepairMessage: '插件安装失败，请帮我诊断并修复。\n\n安装目标：{spec}\n\n错误信息：\n{reason}\n\n请检查该插件并重新安装；完成后告诉我结果。',
 } satisfies Record<string, string>
 
 /** English copy dictionary for the tab. */
@@ -113,6 +115,8 @@ export const en = {
   copied: 'Copied',
   safeModeBanner: 'Safe mode: user plugin configuration is skipped; plugin switches are disabled.',
   exitSafeMode: 'Restore normal mode and restart',
+  repairMessage: 'Plugin "{pluginId}" failed to start last time and is currently disabled. Please fix it.\n\nFailure details:\n{message}\n\nOriginal stack:\n{stack}\n\nPlugin install directory: {installPath}\n\nPlease check and fix this plugin; tell me how to re-enable it once it is fixed.',
+  installRepairMessage: 'Plugin installation failed; please help diagnose and fix it.\n\nInstall target: {spec}\n\nError message:\n{reason}\n\nPlease check this plugin and reinstall it; tell me the result once done.',
 } satisfies Record<string, string>
 
 /** Copy dictionary key for the tab. */

@@ -8,6 +8,7 @@
  */
 import { appVersion } from './app-version.ts'
 import css from './VersionCaption.module.css'
+import { shellText } from './shell-locale.ts'
 
 /**
  * Render the bottom-right version caption.
@@ -16,5 +17,5 @@ import css from './VersionCaption.module.css'
 export function VersionCaption() {
   const version = appVersion()
   if (version === undefined) return null
-  return <div className={css.caption}>{`V${version}`}</div>
+  return <div className={css.caption}>{shellText('versionPrefix', { version })}</div>
 }

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
+import { shellText } from './shell-locale.ts'
 
-const DEFAULT_CLIENT_TITLE = 'Saturn AI'
+const DEFAULT_CLIENT_TITLE = shellText('defaultTitle')
 
 /** Props for the browser title projection. */
 export interface DocumentTitleProps {

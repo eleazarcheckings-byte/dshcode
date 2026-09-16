@@ -6,6 +6,7 @@
 import { useId } from 'react'
 import type { HeroBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SidebarBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import { en } from './locales.ts'
 
 // The accent owns brand contrast; the semantic label remains the fallback
 // for compositions that provide no Saturn skin.
@@ -68,8 +69,8 @@ export function SaturnHeroMark({ size, className }: HeroBrandMarkOwnerProps) {
 export function SaturnName() {
   return (
     <span className="saturn-brand-wordmark">
-      <span>Saturn</span>
-      <span className="saturn-brand-ai">AI</span>
+      <span>{en.name}</span>
+      <span className="saturn-brand-ai">{en.ai}</span>
     </span>
   )
 }

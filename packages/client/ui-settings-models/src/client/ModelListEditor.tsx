@@ -126,10 +126,10 @@ function IconTrash(): ReactNode {
 type CapacityField = 'contextWindow' | 'maxTokens'
 
 /** The three capability checkboxes, in display order. */
-const CAPABILITY_OPTIONS: readonly { toggle: CapabilityToggle; label: keyof typeof en }[] = [
-  { toggle: 'imageInput', label: 'modelImageInput' },
-  { toggle: 'imageGeneration', label: 'modelImageGeneration' },
-  { toggle: 'imageUnderstanding', label: 'modelImageUnderstanding' },
+const CAPABILITY_OPTIONS: readonly { toggle: CapabilityToggle; labelKey: keyof typeof en }[] = [
+  { toggle: 'imageInput', labelKey: 'modelImageInput' },
+  { toggle: 'imageGeneration', labelKey: 'modelImageGeneration' },
+  { toggle: 'imageUnderstanding', labelKey: 'modelImageUnderstanding' },
 ]
 
 /**
@@ -502,10 +502,10 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                           type="checkbox"
                           checked={capabilityChecks(model)[option.toggle]}
                           disabled={disabled}
-                          aria-label={`${t(option.label)} ${index + 1}`}
+                          aria-label={`${t(option.labelKey)} ${index + 1}`}
                           onChange={(event) => { toggleCapability(index, option.toggle, event.target.checked) }}
                         />
-                        <span>{t(option.label)}</span>
+                        <span>{t(option.labelKey)}</span>
                       </label>
                     ))}
                   </div>

@@ -134,20 +134,16 @@ function matchesEntry(entry: PluginInventorySnapshot['entries'][number], normali
  * the plugin's absolute install path, self-contained so the agent never needs
  * to read files outside its workspace to start.
  * @param failure - the recorded failure of the plugin.
+ * @param t - the tab's locale seat.
  * @returns the repair prompt text.
  */
-function repairMessage(failure: PluginFailureItem): string {
-  return `插件「${failure.pluginId}」上次启动失败，当前已被禁用。请修复它。
-
-失败详情：
-${failure.message}
-
-原始堆栈：
-${failure.stack}
-
-插件安装目录：${failure.installPath}
-
-请检查并修复该插件；修复完成后告诉我如何重新启用。`
+function repairMessage(failure: PluginFailureItem, t: PluginInstallerTabProps['t']): string {
+  return t('repairMessage', {
+    pluginId: failure.pluginId,
+    message: failure.message,
+    stack: failure.stack,
+    installPath: failure.installPath,
+  })
 }
 
 /**
@@ -155,17 +151,11 @@ ${failure.stack}
  * install target and the error text, self-contained for the agent.
  * @param spec - the install target (npm package or git URL) that failed.
  * @param reason - the rendered install error.
+ * @param t - the tab's locale seat.
  * @returns the repair prompt text.
  */
-function installRepairMessage(spec: string, reason: string): string {
-  return `插件安装失败，请帮我诊断并修复。
-
-安装目标：${spec}
-
-错误信息：
-${reason}
-
-请检查该插件并重新安装；完成后告诉我结果。`
+function installRepairMessage(spec: string, reason: string, t: PluginInstallerTabProps['t']): string {
+  return t('installRepairMessage', { spec, reason })
 }
 
 /** The merged plugin list tab. */
@@ -374,7 +364,7 @@ export function PluginInstallerTab(props: PluginInstallerTabProps) {
     if (failureSnapshot === undefined) return
     setRepairing(failure.pluginId)
     setError(undefined)
-    void repairPlugin(failureSnapshot.pluginRoot, repairMessage(failure)).then(() => {
+    void repairPlugin(failureSnapshot.pluginRoot, repairMessage(failure, t)).then(() => {
       setRepairing(undefined)
     }).catch((reason: unknown) => {
       setRepairing(undefined)
@@ -386,7 +376,7 @@ export function PluginInstallerTab(props: PluginInstallerTabProps) {
   const onRepairInstall = (): void => {
     if (failedSpec === undefined || view.status !== 'ready') return
     setRepairing(failedSpec)
-    void repairPlugin(view.failures.pluginRoot, installRepairMessage(failedSpec, error ?? '')).then(() => {
+    void repairPlugin(view.failures.pluginRoot, installRepairMessage(failedSpec, error ?? '', t)).then(() => {
       setRepairing(undefined)
       setError(undefined)
       setFailedSpec(undefined)
