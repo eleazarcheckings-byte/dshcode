@@ -64,7 +64,7 @@ describe('module exports', () => {
   })
 
   it('Config schema fills in default exclude, toolCallTimeoutMs, and failOnStartupError', () => {
-    const resolved = ConfigSchema({ configPath: '/tmp/x.json' } as never)
+    const resolved = ConfigSchema({ configPath: '/tmp/x.json' })
     expect(resolved.exclude).toEqual([])
     expect(resolved.toolCallTimeoutMs).toBe(60_000)
     expect(resolved.failOnStartupError).toBe(false)
@@ -96,7 +96,7 @@ describe('apply — real stdio mount', () => {
       },
     })
 
-    const config: Config = ConfigSchema({ configPath } as never)
+    const config: Config = ConfigSchema({ configPath })
     await apply(ctx, config)
 
     expect(ctx.tools.get('mcp__awake__add')).toBeDefined()
@@ -124,7 +124,7 @@ describe('apply — real stdio mount', () => {
     })
     const { warns, errors } = captureLogs(ctx)
 
-    const config: Config = ConfigSchema({ configPath } as never)
+    const config: Config = ConfigSchema({ configPath })
     await apply(ctx, config)
 
     // The real, reachable row still mounted and registered its tools.
@@ -157,7 +157,7 @@ describe('apply — skip and filter behavior', () => {
     })
     const { warns } = captureLogs(ctx)
 
-    await apply(ctx, ConfigSchema({ configPath } as never))
+    await apply(ctx, ConfigSchema({ configPath }))
 
     const status = getStatus(ctx)
     expect(status?.mounted).toEqual([])
@@ -171,7 +171,7 @@ describe('apply — skip and filter behavior', () => {
       awake: { type: 'stdio', command: process.execPath, args: [fixtureServerPath], cwd: mcpClientPackageDir },
     })
 
-    await apply(ctx, ConfigSchema({ configPath, exclude: ['saturnai'] } as never))
+    await apply(ctx, ConfigSchema({ configPath, exclude: ['saturnai'] }))
 
     const status = getStatus(ctx)
     expect(status?.mounted).toEqual(['awake'])
@@ -187,7 +187,7 @@ describe('apply — skip and filter behavior', () => {
       web: { type: 'http', url: 'http://127.0.0.1:1/mcp', headers: { Authorization: 'Bearer test-token' } },
     })
 
-    await apply(ctx, ConfigSchema({ configPath } as never))
+    await apply(ctx, ConfigSchema({ configPath }))
 
     const status = getStatus(ctx)
     expect(status?.mounted).toEqual(['web'])
@@ -215,7 +215,7 @@ describe('apply — secret hygiene', () => {
       })
       const { warns, errors } = captureLogs(ctx)
 
-      await apply(ctx, ConfigSchema({ configPath } as never))
+      await apply(ctx, ConfigSchema({ configPath }))
 
       const allLogText = [...warns, ...errors].join('\n')
       expect(allLogText).not.toContain('super-secret-should-never-be-logged')
@@ -232,7 +232,7 @@ describe('apply — strict startup', () => {
     const dir = await mkdtemp(join(tmpdir(), 'mcp-config-claude-strict-missing-'))
     const ctx = await mountRegistry()
     try {
-      await expect(apply(ctx, ConfigSchema({ configPath: join(dir, 'missing.json') } as never)))
+      await expect(apply(ctx, ConfigSchema({ configPath: join(dir, 'missing.json') })))
         .rejects.toThrow()
     } finally {
       await ctx.fiber.dispose()
@@ -248,7 +248,7 @@ describe('apply — strict startup', () => {
         broken: { type: 'stdio', command: 'this-command-does-not-exist-xyz123' },
       })
 
-      await expect(apply(ctx, ConfigSchema({ configPath, failOnStartupError: true } as never)))
+      await expect(apply(ctx, ConfigSchema({ configPath, failOnStartupError: true })))
         .rejects.toThrow()
     } finally {
       await ctx.fiber.dispose()
