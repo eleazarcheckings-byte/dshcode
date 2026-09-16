@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 `@saturnai/dsh-claims` 让文件归属成为锁，而不是彼此的客气。agent 在写入之前，为它将要修改的确切文件或目录前缀取得租约；任何其他 session 试图写入这些路径时，都会在第一个字节落盘之前被拒绝——既包括第一方的 `write`、`edit`、`str_replace_editor` 工具，也包括参数中指名文件的 `bash`、`pwsh` 和 `terminal` 命令。ledger 存放在 `<DSH_HOME>/claims/ledgers`，位于所有工作树之外，因此租约比取得它的 session 更长寿，两个进程操作同一仓库时读到的也是同一份字节。
 
@@ -17,7 +17,7 @@ kind: "package-reference"
 - [理解实现](#understand-the-implementation)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发者说明](#dev-note)
+- [开发备注](#dev-note)
 
 -----
 
@@ -70,6 +70,6 @@ policy 段落是静态的，与其他常驻段落一起位于 prompt 前缀中�
 - 第一方守卫在派发期间持有 ledger 锁，因而在一个 workspace 内串行化受保护的修改。shell 守卫刻意不这么做，代价是留下一个很窄的窗口：检查期间新取得的 claim 会被漏掉。
 
 <a id="dev-note"></a>
-### 开发者说明
+### 开发备注
 
 [运行时决策](../../../.agents/notes/implemented/bug-fix/2026-09-14-saturn-team-file-ownership.zh.md)记录了最初的权衡，[worktree 隔离](../../../.agents/notes/implemented/feature/2026-09-15-agent-team-worktree-isolation.zh.md)记录了 ledger 为何改为以仓库为键。本包不发布运行时 invariant 安装器：ledger 事务与两个派发守卫在每次修改处强制该关系，行为测试直接覆盖被拒绝的写入。

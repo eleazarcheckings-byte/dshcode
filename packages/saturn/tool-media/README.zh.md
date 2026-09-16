@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 **为 Saturn AI harness 提供的 Higgsfield 级媒体生成能力。** `ctx.media` 是覆盖三个供应商后端的统一接口——**gemini**（图像走 `interactions` REST 端点,视频走 Veo 3.1 的 `predictLongRunning` 异步操作）、**openai**（图像,可选）、**higgsfield**（`docs.higgsfield.ai` 的异步任务 API,是唯一接入动作迁移/物体替换的供应商）——以 `media_generate_image`、`media_generate_video`、`media_generate_audio`、`media_motion_transfer`、`media_job_status` 五个模型可见工具的形式暴露。本包范围内的每个供应商都会产生真实费用;因此每次调用在发出计费网络请求之前都会先请求批准——无论权限预设如何——通过 `ctx.approval`(优先路线,当调用携带 `Agent` 时)或 `ctx.userQuestions`(agentless 兜底路线,面向像 SaturnBot 这样自身模型中完全没有 `Agent` 的调用方),两者都会写明预估的美元成本,且在两条路线都不可用时直接关闭失败(绝不会静默花钱)。生成的资产会写入 `<workspace>/.saturn/media/` 并以文件引用的形式返回,绝不会把字节内容直接交给模型。
 
@@ -18,7 +18,7 @@ kind: "package-reference"
 - [进一步探索](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与延后事项](#known-limitations-and-deferred-work)
-- [开发者说明](#dev-note)
+- [开发备注](#dev-note)
 
 -----
 
@@ -143,7 +143,7 @@ kind: "package-reference"
 - **未实现 webhook 投递**——Higgsfield 支持通过 `hf_webhook` 查询参数进行基于推送的完成通知(`docs.higgsfield.ai/docs/how-to/webhooks`),可以省去上面的轮询预算;但本包没有用于接收此类通知的入站 HTTP 接口。
 
 <a id="dev-note"></a>
-### 开发者说明
+### 开发备注
 
 <details>
 <summary>供维护者参考的工作背景——点击展开</summary>

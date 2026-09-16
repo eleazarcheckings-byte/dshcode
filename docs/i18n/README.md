@@ -52,6 +52,7 @@ Generated English references and graphs participate in pairing when a reviewed C
 - `docs/i18n/terminology.md` and [style-samples.md](style-samples.md) — both are bilingual by construction.
 - [translation-prompt.md](translation-prompt.md) — the automated pipeline's prompt template; its body is machine-consumed verbatim, so a paired translation would change pipeline behavior.
 - `.agents/notes/archived/` — frozen historical triplets. [`verify-archived-agent-notes`](../../scripts/verify-archived-agent-notes.ts) validates their completeness and content seals; translation maintenance must never rewrite them.
+- `apps/mobile/ios/App/CapApp-SPM/README.md` — a Capacitor-generated file inside the native project; `pod install`/Capacitor sync regenerates it, so a paired translation would go stale on the next sync.
 
 **Universal requirement**: every current or future document in scope must merge as a complete bilingual pair. [scripts/translation-pairing.manifest.json](../../scripts/translation-pairing.manifest.json) contains only explicit exclusions; there is no per-file rollout list, date cutoff, or README-specific policy class.
 

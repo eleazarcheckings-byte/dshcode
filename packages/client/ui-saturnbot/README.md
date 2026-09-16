@@ -52,10 +52,23 @@ This package is coded against the `firstRun`/`integrationCatalog` snapshot field
 <a id="model-experience"></a>
 ## Model Experience
 
-This package creates no model sessions or prompts. Its message command sends the selected role and the operator's text to the SaturnBot Host. Published proposals, outcomes, and digests come from durable Host records. It introduces no synthetic activity, success metrics, unread counts, or screen feed.
+### Operator message send
+
+#### What the model sees
+
+This package creates no model session or prompt itself. Its message command (`controller.ts` `message(role, content)`) forwards only the selected `BotRole` and the operator's raw text, unmodified, to the SaturnBot Host's `message` method ([contracts.ts](src/client/contracts.ts) `SaturnBotRemote`); the Host's own `botModelPrompt` ([packages/saturn/saturnbot](../../saturn/saturnbot/README.md#model-experience)) assembles that content into the next specialist request. This package adds no history, formatting, or synthetic context of its own.
+
+#### Token effect
+
+None at this layer. The forwarded `content` string is the only payload; every other model-context field (goal, workspace, role instructions, observations, prior rounds) is assembled by the Host from durable state, not by this package.
+
+#### KV Cache effect
+
+None. This package issues one RPC per send and holds no cached prefix; the Host's own per-call assembly determines any cache reuse, as documented in its README.
+
+## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-## Known Limitations and Deferred Work
 
 - This surface manages one configured workspace instance. It does not implement multi-tenant billing or account isolation.
 - The recent tool journal is bounded at 1,000 records, while the Host supplies bounded run/message/report history. Full journal export and older-message pagination are not exposed here.

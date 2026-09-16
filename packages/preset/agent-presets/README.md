@@ -15,6 +15,7 @@ English | [中文](README.zh.md)
 
 - [Use this package](#use-this-package)
 - [Understand the implementation](#understand-the-implementation)
+- [Team coordination](#team-coordination)
 - [Further Exploration](#further-exploration)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -138,6 +139,13 @@ The creation header names the preset a session started with; the `agentPreset` S
 
 -----
 
+<a id="team-coordination"></a>
+## Team coordination
+
+When the host mounts `agentTeams`, the built-in standard, cordis, and ptc presets omit legacy `send_message`, `interrupt_agent`, and `list_agents` registrations. Team tools own those names, and the legacy subagent launchers use one-shot background jobs. Without the Team runtime, the presets retain continuable subagents and their controls.
+
+-----
+
 <a id="further-exploration"></a>
 ## Further Exploration
 
@@ -191,7 +199,3 @@ This Dev Note is working context for maintainers: open design questions and dire
 Reclaiming a superseded standing mount needs a joined-agent count on `StandingMount`, incremented in `mount`/`composeFrom`/`recompose` and decremented when the agent's scope key dies — the `TODO` at `ensureStanding`. The subtree is not inert: `dsh-skill-filesystem` watches its roots, so an unreclaimed generation keeps a live watcher set alive until the process ends.
 
 </details>
-
-## Team coordination
-
-When the host mounts `agentTeams`, the built-in standard, cordis, and ptc presets omit legacy `send_message`, `interrupt_agent`, and `list_agents` registrations. Team tools own those names, and the legacy subagent launchers use one-shot background jobs. Without the Team runtime, the presets retain continuable subagents and their controls.

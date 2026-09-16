@@ -1504,6 +1504,8 @@ export interface StdioConfig {
   env: Record<string, string>
   /** Working directory for the child process. */
   cwd: string
+  /** Optional deadline for each connection handshake plus initial tool sync, in milliseconds. */
+  connectTimeoutMs?: number
   /** Per-tool-call timeout in milliseconds. */
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
@@ -1526,6 +1528,8 @@ export interface StreamableHttpConfig {
   url: string
   /** Additional headers attached to MCP requests. */
   headers: Record<string, string>
+  /** Optional deadline for each connection handshake plus initial tool sync, in milliseconds. */
+  connectTimeoutMs?: number
   /** Per-tool-call timeout in milliseconds. */
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
@@ -1547,7 +1551,7 @@ export interface ReconnectConfig {
 }
 ```
 
-Source: [`packages/mcp/mcp-client/src/index.ts:98`](../packages/mcp/mcp-client/src/index.ts)
+Source: [`packages/mcp/mcp-client/src/index.ts:113`](../packages/mcp/mcp-client/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -2195,24 +2199,6 @@ export interface Config {
 ```
 
 Source: [`packages/skill/skill-filesystem/src/index.ts:49`](../packages/skill/skill-filesystem/src/index.ts)
-
-<a id="deepseek-aidsh-skill-premium-output"></a>
-
-## `@deepseek-ai/dsh-skill-premium-output`
-
-Requires: `skills` · `systemPrompt`
-
-```ts config-catalog
-/** Deployment overrides for packaged output guidance. */
-export interface Config {
-  /** Mount the policy and bundled guides; default true. */
-  enabled?: boolean
-  /** Replace the default policy; user and project task requirements still take precedence. */
-  policy?: string
-}
-```
-
-Source: [`packages/skill/skill-premium-output/src/index.ts:21`](../packages/skill/skill-premium-output/src/index.ts)
 
 <a id="deepseek-aidsh-spill-local"></a>
 
@@ -3465,10 +3451,51 @@ export interface Config {
   readonly maxMessageBytes?: number
   /** Maximum milliseconds allowed for Team-owned runtime disposal. */
   readonly disposalTimeoutMs?: number
+  /**
+   * Directory holding isolated teammate checkouts. Defaults to
+   * `<DSH_HOME>/worktrees`; deliberately outside every workspace, so a checkout
+   * can never appear in the repository it was taken from.
+   */
+  readonly worktreeRoot?: string
 }
 ```
 
-Source: [`packages/saturn/agent-team/src/types.ts:131`](../packages/saturn/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:154`](../packages/saturn/agent-team/src/types.ts)
+
+<a id="saturnaidsh-design-brain"></a>
+
+## `@saturnai/dsh-design-brain`
+
+Requires: `settings` · `tools` · `systemPrompt` · `loader`
+
+```ts config-catalog
+/** Deployment-owned endpoint and bounded connection costs; clients cannot override them. */
+export interface Config {
+  /** Streamable HTTP MCP endpoint, without URL credentials or query parameters. */
+  endpoint: string
+  /** Deadline for the initial handshake and tool registration, in milliseconds. */
+  connectTimeoutMs: number
+  /** Deadline for each subsequent model tool call, in milliseconds. */
+  toolCallTimeoutMs: number
+  /** Optional deployment headers, redacted from settings and status responses. */
+  headers: Record<string, string>
+}
+```
+
+Source: [`packages/saturn/design-brain/src/index.ts:20`](../packages/saturn/design-brain/src/index.ts)
+
+<a id="saturnaidsh-model-router"></a>
+
+## `@saturnai/dsh-model-router`
+
+Requires: `settings`
+
+```ts config-catalog
+/** Composition entry for `@saturnai/dsh-model-router`; the package takes no composition fields today. */
+export type Config = object
+```
+
+Source: [`packages/saturn/model-router/src/types.ts:46`](../packages/saturn/model-router/src/types.ts)
 
 <a id="saturnaidsh-orchestrate"></a>
 
@@ -3486,7 +3513,75 @@ export interface OrchestrateModeConfig {
 }
 ```
 
-Source: [`packages/saturn/orchestrate/src/index.ts:39`](../packages/saturn/orchestrate/src/index.ts)
+Source: [`packages/saturn/orchestrate/src/index.ts:44`](../packages/saturn/orchestrate/src/index.ts)
+
+<a id="saturnaidsh-remote-access"></a>
+
+## `@saturnai/dsh-remote-access`
+
+Requires: `webServer` · `connection` · `settings`
+
+```ts config-catalog
+/** Deployment-owned bounds; a person chooses the mode, not these. */
+export interface Config {
+  /** Explicit harness home; omitted follows `DSH_HOME`, then `~/.dsh`. */
+  dshHome?: string
+  /** Interface the LAN listener binds. */
+  bindHost: '0.0.0.0' | '127.0.0.1'
+  /** Port for the LAN listener; zero asks the operating system. */
+  port: number
+  /** Display name shown on the phone before it commits to pairing. */
+  hostName: string
+  /** Pairing-token lifetime in milliseconds. */
+  pairingTtlMs: number
+  /** Lifetime of the generated certificate, in days. */
+  certificateValidityDays: number
+  /** How long to wait for cloudflared to publish an address. */
+  tunnelTimeoutMs: number
+}
+```
+
+Source: [`packages/saturn/remote-access/src/index.ts:70`](../packages/saturn/remote-access/src/index.ts)
+
+<a id="saturnaidsh-review"></a>
+
+## `@saturnai/dsh-review`
+
+Requires: `subagents` · `tools` · `sessionProjections`
+
+```ts config-catalog
+/** Deployment-owned configuration of the reviewer. */
+export interface Config {
+  /**
+   * Which `ctx.subagents` provider runs the reviewer. It must be one that gives
+   * the child a fresh conversation; a context-inheriting provider is refused at
+   * the call rather than silently producing a compromised review.
+   */
+  provider?: string
+  /**
+   * Model route for the reviewer, when it should differ from the caller's own.
+   * A different model is the strongest form of independence this seam can buy:
+   * the reviewer then shares neither the context nor the failure modes.
+   */
+  agentOptions?: ReviewerAgentOptions
+  /** Extra tools the reviewer may not use, beyond the contract tools it never gets. */
+  denyTools?: string[]
+  /** Absolute delegation-depth cap for the reviewer child. */
+  maxDepth?: number
+}
+
+/** The reviewer's own model route, when the deployment pins one. */
+export interface ReviewerAgentOptions {
+  /** Provider route (must have a registered adapter at call time). */
+  provider: string
+  /** Model id interpreted by the selected provider adapter. */
+  model: string
+  /** Adapter-owned reasoning effort for that route. */
+  reasoningEffort: ReturnType<typeof ReasoningEffortId>
+}
+```
+
+Source: [`packages/saturn/review/src/index.ts:66`](../packages/saturn/review/src/index.ts)
 
 <a id="saturnaidsh-saturnbot"></a>
 
@@ -3510,7 +3605,25 @@ export interface Config {
 }
 ```
 
-Source: [`packages/saturn/saturnbot/src/index.ts:32`](../packages/saturn/saturnbot/src/index.ts)
+Source: [`packages/saturn/saturnbot/src/index.ts:34`](../packages/saturn/saturnbot/src/index.ts)
+
+<a id="saturnaidsh-skill-premium-output"></a>
+
+## `@saturnai/dsh-skill-premium-output`
+
+Requires: `skills` · `systemPrompt`
+
+```ts config-catalog
+/** Deployment overrides for packaged output guidance. */
+export interface Config {
+  /** Mount the policy and bundled guides; default true. */
+  enabled?: boolean
+  /** Replace the default policy; user and project task requirements still take precedence. */
+  policy?: string
+}
+```
+
+Source: [`packages/skill/skill-premium-output/src/index.ts:21`](../packages/skill/skill-premium-output/src/index.ts)
 
 <a id="saturnaidsh-tool-agent-team"></a>
 
@@ -3529,6 +3642,100 @@ export interface Config {
 ```
 
 Source: [`packages/saturn/tool-agent-team/src/index.ts:17`](../packages/saturn/tool-agent-team/src/index.ts)
+
+<a id="saturnaidsh-tool-media"></a>
+
+## `@saturnai/dsh-tool-media`
+
+Requires: `tools`
+
+```ts config-catalog
+/** Deployment configuration for the media tool package. */
+export interface Config {
+  /** Gemini provider sub-block: credentials plus `GeminiConfig`; omit to leave the provider unconfigured. */
+  readonly gemini?: GeminiPluginConfig
+  /** OpenAI provider sub-block: credentials plus `OpenAiConfig`; omit to leave the provider unconfigured. */
+  readonly openai?: OpenAiPluginConfig
+  /** Higgsfield provider sub-block: credentials plus `HiggsfieldConfig`; omit to leave the provider unconfigured. */
+  readonly higgsfield?: HiggsfieldPluginConfig
+  /** Provider used when a call omits `provider` for an `image` request; defaults to `gemini`. */
+  readonly defaultImageProvider?: MediaProviderId
+  /** Provider used when a call omits `provider` for a `video` request; defaults to `gemini`. */
+  readonly defaultVideoProvider?: MediaProviderId
+}
+
+/** Loader-facing config for the Gemini sub-block, plus its credential fields. */
+export interface GeminiPluginConfig extends GeminiConfig {
+  /** Literal Gemini API key; mutually exclusive with `apiKeyEnv` and never logged. */
+  readonly apiKey?: string
+  /** Name of the environment variable holding the Gemini API key; defaults to `GEMINI_API_KEY`. */
+  readonly apiKeyEnv?: string
+}
+
+/** Loader-facing config for the OpenAI sub-block, plus its credential fields. */
+export interface OpenAiPluginConfig extends OpenAiConfig {
+  /** Literal OpenAI API key; mutually exclusive with `apiKeyEnv` and never logged. */
+  readonly apiKey?: string
+  /** Name of the environment variable holding the OpenAI API key; defaults to `OPENAI_API_KEY`. */
+  readonly apiKeyEnv?: string
+}
+
+/** Loader-facing config for the Higgsfield sub-block, plus its (combined `id:secret`) credential fields. */
+export interface HiggsfieldPluginConfig extends HiggsfieldConfig {
+  /** Literal, already-combined `"{id}:{secret}"` Higgsfield credential; mutually exclusive with `apiKeyEnv` and never logged. */
+  readonly apiKey?: string
+  /** Name of the environment variable holding the combined `"{id}:{secret}"` Higgsfield credential; defaults to `HIGGSFIELD_API_KEY`. */
+  readonly apiKeyEnv?: string
+}
+
+/** The backend a generation call resolves to. */
+export type MediaProviderId = 'gemini' | 'openai' | 'higgsfield'
+
+/** Deployment configuration for the Gemini provider. */
+export interface GeminiConfig {
+  /** REST origin for both the `interactions` and Veo endpoints; defaults to `DEFAULT_GEMINI_BASE_URL`. */
+  readonly baseURL?: string
+  /** Model id passed to the `interactions` endpoint for image generation; defaults to `DEFAULT_GEMINI_IMAGE_MODEL`. */
+  readonly imageModel?: string
+  /** Model id passed to Veo's `predictLongRunning` for video generation; defaults to `DEFAULT_GEMINI_VIDEO_MODEL`. */
+  readonly videoModel?: string
+  /** Per-HTTP-call timeout (submission and each poll), not the whole video job. */
+  readonly timeoutMs?: number
+  /** Delay between successive Veo job-status polls; defaults to `DEFAULT_GEMINI_POLL_INTERVAL_MS`. */
+  readonly pollIntervalMs?: number
+  /** Total wall-clock budget for polling a video job before giving up. */
+  readonly pollTimeoutMs?: number
+}
+
+/** Deployment configuration for the OpenAI provider. */
+export interface OpenAiConfig {
+  /** REST origin for `POST {baseURL}/images/generations`; defaults to `DEFAULT_OPENAI_BASE_URL`. */
+  readonly baseURL?: string
+  /** Model id passed to the images-generations endpoint; defaults to `DEFAULT_OPENAI_IMAGE_MODEL`. */
+  readonly imageModel?: string
+  /** HTTP timeout for the single generation request; defaults to `DEFAULT_OPENAI_TIMEOUT_MS`. */
+  readonly timeoutMs?: number
+}
+
+/** Deployment configuration for the Higgsfield provider. */
+export interface HiggsfieldConfig {
+  /** REST origin for job submission and status polling; defaults to `DEFAULT_HIGGSFIELD_BASE_URL`. */
+  readonly baseURL?: string
+  /** Model path for `media_generate_image` when the call omits `params.modelPath`. */
+  readonly imageModelPath?: string
+  /** Per-HTTP-call timeout (submission and each poll), not the whole job; defaults to `DEFAULT_HIGGSFIELD_TIMEOUT_MS`. */
+  readonly timeoutMs?: number
+  /**
+   * Delay between successive job-status polls; defaults to
+   * `DEFAULT_HIGGSFIELD_POLL_INTERVAL_MS`, capped at `MAX_HIGGSFIELD_POLL_INTERVAL_MS`.
+   */
+  readonly pollIntervalMs?: number
+  /** Total wall-clock budget for polling a job before giving up; defaults to `DEFAULT_HIGGSFIELD_POLL_TIMEOUT_MS`. */
+  readonly pollTimeoutMs?: number
+}
+```
+
+Source: [`packages/saturn/tool-media/src/index.ts:106`](../packages/saturn/tool-media/src/index.ts)
 
 ## Loadable plugins with no config
 
@@ -3621,6 +3828,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@saturnai/dsh-client-ui-done` ([`packages/client/ui-done/src/index.ts`](../packages/client/ui-done/src/index.ts))
 - `@saturnai/dsh-client-ui-fleet` ([`packages/client/ui-fleet/src/index.ts`](../packages/client/ui-fleet/src/index.ts))
 - `@saturnai/dsh-client-ui-orchestrate` ([`packages/client/ui-orchestrate/src/index.ts`](../packages/client/ui-orchestrate/src/index.ts))
+- `@saturnai/dsh-client-ui-remote-access` ([`packages/client/ui-remote-access/src/index.ts`](../packages/client/ui-remote-access/src/index.ts))
 - `@saturnai/dsh-client-ui-saturnbot` ([`packages/client/ui-saturnbot/src/index.ts`](../packages/client/ui-saturnbot/src/index.ts))
 - `@saturnai/dsh-client-ui-skin-saturn` ([`packages/client/ui-skin-saturn/src/index.ts`](../packages/client/ui-skin-saturn/src/index.ts))
 - `@saturnai/dsh-done` — requires `sessionProjections` · `systemPrompt` ([`packages/saturn/done/src/index.ts`](../packages/saturn/done/src/index.ts))

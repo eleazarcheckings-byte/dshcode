@@ -7,23 +7,23 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## Summary
+## 概述
 
 `@saturnai/dsh-model-router` 拥有一个设置命名空间 `saturn-model-router`，其中命名了四个路由分级——`coordinator`、`specialist`、`bulk`、`vision`——每个分级要么是显式的 `{ provider, model, reasoningEffort? }` 路由，要么是 `'default'`。调用方应通过 `ctx.modelRouter.resolve(tier)` 取得路由,而不是硬编码一条路由：留在 `'default'` 的分级会跟随当前的 `agent-default-model`,因此提高部署默认模型会同时提升所有尚未被覆盖的分级。同一命名空间还携带 `externalHarnesses`——一个默认关闭(新安装即关闭)的单一开关,由某个 Bundle 行或预设工具行据此决定是否挂载原生的 Claude Code / Codex 子代理提供方——每一个仍会在其自身的包内平台 CLI 包未安装时自我隐藏,因此仅仅打开开关本身绝不会让一个背后空无一物的工具出现。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
 在 Host 层挂载一次插件即可(共享的 base bundle 已经携带它)。之后任何一行——子代理派生、SaturnBot、某个 Bundle 的 `disabled` 表达式——都通过鸭子类型的 `ctx.get('modelRouter')` 读取,因此省略此包的组合会退化为“无路由器”而不是挂载失败。
 
@@ -72,10 +72,10 @@ saturn-model-router:
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现内部细节——点击展开</summary>
 
 `ModelRouterService` 通过 `ctx.settings.register` 注册该命名空间,后者按顺序解析模式默认值、组合层的 `base`(此处没有——每个字段都有模式默认值)以及用户层;`resolve()` 在每次调用时读取当前注册状态,而不是缓存快照,因此编辑该命名空间会在下一次 `resolve` 时生效,无需重启。回退到 `agentDefaultModel` 是一次鸭子类型的 `ctx.get('agentDefaultModel')` 读取,而不是硬依赖,这与 SPEC §4 中的接口契约(`ctx.modelRouter`,C6 → C5/C8a)一致:从未挂载 `agent-default-model` 的组合仍会把每个 `'default'` 分级解析为随包附带的 DeepSeek V4 Flash 兜底值,而不是抛出异常。
 
@@ -86,7 +86,7 @@ saturn-model-router:
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
 - [llm-pi-ai](../../llm/llm-pi-ai/README.zh.md) — base bundle 中精选的免密钥配置所填充的多提供方适配器。
 - [agent-default-model](../../core/agent-default-model/README.zh.md) — `'default'` 分级回退所依据的部署默认值。
@@ -96,15 +96,15 @@ saturn-model-router:
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this package resolves routing and mount decisions for other Host plugins and never contributes prompt text, tool schemas, or model-visible content of its own.
+无，因为本包只为其他 Host 插件解析路由与挂载决策，从不贡献自己的提示词文本、工具 schema 或模型可见内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Independent:本包不持有任何按请求或按会话的状态,且不会直接触及任何模型请求。某个分级解析出的 `provider`/`model` 决定了消费者自身请求使用哪个适配器与模型 id;更改某个分级的路由是消费者层面的变化(有时是不同的模型,有时是不同的提供方),其缓存影响完全归属于该消费者自身的适配器,而非本路由器。
+独立：本包不持有任何按请求或按会话的状态,且不会直接触及任何模型请求。某个分级解析出的 `provider`/`model` 决定了消费者自身请求使用哪个适配器与模型 id;更改某个分级的路由是消费者层面的变化(有时是不同的模型,有时是不同的提供方),其缓存影响完全归属于该消费者自身的适配器,而非本路由器。
 
-## Known Limitations and Deferred Work
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
@@ -115,10 +115,10 @@ Independent:本包不持有任何按请求或按会话的状态,且不会直接�
 - **不校验每个分级的推理强度是否与目标模型能力匹配** ——目标模型不支持的强度等级属于消费适配器自身的失败模式(参见 `dsh-llm-pi-ai` 的 `UNSUPPORTED_OPTION` / 推理能力处理)。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
 本 Dev Note 为非权威性的工作上下文:尚未决定的方向与给维护者的说明。已发布的行为与已采纳的理由记录在上述各节、包代码与相关 Agent Notes 中。
 
@@ -127,4 +127,4 @@ Independent:本包不持有任何按请求或按会话的状态,且不会直接�
 
 </details>
 
-**Runtime invariant:** No companion is published. This package exposes no independent event sequence or mutable data relation beyond the settings registration enforced at its owning seam.
+**运行时不变量：** 未发布配套包。除了在其所属接缝强制的 settings 注册之外，本包不暴露任何独立的事件序列或可变数据关系。

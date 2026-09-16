@@ -22,11 +22,15 @@ import type { MediaCost } from '../types.ts'
 
 /** Deployment configuration for the Gemini provider. */
 export interface GeminiConfig {
+  /** REST origin for both the `interactions` and Veo endpoints; defaults to `DEFAULT_GEMINI_BASE_URL`. */
   readonly baseURL?: string
+  /** Model id passed to the `interactions` endpoint for image generation; defaults to `DEFAULT_GEMINI_IMAGE_MODEL`. */
   readonly imageModel?: string
+  /** Model id passed to Veo's `predictLongRunning` for video generation; defaults to `DEFAULT_GEMINI_VIDEO_MODEL`. */
   readonly videoModel?: string
   /** Per-HTTP-call timeout (submission and each poll), not the whole video job. */
   readonly timeoutMs?: number
+  /** Delay between successive Veo job-status polls; defaults to `DEFAULT_GEMINI_POLL_INTERVAL_MS`. */
   readonly pollIntervalMs?: number
   /** Total wall-clock budget for polling a video job before giving up. */
   readonly pollTimeoutMs?: number

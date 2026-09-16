@@ -19,8 +19,11 @@ import type { DecodedMedia } from './gemini.ts'
 
 /** Deployment configuration for the OpenAI provider. */
 export interface OpenAiConfig {
+  /** REST origin for `POST {baseURL}/images/generations`; defaults to `DEFAULT_OPENAI_BASE_URL`. */
   readonly baseURL?: string
+  /** Model id passed to the images-generations endpoint; defaults to `DEFAULT_OPENAI_IMAGE_MODEL`. */
   readonly imageModel?: string
+  /** HTTP timeout for the single generation request; defaults to `DEFAULT_OPENAI_TIMEOUT_MS`. */
   readonly timeoutMs?: number
 }
 

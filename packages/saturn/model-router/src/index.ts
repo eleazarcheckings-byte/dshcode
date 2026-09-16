@@ -228,7 +228,11 @@ export class ModelRouterService extends Service {
     }
   }
 
-  /** Whether the deployment has opted into native product subagent providers. */
+  /**
+   * Whether the deployment has opted into native product subagent providers.
+   * @returns the current `externalHarnesses` config flag; independent of
+   *   whether any harness CLI actually resolves on disk.
+   */
   externalHarnessesEnabled(): boolean {
     return this.scope.get().externalHarnesses
   }
@@ -260,6 +264,8 @@ export class ModelRouterService extends Service {
    * both gate on, so enabling the toggle alone can never surface a tool with
    * nothing behind it.
    * @param harness - the native product subagent a row is gating.
+   * @returns true only when the deployment enabled external harnesses AND
+   *   this specific harness's CLI resolves; false otherwise.
    */
   externalHarnessMounted(harness: ExternalHarness): boolean {
     return this.externalHarnessesEnabled() && this.harnessAvailable(harness)

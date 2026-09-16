@@ -15,6 +15,7 @@ kind: "package-reference"
 
 - [使用本包](#use-this-package)
 - [理解实现](#understand-the-implementation)
+- [Team 协调](#team-coordination)
 - [进一步探索](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
@@ -138,6 +139,13 @@ agent-presets:
 
 -----
 
+<a id="team-coordination"></a>
+## Team 协调
+
+当宿主挂载 `agentTeams` 时，内置 standard、cordis 和 ptc preset 会跳过旧版 `send_message`、`interrupt_agent` 和 `list_agents` 注册。这些名称由 Team 工具拥有，旧版 subagent 启动工具使用一次性后台任务。没有 Team 运行时时，preset 保留可继续运行的 subagent 及其控制工具。
+
+-----
+
 <a id="further-exploration"></a>
 ## 进一步探索
 
@@ -191,7 +199,3 @@ agent-presets:
 回收被替代的常驻挂载，需要给 `StandingMount` 加上已加入 agent 的计数，在 `mount`/`composeFrom`/`recompose` 中递增、在 agent 的 scope key 消亡时递减——即 `ensureStanding` 处的 `TODO`。子树并非惰性：`dsh-skill-filesystem` 监听自己的根目录，因此未回收的代际会让一套活的 watcher 一直存活到进程结束。
 
 </details>
-
-## Team 协调
-
-当宿主挂载 `agentTeams` 时，内置 standard、cordis 和 ptc preset 会跳过旧版 `send_message`、`interrupt_agent` 和 `list_agents` 注册。这些名称由 Team 工具拥有，旧版 subagent 启动工具使用一次性后台任务。没有 Team 运行时时，preset 保留可继续运行的 subagent 及其控制工具。

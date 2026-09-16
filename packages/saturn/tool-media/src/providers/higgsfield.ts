@@ -30,11 +30,18 @@ import type { MediaCost, MediaJobStatus } from '../types.ts'
 
 /** Deployment configuration for the Higgsfield provider. */
 export interface HiggsfieldConfig {
+  /** REST origin for job submission and status polling; defaults to `DEFAULT_HIGGSFIELD_BASE_URL`. */
   readonly baseURL?: string
   /** Model path for `media_generate_image` when the call omits `params.modelPath`. */
   readonly imageModelPath?: string
+  /** Per-HTTP-call timeout (submission and each poll), not the whole job; defaults to `DEFAULT_HIGGSFIELD_TIMEOUT_MS`. */
   readonly timeoutMs?: number
+  /**
+   * Delay between successive job-status polls; defaults to
+   * `DEFAULT_HIGGSFIELD_POLL_INTERVAL_MS`, capped at `MAX_HIGGSFIELD_POLL_INTERVAL_MS`.
+   */
   readonly pollIntervalMs?: number
+  /** Total wall-clock budget for polling a job before giving up; defaults to `DEFAULT_HIGGSFIELD_POLL_TIMEOUT_MS`. */
   readonly pollTimeoutMs?: number
 }
 

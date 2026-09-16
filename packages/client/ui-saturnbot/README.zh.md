@@ -52,10 +52,23 @@ kind: "package-reference"
 <a id="model-experience"></a>
 ## 模型体验
 
-本包不创建模型会话或提示词。消息命令将选定角色和操作员输入发送给 SaturnBot Host。已发布提议、结果和简报来自持久 Host 记录。本包不生成虚构活动、成功指标、未读计数或屏幕画面。
+### 操作员消息发送
+
+#### 模型看到的内容
+
+本包自身不创建模型会话或提示词。其消息命令（`controller.ts` 中的 `message(role, content)`）只将选定的 `BotRole` 与操作员的原始文本原样转发给 SaturnBot Host 的 `message` 方法（[contracts.ts](src/client/contracts.ts) 中的 `SaturnBotRemote`）；Host 自身的 `botModelPrompt`（见 [packages/saturn/saturnbot](../../saturn/saturnbot/README.zh.md#model-experience)）会把这段内容组装进下一次领域代理请求。本包不添加任何历史记录、格式化或自造上下文。
+
+#### Token 影响
+
+在本层没有影响。转发的 `content` 字符串是唯一负载；其余每个模型上下文字段（目标、工作区、角色说明、观察数据、此前轮次）都由 Host 从持久状态组装，而非由本包组装。
+
+#### KV 缓存影响
+
+没有影响。本包每次发送只发出一次 RPC 调用，不持有任何缓存前缀；任何缓存复用都取决于 Host 自身的按次组装方式，具体见其 README。
+
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
-## 已知限制与后续工作
 
 - 此界面管理一个已配置工作区实例，不实现多租户计费或账户隔离。
 - 近期工具日志限制为 1,000 条，Host 提供有界运行、消息和报告历史。此处尚未提供完整日志导出和更早消息分页。

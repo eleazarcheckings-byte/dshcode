@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/saturn/model-router/README.md
 README.md: 8135e6018255c768a7d31afab24c9a6a0413c141
-README.zh.md: 1d37f2b2e950c854a18e5120f7a3a279dc165c68
+README.zh.md: 9adf18c7df746bed70061fc323fbe248d2073e87

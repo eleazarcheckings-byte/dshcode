@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/saturn/claims/README.md
 README.md: dc84b94e45de16669e6b076c86f9aaaeaa1f4c4e
-README.zh.md: 12c3fa7b301de37a21c2b7f00b582240603b07c6
+README.zh.md: 5310aec1b4c4c9fd9fe0e0f38d3fef5cddc690a6

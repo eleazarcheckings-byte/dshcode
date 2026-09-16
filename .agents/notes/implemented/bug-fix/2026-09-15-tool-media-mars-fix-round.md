@@ -34,35 +34,10 @@ Any consumer holding a real `dsh-agent` `Agent` can now use `ctx.media` exactly 
 
 ## Round 3 addendum (same day) — the "blocking" gap above was avoidable, and is now closed
 
-A second fresh-context Mars review (`round 2` of this fix) found that the `integration_needs` item this
-note recorded above did not actually require an orchestrator decision: `ctx.userQuestions`
-(`packages/interaction/user-questions`, `UserQuestionService.ask()`) declares its `agent` parameter
-**optional** and already asks unscoped (`ctx.waterfall('user-questions/request', request, noAnswerer)`)
-when none is supplied — entirely inside this package's own IN scope, and exactly the "interaction/
-approval capability" SPEC §3 C7 already names.
+A second fresh-context Mars review (`round 2` of this fix) found that the `integration_needs` item this note recorded above did not actually require an orchestrator decision: `ctx.userQuestions` (`packages/interaction/user-questions`, `UserQuestionService.ask()`) declares its `agent` parameter **optional** and already asks unscoped (`ctx.waterfall('user-questions/request', request, noAnswerer)`) when none is supplied — entirely inside this package's own IN scope, and exactly the "interaction/ approval capability" SPEC §3 C7 already names.
 
-**Fix applied:** `requireSpendApproval` (`src/index.ts`) now prefers `ctx.approval` when the call
-carries an `Agent` (unchanged from Fix 1 above — `withAgent`'s binding still routes through it), and
-falls back to a new `requireSpendApprovalViaUserQuestions` when it does not — asking one yes/no
-question through `ctx.userQuestions.ask()`, carrying the identical estimated-cost line, with zero
-network requests before the human answers, and failing closed on Decline, an aborted/timed-out ask, or
-no answerer being composed (`NO_PROVIDER`) — exactly as the preferred route fails closed. Proven by a
-new file, `tests/agentless-spend-approval.spec.ts` (committed RED first): (a) the cost line reaches the
-question's `detail`, (b) zero requests before the answer, (c) Decline → no request + refused result,
-(d) no answerer composed → still fails closed with a distinct message. `SaturnBot`'s `creative.generate`
-call site (`BotMediaService` in `packages/saturn/saturnbot/src/contracts.ts`; the call itself in
-`src/adapters/integrations.ts`) is now unblocked *without* SaturnBot needing an `Agent` object at all —
-the blocking `integration_needs` item from Fix 1 above is closed, not merely re-described.
+**Fix applied:** `requireSpendApproval` (`src/index.ts`) now prefers `ctx.approval` when the call carries an `Agent` (unchanged from Fix 1 above — `withAgent`'s binding still routes through it), and falls back to a new `requireSpendApprovalViaUserQuestions` when it does not — asking one yes/no question through `ctx.userQuestions.ask()`, carrying the identical estimated-cost line, with zero network requests before the human answers, and failing closed on Decline, an aborted/timed-out ask, or no answerer being composed (`NO_PROVIDER`) — exactly as the preferred route fails closed. Proven by a new file, `tests/agentless-spend-approval.spec.ts` (committed RED first): (a) the cost line reaches the question's `detail`, (b) zero requests before the answer, (c) Decline → no request + refused result, (d) no answerer composed → still fails closed with a distinct message. `SaturnBot`'s `creative.generate` call site (`BotMediaService` in `packages/saturn/saturnbot/src/contracts.ts`; the call itself in `src/adapters/integrations.ts`) is now unblocked *without* SaturnBot needing an `Agent` object at all — the blocking `integration_needs` item from Fix 1 above is closed, not merely re-described.
 
-Also fixed this round, from the same Mars pass: the Dev Note misattributed-commit callout in this
-package's README now names the exact hash (`78a06d26b1`); the SaturnBot citations in both the README
-and this note cite by symbol (`BotMediaService`, the `creative.generate` call site) rather than by line
-number, since the round-1 line numbers had already drifted by round 2's review.
+Also fixed this round, from the same Mars pass: the Dev Note misattributed-commit callout in this package's README now names the exact hash (`78a06d26b1`); the SaturnBot citations in both the README and this note cite by symbol (`BotMediaService`, the `creative.generate` call site) rather than by line number, since the round-1 line numbers had already drifted by round 2's review.
 
-`tsc -p packages/saturn/tool-media/tsconfig.json --noEmit` is still clean (after adding a
-`packages/interaction/user-questions` project reference to this package's `tsconfig.json`, and the
-matching `workspace:^` dependency to `package.json`); `vitest run packages/saturn/tool-media` is 65/65
-green (62 + 3 new). `pnpm install` was not run (prohibited for this cell) — a manual
-`node_modules` junction was created so the new dependency resolves for tests/`tsc` right now, but a real
-`pnpm install` is needed for `pnpm-lock.yaml` to pick up the edge properly; reported in
-`integration_needs`.
+`tsc -p packages/saturn/tool-media/tsconfig.json --noEmit` is still clean (after adding a `packages/interaction/user-questions` project reference to this package's `tsconfig.json`, and the matching `workspace:^` dependency to `package.json`); `vitest run packages/saturn/tool-media` is 65/65 green (62 + 3 new). `pnpm install` was not run (prohibited for this cell) — a manual `node_modules` junction was created so the new dependency resolves for tests/`tsc` right now, but a real `pnpm install` is needed for `pnpm-lock.yaml` to pick up the edge properly; reported in `integration_needs`.
