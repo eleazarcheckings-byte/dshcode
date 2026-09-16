@@ -48,12 +48,10 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "zod": "^4.4.3",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:^"
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-invariants": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
