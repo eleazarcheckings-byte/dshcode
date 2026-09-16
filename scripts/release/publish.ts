@@ -103,10 +103,9 @@ async function publishTarball(
 ): Promise<void> {
   const tagArgs = distTag === undefined ? [] : ['--tag', distTag]
   for (let tries = 1; tries <= PUBLISH_ATTEMPTS; tries += 1) {
-    // No --access: the sequences do not share one access level, so a
-    // command-line flag could not serve both and would override the manifest
-    // that does. Each packed manifest decides, and
-    // check-workspace-constraints holds every manifest to its sequence's level.
+    // No --access: a command-line flag would override the manifest that owns
+    // the level, so each packed manifest decides, and
+    // check-workspace-constraints holds every release member to `public`.
     const result = attemptEchoed('npm', ['publish', tarball, ...tagArgs])
     const output = `${result.stdout}${result.stderr}`
     if (result.status === 0) return

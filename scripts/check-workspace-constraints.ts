@@ -296,12 +296,12 @@ export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): st
     // package, and the repository field is how a consumer finds the source of
     // the package it installed.
     //
-    // Access is per release sequence, not per scope: the vendored framework and
-    // the Landlock packages publish publicly because outside consumers install
-    // them, while the dsh family stays restricted until its own sequence goes
-    // public. A mixed scope is why no publish path passes `--access` — one flag
-    // cannot serve both, so each packed manifest decides
+    // Every release member publishes at `public`; the vendored framework and
+    // the Landlock packages reached that level first because a public package
+    // cannot install a restricted dependency
     // ([rationale](../.agents/notes/implemented/process/2026-08-13-public-vendor-and-native-sequences.md)).
+    // No publish path passes `--access`: a flag would override the manifest
+    // that owns the level, so each packed manifest decides.
     if (manifest.private === true) {
       errors.push(`${label}: release member must not set "private": true`)
     }
