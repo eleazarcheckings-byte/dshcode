@@ -24,6 +24,8 @@ const RAIL_WIDTH = 72
 
 let frame: HTMLDivElement
 let overlay: HTMLDivElement
+/** Width the stubbed layout reports for the rail; 0 mimics `display: none` under the phone sheet. */
+let railWidth = RAIL_WIDTH
 
 function mountRail(now: number, previousInset?: string) {
   vi.setSystemTime(now)
@@ -46,7 +48,7 @@ beforeEach(() => {
     const isRail = this.hasAttribute('data-peak-rail')
     return {
       x: 0, y: 0, top: 0, left: 0, bottom: 0, right: 0,
-      width: isRail ? RAIL_WIDTH : 0, height: isRail ? 32 : 0, toJSON: () => ({}),
+      width: isRail ? railWidth : 0, height: isRail ? railWidth === 0 ? 0 : 32 : 0, toJSON: () => ({}),
     }
   })
 })
@@ -54,6 +56,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   frame?.remove()
+  railWidth = RAIL_WIDTH
   vi.restoreAllMocks()
   vi.useRealTimers()
 })
@@ -89,6 +92,22 @@ describe('PeakRail', () => {
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe(`${RAIL_WIDTH + PEAK_RAIL_GAP}px`)
     view.unmount()
     expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('40px')
+  })
+
+  it('reserves nothing while it has no box (the phone sheet hides the rail)', () => {
+    railWidth = 0
+    const view = mountRail(MONDAY_PEAK, '40px')
+    expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('40px')
+    view.unmount()
+    expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('40px')
+  })
+
+  it('stays out of the SaturnBot window and reserves nothing there', () => {
+    vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, search: '?saturnbot=1' } as Location)
+    const view = mountRail(MONDAY_PEAK)
+    expect(view.container.querySelector('[data-peak-rail]')).toBeNull()
+    expect(view.queryByRole('img')).toBeNull()
+    expect(frame.style.getPropertyValue('--dsh-shell-trailing-extra')).toBe('')
   })
 
   it('follows the tier switch on its minute tick', () => {
