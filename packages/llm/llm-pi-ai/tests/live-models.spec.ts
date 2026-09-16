@@ -240,7 +240,8 @@ describe('LiveModelCache', () => {
   it('makes no call at all while no token exists', async () => {
     const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(jsonResponse(200, listing)))
     const { cache: live, onFailure } = cache(fetchSpy, { value: 0 })
-    await live.refresh('huggingface', source(undefined))
+    // Spelled out: `source(undefined)` would take the parameter default (the token).
+    await live.refresh('huggingface', { baseURL: ROUTER, apiKey: () => Promise.resolve(undefined) })
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(onFailure).not.toHaveBeenCalled()
     expect(live.models('huggingface')).toBeUndefined()
