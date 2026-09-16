@@ -59,6 +59,9 @@ import type {
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { idleWatchdog, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import type { ModelCapabilityInfo, ResolvedPiAiProviderProfile } from './config.ts'
+import { DEFAULT_CONTEXT_WINDOW, DEFAULT_INPUT, DEFAULT_MAX_TOKENS } from './config.ts'
+import { resolveRouteModels } from './catalog.ts'
+import { HUGGINGFACE_ROUTER_HOST, isRoutableModelId, routerFailure, splitRoutedModelId } from './live-models.ts'
 import { toPiContext } from './context.ts'
 import { toStreamChunks } from './stream.ts'
 
@@ -101,6 +104,50 @@ export interface PiAiAdapterOptions {
    * conversion because its stored replay state is unusable by this build.
    */
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
+  /**
+   * Live listings for routes that set `modelsEndpoint`. `refresh` runs before
+   * such a route lists its models (it swallows its own failures, keeping the
+   * last good list); `describe` supplies the picker line for a live model.
+   */
+  liveModels?: PiAiLiveModelsHook
+}
+
+/** The plugin-owned live-listing seam a `modelsEndpoint` route reads. */
+export interface PiAiLiveModelsHook {
+  /** Refresh one route's listing when it is stale. */
+  refresh: (provider: string, signal?: AbortSignal) => Promise<void>
+  /** The description for one listed or routed model id, when the live list names it. */
+  describe: (provider: string, modelId: string) => string | undefined
+}
+
+/**
+ * Whether a route talks to the Hugging Face router, whose failures get the
+ * tagged, actionable messages. The route key counts too, so a deployment
+ * proxying the router under its own host keeps the messages.
+ */
+function isHuggingFaceRoute(profile: ResolvedPiAiProviderProfile, model: Model<Api>): boolean {
+  if (profile.provider === 'huggingface') return true
+  try {
+    return new URL(model.baseUrl).host === HUGGINGFACE_ROUTER_HOST
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Replace a router failure's generic text with the actionable one. pi-ai
+ * flattens the HTTP failure into `errorMessage`, which starts with the status.
+ */
+function mapRouterFinish(chunk: StreamChunk): StreamChunk {
+  if (chunk.type !== 'finish' || chunk.reason.kind !== 'error') return chunk
+  const status = /^\s*(\d{3})(?!\d)/u.exec(chunk.reason.failure.message)?.[1]
+  if (status === undefined) return chunk
+  const mapped = routerFailure(Number(status))
+  if (!mapped.message.startsWith('[huggingface:')) return chunk
+  return {
+    ...chunk,
+    reason: { ...chunk.reason, failure: { ...chunk.reason.failure, message: mapped.message, code: mapped.failure.code } },
+  }
 }
 
 /** The two auth injectables a pi-ai collection is built with. */
@@ -270,11 +317,39 @@ export class PiAiAdapter extends LlmAdapter {
   /** The configured descriptor for one exact route/model pair within one snapshot. */
   private modelOf(snapshot: PiAiSnapshot, provider: string, model: string): Model<Api> {
     this.profileOf(snapshot, provider)
-    const resolved = snapshot.models.getModel(provider, model)
+    const resolved = snapshot.models.getModel(provider, model) ?? this.routedModel(snapshot, provider, model)
     if (resolved === undefined) {
       throw new LlmError(`pi-ai provider "${provider}" has no configured model "${model}"`, 'UNKNOWN_MODEL')
     }
     return resolved
+  }
+
+  /**
+   * A model a `modelsEndpoint` route does not list but can still serve: a
+   * listed model under a routing suffix (`org/name:cheapest`) keeps that
+   * model's facts, and any other `org/name[:suffix]` id is materialized from
+   * the route's defaults — the listing is advisory, and the router is the
+   * authority on what it serves.
+   */
+  private routedModel(snapshot: PiAiSnapshot, provider: string, model: string): Model<Api> | undefined {
+    const profile = snapshot.profiles.get(provider)
+    if (profile?.modelsEndpoint !== true || !isRoutableModelId(model)) return undefined
+    const { base } = splitRoutedModelId(model)
+    const listed = snapshot.models.getModel(provider, base)
+    if (listed !== undefined) return { ...listed, id: model }
+    const [materialized] = resolveRouteModels({
+      provider,
+      ...profile.api === undefined ? {} : { api: profile.api },
+      ...profile.baseURL === undefined ? {} : { baseURL: profile.baseURL },
+      ...profile.compat === undefined ? {} : { compat: profile.compat },
+      models: [{ id: base }],
+      defaultInput: [...profile.defaultInput ?? DEFAULT_INPUT],
+      defaultContextWindow: profile.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
+      defaultMaxTokens: profile.defaultMaxTokens ?? DEFAULT_MAX_TOKENS,
+    }).models
+    /* v8 ignore next -- resolveRouteModels materializes exactly the one entry it is given */
+    if (materialized === undefined) return undefined
+    return { ...materialized, id: model, name: model }
   }
 
   override providerInfo(provider: string): LlmProviderInfo {
@@ -289,17 +364,28 @@ export class PiAiAdapter extends LlmAdapter {
   }
 
   override listModels(provider: string): Promise<readonly LlmModelInfo[]> {
-    return Promise.resolve().then(() => {
+    return Promise.resolve().then(async () => {
+      if (this.current().profiles.get(provider)?.modelsEndpoint === true) {
+        await this.config.liveModels?.refresh(provider)
+      }
       const snapshot = this.current()
       const profile = this.profileOf(snapshot, provider)
       return snapshot.models.getModels(provider).map(model => ({
         provider,
         id: model.id,
         name: model.name,
+        ...this.descriptionOf(profile, model.id),
         inputModalities: [...model.input],
         ...capabilityInfo(profile, model.id),
       }))
     })
+  }
+
+  /** The live description of one model on a `modelsEndpoint` route, as a spreadable field. */
+  private descriptionOf(profile: ResolvedPiAiProviderProfile, modelId: string): { description: string } | Record<string, never> {
+    if (profile.modelsEndpoint !== true) return {}
+    const description = this.config.liveModels?.describe(profile.provider, modelId)
+    return description === undefined ? {} : { description }
   }
 
   override resolveModel(
@@ -324,6 +410,7 @@ export class PiAiAdapter extends LlmAdapter {
       provider,
       id: model,
       name: resolvedModel.name,
+      ...this.descriptionOf(profile, model),
       inputModalities: [...resolvedModel.input],
       ...capabilityInfo(profile, model),
       context: { contextWindow: resolvedModel.contextWindow },
@@ -404,6 +491,7 @@ export class PiAiAdapter extends LlmAdapter {
         // Harness-owned and therefore win collisions.
         headers: requestHeaders(profile.headers),
       })
+      const routerErrors = isHuggingFaceRoute(profile, model)
       const iterator = toStreamChunks(events, model.contextWindow, options.signal)[Symbol.asyncIterator]()
       let exhausted = false
       try {
@@ -415,7 +503,7 @@ export class PiAiAdapter extends LlmAdapter {
             exhausted = true
             return
           }
-          yield result.value
+          yield routerErrors ? mapRouterFinish(result.value) : result.value
         }
       } finally {
         if (!exhausted) {

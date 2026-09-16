@@ -39,6 +39,8 @@ import type {
   PiAiReasoningEfforts,
 } from './catalog.ts'
 import { buildProvider, supportedProtocols } from './provider.ts'
+import { mergeLiveModels } from './live-models.ts'
+import type { LiveModel } from './live-models.ts'
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
@@ -107,6 +109,15 @@ export interface PiAiProviderProfile {
    * unset fields from the installed model of the same id.
    */
   models?: PiAiModelProfile[]
+  /**
+   * Serve this route's models from its endpoint's live `GET {baseURL}/models`
+   * listing (bearer auth, cached ten minutes), merged after {@link models},
+   * which then act as the seed shown until a listing succeeds and kept when a
+   * refresh fails. Only OpenAI-compatible protocols have a readable listing.
+   * Built for the Hugging Face router, and equally serves self-hosted TGI,
+   * vLLM, or LM Studio routes.
+   */
+  modelsEndpoint?: boolean
   /**
    * Installed-catalog customizations by model id: each entry reshapes that
    * one model with the same fields a {@link models} entry takes, while the
@@ -220,6 +231,9 @@ export interface ResolvedPiAiProviderProfile
    */
   modelCapabilities: ReadonlyMap<string, ModelCapabilityInfo>
 }
+
+/** Protocols whose `GET /models` listing a `modelsEndpoint` route can read. */
+const LISTABLE_PROTOCOLS: ReadonlySet<string> = new Set(['openai-completions', 'openai-responses'])
 
 /** Plugin configuration: the provider routes this instance owns. */
 export interface Config {
@@ -335,6 +349,7 @@ const profile = z.object({
   api: z.union(supportedProtocols()),
   baseURL: z.string(),
   models: z.array(modelProfile),
+  modelsEndpoint: z.boolean(),
   modelOverrides: z.dict(modelOverride),
   compat: compatProfile,
   defaultContextWindow: z.number().step(1).min(1).default(DEFAULT_CONTEXT_WINDOW),
@@ -417,6 +432,7 @@ function assertValidHeaders(provider: string, headers: Readonly<Record<string, s
  */
 export function resolveProfiles(
   providers: Readonly<Record<string, PiAiProviderProfile>> | undefined,
+  liveModels?: (provider: string) => readonly LiveModel[] | undefined,
 ): Map<string, ResolvedPiAiProviderProfile> {
   if (Array.isArray(providers)) {
     throw new Error('llm-pi-ai: providers is now a dict keyed by provider route, not an array of profiles')
@@ -466,11 +482,20 @@ export function resolveProfiles(
     // always shown route keys, and a catalog route must not silently rename
     // itself on every configuration surface just because it gained a profile.
     const displayName = source.displayName ?? provider
+    if (source.modelsEndpoint === true && source.api !== undefined && !LISTABLE_PROTOCOLS.has(source.api)) {
+      throw new Error(
+        `llm-pi-ai: provider "${provider}" sets modelsEndpoint, but api "${source.api}" has no model listing this`
+        + ' build can read; use an OpenAI-compatible protocol or list the models by hand',
+      )
+    }
+    const models = source.modelsEndpoint === true
+      ? mergeLiveModels(source.models ?? [], liveModels?.(provider))
+      : source.models
     const catalog = resolveRouteModels({
       provider,
       ...source.api === undefined ? {} : { api: source.api },
       ...source.baseURL === undefined ? {} : { baseURL: source.baseURL },
-      ...source.models === undefined ? {} : { models: source.models },
+      ...models === undefined ? {} : { models },
       ...source.modelOverrides === undefined ? {} : { modelOverrides: source.modelOverrides },
       ...source.compat === undefined ? {} : { compat: source.compat },
       defaultInput,

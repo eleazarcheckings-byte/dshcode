@@ -64,12 +64,13 @@ import type {} from '@deepseek-ai/dsh-settings'
 import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { PiAiAdapter } from './adapter.ts'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
-import { catalogProviderIds } from './catalog.ts'
+import { catalogProvider, catalogProviderIds } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { discoverModels } from './discovery.ts'
 import type { StoredModelDiscoveryProfile } from './discovery.ts'
 import { registerPiAiFlows } from './login.ts'
+import { LiveModelCache } from './live-models.ts'
 
 export { PiAiAdapter } from './adapter.ts'
 export type { PiAiAdapterOptions } from './adapter.ts'
@@ -85,6 +86,7 @@ export type {
   ResolvedPiAiProviderProfile,
 } from './config.ts'
 export { recordKeyFor } from './auth.ts'
+export type { PiAiLiveModelsHook } from './adapter.ts'
 export { supportedProtocols } from './provider.ts'
 
 export const name = 'llm-pi-ai'
@@ -143,6 +145,15 @@ function directoryEntries(
 /** Register one generic pi-ai adapter for all configured provider routes. */
 export function apply(ctx: Context, config: Config): void {
   let current: () => Config = () => config
+  // Live listings for `modelsEndpoint` routes. A failure is a warning, never a
+  // thrown request: the last good list (or the route's seeds) keeps serving.
+  // The message is built without the token, and redacted again inside the cache.
+  const live = new LiveModelCache({
+    onFailure: (route, error) => {
+      ctx.logger.warn(`llm-pi-ai: route "${route}" model listing failed, keeping the last good list (${error.message})`)
+    },
+  })
+  let lastGeneration = -1
   let lastRaw: Config | undefined
   let memoized: ReadonlyMap<string, ResolvedPiAiProviderProfile> | undefined
   /**
@@ -158,8 +169,9 @@ export function apply(ctx: Context, config: Config): void {
    */
   const profiles = (): ReadonlyMap<string, ResolvedPiAiProviderProfile> => {
     const raw = current()
-    if (raw === lastRaw && memoized !== undefined) return memoized
-    const next = resolveProfiles(raw.providers)
+    if (raw === lastRaw && live.generation === lastGeneration && memoized !== undefined) return memoized
+    const next = resolveProfiles(raw.providers, provider => live.models(provider))
+    lastGeneration = live.generation
     lastRaw = raw
     memoized = next
     return next
@@ -205,6 +217,24 @@ export function apply(ctx: Context, config: Config): void {
       hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath),
       ref,
     ),
+    liveModels: {
+      refresh: async (provider, signal) => {
+        const profile = profiles().get(provider)
+        if (profile?.modelsEndpoint !== true) return
+        const baseURL = profile.baseURL ?? catalogProvider(provider)?.baseUrl
+        if (baseURL === undefined) return
+        await live.refresh(provider, {
+          baseURL,
+          ...profile.headers === undefined ? {} : { headers: profile.headers },
+          // No stored token means no listing yet, not a failure: the seeds serve.
+          apiKey: () => resolveApiKey(provider, profile).catch((error: unknown) => {
+            if (error instanceof LlmError && error.failure.code === 'MISSING_CREDENTIAL') return undefined
+            throw error
+          }),
+        }, signal)
+      },
+      describe: (provider, modelId) => live.describe(provider, modelId),
+    },
     onReplayDegrade: ({ provider, model, reason }) => {
       ctx.logger.warn(
         `llm-pi-ai: unusable replay state on assistant history for route "${provider}/${model}";`
@@ -250,6 +280,7 @@ export function apply(ctx: Context, config: Config): void {
     return {
       headers: profile.headers,
       resolveApiKey: () => resolveApiKey(provider, profile),
+      ...profile.modelsEndpoint === true ? { liveListing: true } : {},
     }
   }
   // Interrogating an endpoint is a configuration-time action over a draft, so

@@ -26,6 +26,7 @@ import { INVALID_CREDENTIAL_CODE, LlmError, normalizeApiKey } from '@deepseek-ai
 import type { LlmDiscoveredModel, LlmModelDiscoveryOperation } from '@deepseek-ai/dsh-llm'
 import { attributionHeaders } from '@deepseek-ai/dsh-llm'
 import { catalogModels } from './catalog.ts'
+import { HUGGINGFACE_ROUTER_HOST, mapModelListing, routerFailure } from './live-models.ts'
 
 /**
  * Protocols whose model listing this module can read: the two that speak
@@ -186,6 +187,8 @@ export interface StoredModelDiscoveryProfile {
   readonly headers: Readonly<Record<string, string>> | undefined
   /** Resolve the named route's credential only when the draft carries none. */
   readonly resolveApiKey: () => Promise<string | undefined>
+  /** The route sets `modelsEndpoint`: its live listing, not the installed catalog, answers. */
+  readonly liveListing?: boolean
 }
 
 /**
@@ -204,7 +207,8 @@ export async function discoverModels(
 ): Promise<readonly LlmDiscoveredModel[]> {
   // A catalog route already has its answer, and a better one: the installed
   // entries carry context windows and output caps no listing endpoint reports.
-  if (request.provider !== undefined) {
+  const live = storedProfile?.()?.liveListing === true
+  if (request.provider !== undefined && !live) {
     const installed = catalogModels(request.provider)
     if (installed.size > 0) {
       return [...installed.values()].map(model => ({
@@ -261,6 +265,7 @@ export async function discoverModels(
     }
     throw new LlmError(`could not reach ${url}`, 'DISCOVERY_FAILED', { cause: error })
   }
+  if (!response.ok && isRouter(url)) throw routerFailure(response.status)
   if (!response.ok) {
     throw new LlmError(
       `${url} answered ${response.status}${response.status === 401 || response.status === 403 ? '; check the API key' : ''}`,
@@ -285,5 +290,22 @@ export async function discoverModels(
   } catch (error: unknown) {
     throw new LlmError(`${url} did not answer with JSON`, 'DISCOVERY_FAILED', { cause: error })
   }
+  // A router listing (entries carrying `providers[]`) keeps only models with a
+  // live provider, sized by the largest live context.
+  if (live || isRouter(url)) {
+    return mapModelListing(body).map(model => ({
+      id: model.id,
+      ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
+    }))
+  }
   return readListing(body)
+}
+
+/** Whether a listing URL is the Hugging Face router's. */
+function isRouter(url: string): boolean {
+  try {
+    return new URL(url).host === HUGGINGFACE_ROUTER_HOST
+  } catch {
+    return false
+  }
 }

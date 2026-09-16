@@ -121,6 +121,25 @@
           xai: {}
           moonshotai: {}
           zai: {}
+          # Hugging Face Inference Providers through the OpenAI-compatible
+          # router. Keyless until a token is stored under HF_TOKEN (Settings →
+          # Models), and no call leaves before then. `modelsEndpoint` serves
+          # every model with a live provider from the router's own
+          # `GET /v1/models` (cached ten minutes); the three ids below are the
+          # seed shown before the first listing and kept if a refresh fails.
+          # Any `org/name[:provider|:cheapest|:fastest]` id is also accepted.
+          huggingface:
+            displayName: Hugging Face
+            api: openai-completions
+            baseURL: https://router.huggingface.co/v1
+            apiKeyEnv: HF_TOKEN
+            modelsEndpoint: true
+            compat:
+              supportsDeveloperRole: false
+            models:
+              - id: openai/gpt-oss-120b
+              - id: deepseek-ai/DeepSeek-V3.1
+              - id: meta-llama/Llama-3.3-70B-Instruct
           ollama-local:
             displayName: Ollama (local)
             api: openai-completions
