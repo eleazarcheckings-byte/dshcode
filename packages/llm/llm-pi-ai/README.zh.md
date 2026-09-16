@@ -110,7 +110,7 @@ profile 通过可选 settings seam 每次操作重新读取：base 与用户的 
 
 ### 提供实时模型列表
 
-设置 `modelsEndpoint: true` 的声明路由从端点自身的 `GET {baseURL}/models`（bearer 令牌，缓存十分钟）提供模型，而不是静态列表；其 `models` 作为种子保留：排在最前，在首次列出成功前单独提供，刷新失败时与最后有效列表一起保留，因此选择器永远不会为空。路由没有已存凭据时不发出任何请求。带 `providers[]` 数组的条目（Hugging Face 路由器）只有在某个提供方为 `live` 时才保留；上下文窗口取在线提供方中最大的 `context_length`，只有 `architecture.input_modalities` 列出 `image` 时才声明图片输入。这种路由也接受未列出的 id：`org/name:<后缀>` 沿用已列出模型的事实，其他 `org/name[:后缀]` 以路由默认值提供。基础 bundle 以这种方式声明 `huggingface`（`apiKeyEnv: HF_TOKEN`，路由器 `https://router.huggingface.co/v1`，三个种子）。路由器的 401、402、403、404 与 429 回答在列出、发现与对话流中都会变为带可操作消息的 `[huggingface:<kind>]` 失败；客户端按标签本地化。
+设置 `modelsEndpoint: true` 的声明路由从端点自身的 `GET {baseURL}/models`（bearer 令牌；成功的列表服务十分钟，失败的列表 30 秒后重试，已存密钥变化时立即重新获取）提供模型，而不是静态列表；其 `models` 作为种子保留：排在最前，在首次列出成功前单独提供，刷新失败时与最后有效列表一起保留，因此选择器永远不会为空。路由没有已存凭据时不发出任何请求。带 `providers[]` 数组的条目（Hugging Face 路由器）只有在某个提供方为 `live` 时才保留；上下文窗口取在线提供方中最大的 `context_length`，只有 `architecture.input_modalities` 列出 `image` 时才声明图片输入。这种路由也接受未列出的 id：`org/name:<后缀>` 沿用已列出模型的事实，其他 `org/name[:后缀]` 以路由默认值提供。基础 bundle 以这种方式声明 `huggingface`（`apiKeyEnv: HF_TOKEN`，路由器 `https://router.huggingface.co/v1`，三个种子）。路由器的 401、402、403、404 与 429 回答在列出、发现与对话流中都会变为带可操作消息的 `[huggingface:<kind>]` 失败；客户端按标签本地化，对话会优先显示该文案而非通用的密钥无效文案。403（受限模型）的代码是 `ACCESS_DENIED`，而非 `AUTH`。其他 `modelsEndpoint` 路由的列表失败使用与提供方无关的措辞。
 
 ### 失败与恢复
 
