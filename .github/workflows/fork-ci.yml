@@ -10,10 +10,13 @@ name: Fork CI
 #
 # Job map:
 # - static:   Typert contracts, lint, typecheck (host + client), the doc-sync
-#             aggregate, the shared static gates (constraints, package
-#             invariants, Cordis config, runtime closure, optional-dependency
-#             imports, issue policy), the module graph check, and the desktop
-#             runtime closure
+#             aggregate, the shared static gates (runtime closure, application
+#             entrypoints, constraints, package dependencies, package licenses
+#             and invariants, Cordis config, optional-dependency imports,
+#             client packages, issue policy), the module graph check, and the
+#             desktop runtime closure. Every step after Lint carries
+#             `if: success() || failure()`, so one run reports every gate
+#             instead of the first failing one.
 # - unit:     the complete keyless vitest unit inventory (thread-safe and
 #             process-bound projects; includes apps/desktop and apps/web specs)
 # - web:      built web frontend + keyless browser replay
@@ -29,6 +32,11 @@ name: Fork CI
 #   clones), so the upstream check:ci:static aggregate (which embeds knip)
 #   cannot run whole; this lane pins its green subset instead. Fix the debt,
 #   then rejoin via check:ci:static plus one duplication step.
+# - verify-client-ui-i18n: the last shared static gate still held out. The
+#   fork's Saturn rebrand left 12 hard-coded UI strings (the two brand
+#   wordmarks, the desktop title bar's menu label/title, the version caption,
+#   three model-editor labels, and the plugin-installer repair prompts).
+#   Untranslate them, then add the step next to `Client packages`.
 # - Snapshot replays (test:snapshot): their goldens are upstream-owned and
 #   drift on this fork; re-own them with a fork-side refresh before
 #   re-enabling (check:ci:snapshot after build).
@@ -117,9 +125,11 @@ jobs:
       - name: Typert contracts (host build)
         run: pnpm run build:lib:host
 
-      # A Lint failure aborts the job before every step below it, so a red run
-      # reports one gate, not the full static picture; read the remaining gates
-      # from the next run.
+      # Every step below carries `if: success() || failure()` so one red run
+      # reports the full static picture instead of only the first failing
+      # gate. `always()` is deliberately NOT used: it would also run the gates
+      # through a cancellation, turning every superseded pull-request run into
+      # a full 90-minute lane.
       - name: Lint
         run: pnpm run lint:contracts-ready
 
@@ -127,47 +137,72 @@ jobs:
       # half of `build:lib:client`: this step builds the client contracts it
       # checks, so it needs no build predecessor of its own.
       - name: Typecheck (host + client)
+        if: success() || failure()
         run: pnpm run typecheck:contracts-ready
 
       # DSH_ARCHIVE_BASE_REF must be set exactly on pull requests: an empty
       # string would be read as a literal ref instead of the HEAD default.
+      # The status pair has to be spelled out here too — a bare event test
+      # carries an implicit success(), which is the abort this lane removes.
       - name: Run documentation gates (pull request)
-        if: github.event_name == 'pull_request'
+        if: (success() || failure()) && github.event_name == 'pull_request'
         env:
           DSH_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: pnpm run doc-sync
 
       - name: Run documentation gates (push)
-        if: github.event_name != 'pull_request'
+        if: (success() || failure()) && github.event_name != 'pull_request'
         run: pnpm run doc-sync
 
-      # The shared static gates from upstream's check:ci:static, minus the
-      # deferred knip and duplication lanes (see the header job map).
+      # The shared static gates from upstream's check:ci:static in that
+      # function's own order, minus the deferred knip, duplication, and
+      # client-UI-i18n lanes (see the header job map).
       - name: Runtime closure
+        if: success() || failure()
         run: pnpm run verify-runtime-closure
 
+      - name: Application entrypoints
+        if: success() || failure()
+        run: pnpm run verify-application-entrypoints
+
       - name: Workspace constraints
+        if: success() || failure()
         run: pnpm run constraints
 
+      - name: Package dependencies
+        if: success() || failure()
+        run: pnpm run verify-package-dependencies
+
       - name: DSH package licenses
+        if: success() || failure()
         run: pnpm run verify-dsh-package-licenses
 
       - name: Package invariants
+        if: success() || failure()
         run: pnpm run verify-package-invariants
 
       - name: Cordis config
+        if: success() || failure()
         run: pnpm run verify-cordis-config
 
       - name: Optional dependency imports
+        if: success() || failure()
         run: pnpm run verify-optional-dependency-imports
 
+      - name: Client packages
+        if: success() || failure()
+        run: pnpm run verify-client-packages
+
       - name: Issue management policy
+        if: success() || failure()
         run: pnpm run test:issue-management
 
       - name: Module graph
+        if: success() || failure()
         run: pnpm run verify-module-graph
 
       - name: Desktop runtime closure
+        if: success() || failure()
         run: pnpm run verify-desktop-runtime-closure
 
   unit:
