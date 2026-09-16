@@ -43,6 +43,21 @@ jobs:
       - name: Sync iOS project
         run: npx cap sync ios
 
+      # Both archive steps below use -scheme App. No shared .xcscheme is
+      # committed under ios/App/App.xcodeproj/xcshareddata/xcschemes (that
+      # is apps/mobile's own scope, not this workflow's) -- so before
+      # spending build time, fail loudly and print the real scheme list if
+      # "App" does not resolve, rather than let archive fail opaquely.
+      - name: Verify Xcode scheme resolves
+        run: |
+          set -euo pipefail
+          if ! xcodebuild -list -project ios/App/App.xcodeproj | grep -Eq '^[[:space:]]*App[[:space:]]*$'; then
+            echo "::error::Scheme 'App' not found in ios/App/App.xcodeproj. Available schemes:" >&2
+            xcodebuild -list -project ios/App/App.xcodeproj >&2
+            echo "A shared scheme must be committed at ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme (see apps/mobile/README.md)." >&2
+            exit 1
+          fi
+
       # Opt-in App Store Connect signing. xcodebuild's -authenticationKeyPath/
       # -authenticationKeyID/-authenticationKeyIssuerID (used below with
       # -allowProvisioningUpdates for automatic signing) and altool's

@@ -126,6 +126,14 @@ automatic signing (`xcodebuild -allowProvisioningUpdates
 exports a `.ipa`, and uploads it to TestFlight with
 `xcrun altool --upload-app --apiKey --apiIssuer`.
 
+Both the signed and unsigned legs build with `-scheme App`; no shared
+`ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme` is committed
+(step 2 above works from Xcode's own GUI-managed scheme list, which does not
+require one), so the workflow's first step after `cap sync` runs
+`xcodebuild -list` and fails loudly, printing the real scheme list, if
+`App` doesn't resolve on a clean checkout — this has not yet been confirmed
+green on an actual macOS runner.
+
 ## Why npm, not pnpm
 
 Root `pnpm-workspace.yaml` and root `package.json`'s npm `workspaces` array both already glob `apps/*`, so **any** directory under `apps/` — this one included — is implicitly a pnpm workspace member the moment it exists, with no edit needed to either file. That's a real hazard for a directory meant to be npm-only: this session repeatedly observed `apps/mobile/node_modules` losing specific packages' contents (`@capacitor/android`, `@aparajita/capacitor-biometric-auth`) between build steps, consistent with something elsewhere in the monorepo running a root-level `pnpm install`, discovering this new workspace member via the existing glob, and reconciling its `node_modules` against a pnpm lockfile that has no entry for it. See `integration_needs` in this cell's report for the fix this implies (excluding `apps/mobile` from both globs, or giving it a dedicated ignore entry) — **do not** add an explicit `apps/mobile` line to `pnpm-workspace.yaml` to "opt it in" further; the fix is the opposite.

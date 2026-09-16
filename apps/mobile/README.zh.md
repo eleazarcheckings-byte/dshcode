@@ -125,6 +125,13 @@ API key，所以只需要填一次就能同时解锁这里和桌面端的公证�
 导出 `.ipa`，再用 `xcrun altool --upload-app --apiKey --apiIssuer`
 上传到 TestFlight。
 
+无论是签名路径还是未签名路径，构建时都使用 `-scheme App`；仓库里并未提交
+共享的 `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme`
+（上文第 2 步依赖的是 Xcode 自身 GUI 管理的 scheme 列表，本就不需要这个文件），
+所以该 workflow 在 `cap sync` 之后的第一步会运行 `xcodebuild -list`，
+如果在一次全新 checkout 上解析不到 `App` 就会立刻失败并打印真实的
+scheme 列表 —— 这一点目前尚未在真实的 macOS runner 上跑通验证过。
+
 ## 为什么用 npm 而不是 pnpm
 
 仓库根目录的 `pnpm-workspace.yaml` 与根 `package.json` 的 npm `workspaces` 数组都已经匹配了 `apps/*` 这个通配符，因此 `apps/` 下的**任何**目录 —— 包括本目录 —— 一旦存在，就会隐式成为 pnpm 工作区成员，完全不需要再对任何一个文件做修改。这对一个理应只用 npm 的目录来说是真实的风险：本次会话曾多次观察到 `apps/mobile/node_modules` 中特定包的内容（`@capacitor/android`、`@aparajita/capacitor-biometric-auth`）在构建步骤之间消失，这与“仓库中别处正在执行一次根级 `pnpm install`，通过既有通配符发现了这个新的工作区成员，并按一份根本没有它条目的 pnpm lockfile 去调和其 `node_modules`”这一情形完全吻合。具体的修复建议见本分支报告中的 `integration_needs`（把 `apps/mobile` 从这两处通配符中排除，或单独加一条忽略规则）—— **不要**为了“正式收编”它而在 `pnpm-workspace.yaml` 里再加一行 `apps/mobile`；需要的修复方向恰恰相反。

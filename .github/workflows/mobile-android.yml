@@ -52,6 +52,14 @@ jobs:
       - name: Sync Android project
         run: npx cap sync android
 
+      # gradlew is tracked mode 100644 (no exec bit survives a Windows/git
+      # checkout), so actions/checkout on ubuntu-latest yields a
+      # non-executable file. Restore it here rather than in the tracked
+      # file itself -- android/ is outside this workflow's scope.
+      - name: Make gradlew executable
+        working-directory: apps/mobile/android
+        run: chmod +x gradlew
+
       - name: Debug APK (assembleDebug, always -- unsigned/debug-keystore)
         working-directory: apps/mobile/android
         run: ./gradlew assembleDebug
