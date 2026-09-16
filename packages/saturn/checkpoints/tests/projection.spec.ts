@@ -116,9 +116,14 @@ describe('the checkpoints projection', () => {
 })
 
 describe('defaultInstallRoot', () => {
-  it('names the installed app under LOCALAPPDATA', () => {
+  // LOCALAPPDATA names a Windows tree, so the answer is a Windows path on every
+  // host that asks. Joining through the ambient `path` made the separator follow
+  // the runner instead of the value, which is why the Linux CI leg read back a
+  // mixed-separator root while this Windows machine passed.
+  it('names the installed app under LOCALAPPDATA, whatever host asks', () => {
     expect(defaultInstallRoot({ LOCALAPPDATA: 'C:\\Users\\izzy\\AppData\\Local' }))
       .toBe('C:\\Users\\izzy\\AppData\\Local\\Programs\\@dshcodedesktop')
+    expect(defaultInstallRoot({ LOCALAPPDATA: 'C:\\Users\\izzy\\AppData\\Local' })).not.toContain('/')
   })
 
   it('is null when this machine cannot name the install, so the guard stays silent', () => {
