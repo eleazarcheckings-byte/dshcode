@@ -72,6 +72,11 @@ export function ConversationSessionHeader({
     <header
       className={clsx(css.header, hideChrome && css.headerHidden)}
       aria-hidden={hideChrome || undefined}
+      // Durable anchor for the global mobile sheet (ui-theme styles/mobile.css):
+      // every control in this row — the crumbs, the view tabs, and whatever the
+      // actions/utilities slots fill in — has to be a 44px touch target on a
+      // phone, and the sheet cannot reach a hashed CSS-module class.
+      data-conversation-header=""
     >
       {!hideChrome && (
         <>
@@ -135,7 +140,7 @@ export function ConversationSessionHeader({
             </div>
           </div>
           {tabs.length > 1 && (
-            <div className={css.tabs} role="tablist">
+            <div className={css.tabs} role="tablist" data-conversation-tabs="">
               {tabs.map(viewTab => (
                 <button
                   key={viewTab.id}
@@ -143,6 +148,7 @@ export function ConversationSessionHeader({
                   role="tab"
                   aria-selected={viewTab.id === active?.id}
                   className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+                  data-conversation-tab=""
                   onClick={() => { selectView(viewTab.id) }}
                 >
                   {viewTab.label}

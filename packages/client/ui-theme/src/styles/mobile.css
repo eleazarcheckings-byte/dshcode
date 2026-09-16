@@ -151,6 +151,25 @@
     min-height: 44px;
   }
 
+  /* The conversation header is the other row a thumb has to hit: the session
+     crumbs, the view tabs, and whatever the actions/utilities seats are
+     filled with (Agent Team, the job list, Definition of Done). Anchoring the
+     header rather than each fill keeps every one of those packages out of
+     this change — they publish nothing new and this sheet still reaches them. */
+  [data-conversation-header] button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* The tab's selected state is a 2px bar drawn at the button's own floor, so
+     growing the button must keep the label sitting on that floor rather than
+     floating in the middle of a taller box. */
+  [data-conversation-header] [data-conversation-tab] {
+    display: inline-flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
   /* ---- Tool rows: one line, disclosure intact ---------------------------- */
 
   [data-tool] [data-disclosure-row] {

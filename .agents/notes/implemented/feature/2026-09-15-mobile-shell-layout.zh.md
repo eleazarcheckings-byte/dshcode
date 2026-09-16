@@ -36,6 +36,10 @@ SPEC §8 M2 要求的是"同一个产品出现在手机上" —— 同样的圆�
 
 `keyboardInset(layoutHeight, visualViewport)` 就是全部测量：`max(0, round(innerHeight - viewport.height - viewport.offsetTop))`。减去 `offsetTop` 很关键 —— 那一段已经滚出顶部，再算一次就会重复补白。`installKeyboardInset` 订阅视觉视口的 `resize`（键盘）与 `scroll`（浏览器为了让聚焦字段保持可见而滚动，它改变 `offsetTop` 却不改变高度），并把结果作为 `--saturn-keyboard-inset` 发布到文档元素上。`ConversationRoot` 安装它一次 —— 它是输入框座位的常驻拥有者，且全局只有一个 —— 样式表则把它花在座位的下内边距上。没有 `visualViewport` 的引擎发布 `0px`：既然没有任何东西报告键盘，凭猜测补白只会平白移动输入框。
 
+### `ui-conversation/skeleton/ConversationSession.tsx` —— 会话头部同样是触控表面
+
+第一版把标题条、抽屉、输入框座位与工具折叠行提到了 44px 便止步于此，结果手机用户最常伸手去点的那一行仍保持桌面尺寸：视图标签是 13/16 的文字加 11px 下内边距（实测 27px），而 `actions` / `utilities` 座位 —— Agent Team、任务列表、Definition of Done —— 只有 21px。这些座位由样式表并不拥有、也不应被迫改动的包填充，因此头部发布一个持久锚点 `data-conversation-header`，样式表据此抬高其中的每一个 `button`。视图标签另带一个锚点 `data-conversation-tab`，理由只有一个：选中态是画在按钮自身底线上的 2px 横条，按钮变高后必须让文字继续坐在那条底线上（`inline-flex` + `align-items: flex-end`），而不是浮在新盒子的中间。在 Chromium 中以 390×844 加载真实样式表实测：改前为 28/21/21/27/27px，改后五个控件全为 44px，且 `document.documentElement.scrollWidth` 仍是 390。
+
 ## 考虑过的替代方案
 
 **独立的移动路由或分叉的手机布局。** 依授权与本身价值均被否决：两套外壳会漂移，之后每个功能都要做两遍。
@@ -50,9 +54,11 @@ SPEC §8 M2 要求的是"同一个产品出现在手机上" —— 同样的圆�
 
 ## 测试
 
-对 `ui-layout`、`ui-sidebar`、`ui-theme`、`ui-conversation` 运行 vitest —— 71 个文件、660 个用例全绿。新增：`drawer-trap.client.spec.ts`（Escape、两个方向的 Tab 回绕、空面板兜底、两种焦点时序分支、归还及其幂等）、`mobile-columns.client.spec.ts`（断点与 store 的抽屉语义）、`mobile-frame.client.spec.tsx`（手机形状、抽屉的 dialog 标记、遮罩/Escape/路由变化关闭、焦点归还，以及 1280px 下的桌面形状）、`keyboard-inset.client.spec.ts`、`mobile-styles.client.spec.ts`（上文的样式表契约）、`drawer-anchor.client.spec.tsx`。另有三处既有断言因 store 新增两个字段而放宽，一处因新样式表加入挂载顺序而更新，侧栏快照因新的根属性重新录制。
+对 `ui-layout`、`ui-sidebar`、`ui-theme`、`ui-conversation` 运行 vitest —— 73 个文件、668 个用例全绿。新增：`drawer-trap.client.spec.ts`（Escape、两个方向的 Tab 回绕、空面板兜底、两种焦点时序分支、归还及其幂等）、`mobile-columns.client.spec.ts`（断点与 store 的抽屉语义）、`mobile-frame.client.spec.tsx`（手机形状、抽屉的 dialog 标记、遮罩/Escape/路由变化关闭、焦点归还，以及 1280px 下的桌面形状）、`keyboard-inset.client.spec.ts`、`mobile-styles.client.spec.ts`（上文的样式表契约）、`drawer-anchor.client.spec.tsx`。另有三处既有断言因 store 新增两个字段而放宽，一处因新样式表加入挂载顺序而更新，侧栏快照因新的根属性重新录制。
 
-`apps/web/tests/mobile-layout.e2e.ts` 在 390×844 下驱动真实组合：抽屉从标题条打开，停在 `left: 0`、占屏宽 84%、遮罩可点，且没有任何小于 44px 的控件；选中会话行触发路由变化后抽屉关闭；输入框在模拟的 336px 键盘带上方抬起且不被裁切；两种状态下 `document.documentElement.scrollWidth` 均 ≤ 390。截图随运行一并写出。
+`session-header-anchors.client.spec.tsx` 从 DOM 一侧固定这两个头部锚点（头部即 `<header>` 元素、该行的每个按钮都在其内、每个标签都被标记且保留 `role="tab"`），`mobile-header-targets.client.spec.ts` 固定同一契约的样式表一侧（两个方向都 44px、标签文字钉在它的横条上、只用属性选择器、仍然只有一个断点）。两者在本轮之前的样式表上均失败。
+
+`apps/web/tests/mobile-layout.e2e.ts` 在 390×844 下驱动真实组合：抽屉从标题条打开，停在 `left: 0`、占屏宽 84%、遮罩可点；选中会话行触发路由变化后抽屉关闭；手机外壳中没有任何小于 44px 的控件 —— 标题条、抽屉、会话头部与输入框座位，正是样式表所管辖的那一组；输入框在模拟的 336px 键盘带上方抬起且不被裁切；两种状态下 `document.documentElement.scrollWidth` 均 ≤ 390。截图写入 `.artifacts/`，与所有同级场景一致。该场景在当前代码树中无法启动 —— `launchWebScaffold` 因陈旧的 `packages/saturn/tool-media/lib/index.js` 抛出 `failed to apply loader entry saturn-tool-media … Cannot read properties of undefined (reading 'gemini')`，这个问题早于本次工作，且会拦住每一个 web 场景而不只是这一个 —— 因此只有在一次构建刷新该包的 `lib/` 之后才能重新跑绿。
 
 ## 影响
 

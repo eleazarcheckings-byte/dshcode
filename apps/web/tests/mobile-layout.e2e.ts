@@ -18,7 +18,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { saveFailureShot } from './support.ts'
+import { REPO_ROOT, saveFailureShot } from './support.ts'
 
 const SEED = fileURLToPath(new URL('../../../snapshots/web/seeded-history/session.jsonl', import.meta.url))
 const SEED_ID = 'mobile-layout-web-e2e'
@@ -31,16 +31,41 @@ const KEYBOARD_BAND = 336
 /** Minimum touch target, in CSS px. */
 const TAP_TARGET = 44
 
-/** Review evidence for Mars lands beside the cell's report, not in the repo. */
-const SHOT_DIR = join(
-  'C:/Users/izzy/AppData/Local/Temp/claude',
-  'C--Users-izzy-AppData-Roaming-Claude-scratch-workspaces-aa6abf7a-58b2-4cd8-bbf3-54d53901976a-fe917530-2838-46a4-8bbb-34a35b9089b5-scratch-2026-09-15-9fd785',
-  '0eb561da-047e-4b12-a49e-fe5f269e7fe2/scratchpad/build/M2-shots',
-)
+/** Screenshots land where every sibling scenario puts them, beside the repo. */
+const SHOT_DIR = join(REPO_ROOT, '.artifacts')
 
 /** Widest horizontal extent the document reports, the overflow oracle. */
 function documentScrollWidth(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth)
+}
+
+/**
+ * Smallest touch target across the whole mobile chrome — the title strip, the
+ * drawer, the conversation header and the composer seat, which is exactly the
+ * set the global sheet claims to raise to 44px. Sampling only the drawer left
+ * the header (view tabs, the actions and utilities seats) outside the gate.
+ * @param page - the 390x844 page under test.
+ * @returns the smallest side in CSS px, with the control that reported it.
+ */
+function smallestTapTarget(page: Page): Promise<{ side: number; control: string }> {
+  return page.evaluate(() => {
+    const roots = document.querySelectorAll(
+      '[data-mobile-strip], [data-mobile-drawer], [data-conversation-header], [data-composer-seat]')
+    let side = Number.POSITIVE_INFINITY
+    let control = '(no control rendered)'
+    for (const root of roots) {
+      for (const element of root.querySelectorAll('button, [role="tab"], [role="treeitem"]')) {
+        const box = element.getBoundingClientRect()
+        if (box.width === 0 || box.height === 0) continue
+        const smaller = Math.min(box.width, box.height)
+        if (smaller >= side) continue
+        side = smaller
+        control = `${element.tagName} "${(element.textContent ?? '').trim().slice(0, 32)}"`
+          + ` (${Math.round(box.width)}x${Math.round(box.height)})`
+      }
+    }
+    return { side, control }
+  })
 }
 
 describe.skipIf(MODE === 'record')('web e2e: mobile layout at 390x844', () => {
@@ -97,11 +122,10 @@ describe.skipIf(MODE === 'record')('web e2e: mobile layout at 390x844', () => {
     expect(await page.locator('[data-mobile-backdrop]').evaluate(el =>
       getComputedStyle(el).pointerEvents)).toBe('auto')
 
-    // Every control the drawer offers is a real touch target.
-    const smallest = await panel.evaluate(element => Math.min(...[...element.querySelectorAll('button')]
-      .filter(button => button.getBoundingClientRect().width > 0)
-      .map(button => Math.min(button.getBoundingClientRect().width, button.getBoundingClientRect().height))))
-    expect(smallest).toBeGreaterThanOrEqual(TAP_TARGET)
+    // Every control the phone chrome offers is a real touch target — the
+    // drawer AND the strip, the conversation header and the composer seat.
+    const withDrawer = await smallestTapTarget(page)
+    expect(withDrawer.side, withDrawer.control).toBeGreaterThanOrEqual(TAP_TARGET)
 
     await page.screenshot({ path: join(SHOT_DIR, 'mobile-drawer-open.png') })
 
@@ -123,6 +147,13 @@ describe.skipIf(MODE === 'record')('web e2e: mobile layout at 390x844', () => {
 
     // Resting: the composer sits above the bottom safe area.
     expect(await documentScrollWidth(page)).toBeLessThanOrEqual(VIEWPORT.width)
+
+    // The seeded session is open, so the conversation header (crumbs, view
+    // tabs, the actions and utilities seats) is on screen here and nowhere
+    // else — this is the reading that covers it.
+    await page.locator('[data-conversation-header]').first().waitFor({ timeout: 15_000 })
+    const resting = await smallestTapTarget(page)
+    expect(resting.side, resting.control).toBeGreaterThanOrEqual(TAP_TARGET)
 
     // Keyboard open: publish the inset the visualViewport listener would.
     await page.evaluate((band: number) => {
