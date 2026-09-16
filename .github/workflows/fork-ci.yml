@@ -102,12 +102,30 @@ jobs:
 
       # One host build feeds every contracts-ready consumer below; the raw
       # `lint`/`typecheck` scripts would each rebuild it.
+      #
+      # The client face (`build:lib:client`) is deliberately absent, and adding
+      # it before Lint would buy nothing: type-aware oxlint resolves every
+      # workspace import through tsconfig.base.json's generated `paths` map,
+      # which points at each package's `src`, not its build output. `tsc
+      # --showConfig -p packages/client/ui-renderer/tsconfig.json` resolves
+      # `@deepseek-ai/dsh-client-ui-slots` to `./packages/client/ui-slots/src`,
+      # and `.oxlintrc.json` ignores `**/lib/**` outright — so the emitted
+      # `lib/types` are unreachable from the lint program by construction. A
+      # client-package lint diagnostic here is therefore source debt that
+      # reproduces on an unbuilt local checkout, never a missing-contract
+      # artifact of this lane.
       - name: Typert contracts (host build)
         run: pnpm run build:lib:host
 
+      # A Lint failure aborts the job before every step below it, so a red run
+      # reports one gate, not the full static picture; read the remaining gates
+      # from the next run.
       - name: Lint
         run: pnpm run lint:contracts-ready
 
+      # `typecheck:contracts-ready` IS `tsc -b tsconfig.client.json`, the client
+      # half of `build:lib:client`: this step builds the client contracts it
+      # checks, so it needs no build predecessor of its own.
       - name: Typecheck (host + client)
         run: pnpm run typecheck:contracts-ready
 
