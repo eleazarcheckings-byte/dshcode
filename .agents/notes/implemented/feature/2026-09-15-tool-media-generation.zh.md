@@ -27,3 +27,5 @@ SaturnAI 之前没有从模型调用通向 Higgsfield 级图像/视频/动作迁
 ## 后果
 
 任何装配了本包并为至少一个供应商配置了凭据的组合,都可以使用 `ctx.media`;SaturnBot 的 `creative`/`growth` 角色(或任何其他消费者)都可以按照固定的接口调用 `ctx.media.generate(req)`,获得一次经批准闸门把关的真实可用生成,而不再是一个桩。`media_generate_audio` 与 `media_motion_transfer` 目前都要求显式的 `params.modelPath`(这是有文档记录的,而非静默行为);一旦对应契约得到验证,为二者接入已验证的默认值将是一项小而独立的后续工作。`docs/tool-catalog.md` 需要一次 `doc-sync` 重新生成,才能纳入这五个新工具的模式(记为一项集成事项,不在本包范围内完成——本包的范围仅限于 `packages/saturn/tool-media/**`)。
+
+提交轨迹（为 RED→green 审计披露）：本包的 `src/`、两份 README 以及 RED 规格中 mock HTTP 处理器的六行改动，落在提交 `78a06d26b1` 中，其主题写着 `docs(saturn): re-record translation-pairing sidecars for hygiene-docs READMEs`；RED 规格本身是 `25cb088cf6`，而 `git log --all` 中没有任何 tool-media 的 `feat(` 提交。该规格改动只调整了 mock（一个排队中的 Higgsfield 任务及其状态轮询），没有改动任何断言。请依据这两个哈希审计链条；[提交类型作用域闸门](../process/2026-09-16-commit-type-scope-gate.zh.md) 现在会在提交时拒绝这类错标。

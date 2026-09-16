@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-15-saturnbot-runtime-mars-fix-round.md
-2026-09-15-saturnbot-runtime-mars-fix-round.md: 4b94bbad51b4b1757f28fa4eb3f8512bd822641f
-2026-09-15-saturnbot-runtime-mars-fix-round.zh.md: 0d96f28992145da11149e1052f80095a804b1eff
+2026-09-15-saturnbot-runtime-mars-fix-round.md: c907b2ad424854cf24775cf015088ee4367c5636
+2026-09-15-saturnbot-runtime-mars-fix-round.zh.md: d11ad3411eff4039bf672b4f15206d03c04369a7
