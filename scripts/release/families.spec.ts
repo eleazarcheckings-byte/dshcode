@@ -46,7 +46,37 @@ describe('release families', () => {
     const members = releaseFamily('dsh').members(resolve(import.meta.dirname, '../..'))
 
     expect(members.some(member => member.directory.startsWith('packages/experimental/'))).toBe(false)
-    expect(members.map(member => member.name)).not.toContain('@saturnai/dsh-agent-team')
+    expect(members.map(member => member.name)).not.toContain('@deepseek-ai/dsh-experimental-inspector')
+  })
+
+  it('publishes both product scopes in the dsh release', () => {
+    const members = releaseFamily('dsh').members(resolve(import.meta.dirname, '../..'))
+    const names = members.map(entry => entry.name)
+
+    // `@deepseek-ai/dsh-base` and `@deepseek-ai/dsh-web-app` declare install
+    // dependencies on `@saturnai` packages, so a family that named only the
+    // `@deepseek-ai` scope would publish install trees that cannot resolve.
+    expect(names).toContain('@deepseek-ai/dsh')
+    expect(names).toContain('@saturnai/dsh-agent-team')
+  })
+
+  it('rejects a member outside the scopes its family publishes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-release-scope-'))
+    roots.push(root)
+    write(join(root, 'packages/core/harness/package.json'), '{"name":"@deepseek-ai/dsh-harness","version":"0.0.1"}\n')
+    write(join(root, 'packages/saturn/product/package.json'), '{"name":"@saturnai/dsh-product","version":"0.0.1"}\n')
+    write(join(root, 'vendor/cordis/package.json'), '{"name":"@saturnai/cordis","version":"4.0.1"}\n')
+
+    expect(releaseFamily('dsh').members(root).map(entry => entry.name)).toEqual([
+      '@deepseek-ai/dsh-harness',
+      '@saturnai/dsh-product',
+    ])
+    // The vendored framework is republished under one scope only, so the same
+    // name that is a legitimate dsh member is a defect here.
+    expect(() => { releaseFamily('vendor').members(root) }).toThrow(/vendor\/cordis\/package\.json must name/)
+
+    write(join(root, 'packages/core/outside/package.json'), '{"name":"@other/dsh-outside","version":"0.0.1"}\n')
+    expect(() => { releaseFamily('dsh').members(root) }).toThrow(/packages\/core\/outside\/package\.json must name/)
   })
 
   it('bumps private dsh packages without adding release tags', () => {
