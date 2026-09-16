@@ -38,7 +38,8 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-subagent` | `list_subagent_models`, `subagent` | `ctx.tools`, `ctx.subagents`, `ctx.systemPrompt`, `ctx.llm for model discovery and selected-route validation` | `tool/call`, `tool/result`, `child session events through the chosen provider` | `subagent`, `subagent_fork` | The registered delegation name is the load-time `toolName` config (default `subagent`); the default schema above has model selection off, while the discovery schema is shown as the fixed companion available in an enabled Session. Web presets sample the Plugins preference for each new top-level Session and preserve that decision for its child Sessions; `subagent_fork` remains fixed-route. Each instance independently controls whether it reads model-selection settings and its background behavior through `modelSelectionSettings`, `backgroundMode`, and `enableRunInBackground`. |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message` | `ctx.tools`, `ctx.subagents`, `ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named control tools over continuable background subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while this package registers `send_message` and `interrupt_agent` once, plus `list_agents` from its separately loaded `/list-agents` plugin (whose catalog rows use the sessionProjections and live Agent registries). |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands, PTY sends, and subagents are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
-| `@saturnai/dsh-tool-agent-team` | `followup_task`, `interrupt_agent`, `list_agents`, `send_message`, `spawn_teammate`, `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update`, `wait_agent` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `an exact live Team member Agent` | `tool/call`, `team/member`, `team/message/queued`, `team/message/delivered`, `team/task`, `tool/result` | - | All ten tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names. |
+| `@saturnai/dsh-tool-agent-team` | `followup_task`, `interrupt_agent`, `list_agents`, `merge_teammate`, `send_message`, `spawn_teammate`, `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update`, `wait_agent` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `an exact live Team member Agent` | `tool/call`, `team/member`, `team/message/queued`, `team/message/delivered`, `team/task`, `tool/result` | - | All eleven tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names. |
+| `@saturnai/dsh-tool-media` | `media_generate_audio`, `media_generate_image`, `media_generate_video`, `media_job_status`, `media_motion_transfer` | `ctx.tools`, `ctx.approval (execution time, optional — preferred spend-approval route when the call carries an Agent)`, `ctx.userQuestions (execution time, optional — the agentless spend-approval fallback)`, `ctx.credentials (execution time, optional — falls back to the launch environment)` | `tool/call`, `tool/result` | - | Every one of the five tools costs money and is gated behind a spend-approval prompt showing the estimated USD cost before any billable network call — `ctx.approval` when the call carries an Agent (preferred), else the agentless `ctx.userQuestions` fallback; a call fails closed when neither route is composed. `media_generate_audio` and `media_motion_transfer` route to `higgsfield` only and require an explicit `params.modelPath` (no default is published for either). |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
@@ -1927,6 +1928,31 @@ List the Lead and every durable teammate with current runtime status.
 
 Source: [`packages/saturn/tool-agent-team/src/index.ts`](../packages/saturn/tool-agent-team/src/index.ts)
 
+### `merge_teammate`
+
+Bring an isolated teammate's work into your working directory. Reports every file in its diff, applies the whole diff or none of it, and refuses any file another member has claimed. Team Lead only.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "target": {
+      "type": "string",
+      "description": "Teammate name."
+    },
+    "dry_run": {
+      "type": "boolean",
+      "description": "Report the files and their owners without changing anything."
+    }
+  },
+  "required": [
+    "target"
+  ]
+}
+```
+
+Source: [`packages/saturn/tool-agent-team/src/index.ts`](../packages/saturn/tool-agent-team/src/index.ts)
+
 ### `send_message`
 
 Send durable information to another Team member without starting an idle member.
@@ -1979,6 +2005,14 @@ Create one named, durable teammate. Only the Team Lead may call this tool.
       "enum": [
         "fresh",
         "fork"
+      ]
+    },
+    "isolation": {
+      "type": "string",
+      "description": "shared puts the teammate in your working directory, where its edits are immediately visible to everyone. worktree gives it a private checkout of the current commit, invisible until you call merge_teammate; use it when the work rewrites files others are reading, and only in a git repository. Defaults to shared.",
+      "enum": [
+        "shared",
+        "worktree"
       ]
     }
   },
@@ -2177,7 +2211,181 @@ Wait for the next teammate status, mailbox, or shared-task change after this cal
 
 Source: [`packages/saturn/tool-agent-team/src/index.ts`](../packages/saturn/tool-agent-team/src/index.ts)
 
-All ten tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names.
+All eleven tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names.
+
+<a id="saturnaidsh-tool-media"></a>
+
+## `@saturnai/dsh-tool-media`
+
+### `media_generate_audio`
+
+Generate one audio clip (speech or music) from a text prompt, via the higgsfield provider. Costs money — the user is asked to approve the estimated cost before generation starts. Requires params.modelPath (the exact Higgsfield audio model path) since no default is configured.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The audio to generate — the words to speak, or a description of the music."
+    },
+    "provider": {
+      "type": "string",
+      "description": "Explicit backend override; omit to use the configured default for this media kind.",
+      "enum": [
+        "gemini",
+        "openai",
+        "higgsfield"
+      ]
+    },
+    "model": {
+      "type": "string",
+      "description": "Explicit model id/path override for the resolved provider."
+    },
+    "params": {
+      "type": "object",
+      "description": "Provider-specific extras — see the tool-media README for the accepted fields per provider (aspect ratio, duration, resolution, reference image, higgsfield modelPath/body, pricePerImageUsd, …).",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+### `media_generate_image`
+
+Generate one image from a text prompt. Costs money — the user is asked to approve the estimated cost before generation starts. Returns a file reference under the workspace, not the image bytes.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The image to generate, described in detail."
+    },
+    "provider": {
+      "type": "string",
+      "description": "Explicit backend override; omit to use the configured default for this media kind.",
+      "enum": [
+        "gemini",
+        "openai",
+        "higgsfield"
+      ]
+    },
+    "model": {
+      "type": "string",
+      "description": "Explicit model id/path override for the resolved provider."
+    },
+    "params": {
+      "type": "object",
+      "description": "Provider-specific extras — see the tool-media README for the accepted fields per provider (aspect ratio, duration, resolution, reference image, higgsfield modelPath/body, pricePerImageUsd, …).",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+### `media_generate_video`
+
+Generate one short video from a text prompt (optionally seeded by a first-frame image). Costs money — the user is asked to approve the estimated cost before generation starts. Returns a file reference under the workspace.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The video to generate, described in detail (subject, action, camera, style)."
+    },
+    "provider": {
+      "type": "string",
+      "description": "Explicit backend override; omit to use the configured default for this media kind.",
+      "enum": [
+        "gemini",
+        "openai",
+        "higgsfield"
+      ]
+    },
+    "model": {
+      "type": "string",
+      "description": "Explicit model id/path override for the resolved provider."
+    },
+    "params": {
+      "type": "object",
+      "description": "Provider-specific extras — see the tool-media README for the accepted fields per provider (aspect ratio, duration, resolution, reference image, higgsfield modelPath/body, pricePerImageUsd, …).",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+### `media_job_status`
+
+Look up the status and output assets of a previously started media generation job, by the id it returned.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "The job id a previous media_generate_* / media_motion_transfer call returned."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+### `media_motion_transfer`
+
+Higgsfield-only motion-transfer or object-swap on a source video (the "Genjutsu" capability): keep the motion/camera/timing and rebuild the cast/location/product from references, or swap one element while leaving the rest untouched. Costs money — the user is asked to approve the estimated cost before generation starts. Requires params.modelPath (the exact Higgsfield endpoint path) and params.body (the exact request body that endpoint needs — reference/driving media URLs, etc.), since docs.higgsfield.ai does not publish a fixed path for this feature as of 2026-09-15.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "What should change (or stay the same) in the rebuilt footage."
+    },
+    "model": {
+      "type": "string",
+      "description": "Explicit model id/path override for the resolved provider."
+    },
+    "params": {
+      "type": "object",
+      "description": "Provider-specific extras — see the tool-media README for the accepted fields per provider (aspect ratio, duration, resolution, reference image, higgsfield modelPath/body, pricePerImageUsd, …).",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+Every one of the five tools costs money and is gated behind a spend-approval prompt showing the estimated USD cost before any billable network call — `ctx.approval` when the call carries an Agent (preferred), else the agentless `ctx.userQuestions` fallback; a call fails closed when neither route is composed. `media_generate_audio` and `media_motion_transfer` route to `higgsfield` only and require an explicit `params.modelPath` (no default is published for either).
 
 <a id="deepseek-aidsh-tool-todo"></a>
 

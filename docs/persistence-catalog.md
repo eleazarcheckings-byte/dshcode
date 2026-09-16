@@ -433,7 +433,23 @@ Source: [`packages/compaction/compaction/src/types.ts:34`](../packages/compactio
 'done/change': { readonly next: DoneState | null }
 ```
 
-Source: [`packages/saturn/done/src/types.ts:62`](../packages/saturn/done/src/types.ts)
+Source: [`packages/saturn/done/src/types.ts:159`](../packages/saturn/done/src/types.ts)
+
+<a id="donecountersign--log-only"></a>
+
+#### `done/countersign` — log-only
+
+```ts persistence-catalog
+/**
+ * One independent review of this session's contract, minted by the review
+ * tool: log-only, non-surface, append-only. A `prove` citing the record's
+ * token reads it back from here, so the provenance of a proven contract is
+ * durable rather than held in memory.
+ */
+'done/countersign': { readonly record: CountersignRecord }
+```
+
+Source: [`packages/saturn/done/src/types.ts:166`](../packages/saturn/done/src/types.ts)
 
 ### `feedback/*`
 
@@ -700,7 +716,7 @@ Source: [`packages/sandbox/sandbox-policy/src/session-mode.ts:33`](../packages/s
 'saturnbot/model-error': { message: string }
 ```
 
-Source: [`packages/saturn/saturnbot/src/model.ts:28`](../packages/saturn/saturnbot/src/model.ts)
+Source: [`packages/saturn/saturnbot/src/model.ts:29`](../packages/saturn/saturnbot/src/model.ts)
 
 <a id="saturnbotmodel-request--log-only"></a>
 
@@ -711,7 +727,7 @@ Source: [`packages/saturn/saturnbot/src/model.ts:28`](../packages/saturn/saturnb
 'saturnbot/model-request': BotModelRequest
 ```
 
-Source: [`packages/saturn/saturnbot/src/model.ts:24`](../packages/saturn/saturnbot/src/model.ts)
+Source: [`packages/saturn/saturnbot/src/model.ts:25`](../packages/saturn/saturnbot/src/model.ts)
 
 <a id="saturnbotmodel-result--log-only"></a>
 
@@ -724,7 +740,7 @@ Source: [`packages/saturn/saturnbot/src/model.ts:24`](../packages/saturn/saturnb
 
 Types: [TokenUsage](subsystems/llm-streaming.md)
 
-Source: [`packages/saturn/saturnbot/src/model.ts:26`](../packages/saturn/saturnbot/src/model.ts)
+Source: [`packages/saturn/saturnbot/src/model.ts:27`](../packages/saturn/saturnbot/src/model.ts)
 
 ### `schedule/*`
 
@@ -900,7 +916,7 @@ Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:17`](../p
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMemberSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/saturn/agent-team/src/types.ts:223`](../packages/saturn/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:292`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -918,7 +934,7 @@ Source: [`packages/saturn/agent-team/src/types.ts:223`](../packages/saturn/agent
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageId](subsystems/agent-team.md)
 
-Source: [`packages/saturn/agent-team/src/types.ts:229`](../packages/saturn/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:298`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -931,7 +947,7 @@ Source: [`packages/saturn/agent-team/src/types.ts:229`](../packages/saturn/agent
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamMessageSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/saturn/agent-team/src/types.ts:227`](../packages/saturn/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:296`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -944,7 +960,7 @@ Source: [`packages/saturn/agent-team/src/types.ts:227`](../packages/saturn/agent
 
 Types: [TeamId](subsystems/agent-team.md) · [TeamTaskSnapshot](subsystems/agent-team.md)
 
-Source: [`packages/saturn/agent-team/src/types.ts:225`](../packages/saturn/agent-team/src/types.ts)
+Source: [`packages/saturn/agent-team/src/types.ts:294`](../packages/saturn/agent-team/src/types.ts)
 
 ### `todo/*`
 

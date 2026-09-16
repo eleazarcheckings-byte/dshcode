@@ -435,7 +435,23 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'done/change': { readonly next: DoneState | null }
 ```
 
-来源：[`packages/saturn/done/src/types.ts:62`](../packages/saturn/done/src/types.ts)
+来源：[`packages/saturn/done/src/types.ts:159`](../packages/saturn/done/src/types.ts)
+
+<a id="donecountersign--log-only"></a>
+
+#### `done/countersign` — log-only
+
+```ts persistence-catalog
+/**
+ * One independent review of this session's contract, minted by the review
+ * tool: log-only, non-surface, append-only. A `prove` citing the record's
+ * token reads it back from here, so the provenance of a proven contract is
+ * durable rather than held in memory.
+ */
+'done/countersign': { readonly record: CountersignRecord }
+```
+
+来源：[`packages/saturn/done/src/types.ts:166`](../packages/saturn/done/src/types.ts)
 
 ### `feedback/*`
 
@@ -690,6 +706,43 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/sandbox/sandbox-policy/src/session-mode.ts:33`](../packages/sandbox/sandbox-policy/src/session-mode.ts)
 
+### `saturnbot/*`
+
+<a id="saturnbotmodel-error--log-only"></a>
+
+#### `saturnbot/model-error` — log-only
+
+```ts persistence-catalog
+/** Terminal model outcome without provider credentials or request headers. */
+'saturnbot/model-error': { message: string }
+```
+
+来源：[`packages/saturn/saturnbot/src/model.ts:29`](../packages/saturn/saturnbot/src/model.ts)
+
+<a id="saturnbotmodel-request--log-only"></a>
+
+#### `saturnbot/model-request` — log-only
+
+```ts persistence-catalog
+/** Exact SaturnBot request, including all model-visible state and tool descriptions. */
+'saturnbot/model-request': BotModelRequest
+```
+
+来源：[`packages/saturn/saturnbot/src/model.ts:25`](../packages/saturn/saturnbot/src/model.ts)
+
+<a id="saturnbotmodel-result--log-only"></a>
+
+#### `saturnbot/model-result` — log-only
+
+```ts persistence-catalog
+/** Visible structured response and usage; private reasoning blocks are not retained. */
+'saturnbot/model-result': { text: string; usage: TokenUsage | null }
+```
+
+类型：[TokenUsage](subsystems/llm-streaming.zh.md)
+
+来源：[`packages/saturn/saturnbot/src/model.ts:27`](../packages/saturn/saturnbot/src/model.ts)
+
 ### `schedule/*`
 
 <a id="schedulechange--log-only"></a>
@@ -864,7 +917,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMemberSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/saturn/agent-team/src/types.ts:206`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:292`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -882,7 +935,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMessageId](subsystems/agent-team.zh.md)
 
-来源：[`packages/saturn/agent-team/src/types.ts:212`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:298`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -895,7 +948,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMessageSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/saturn/agent-team/src/types.ts:210`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:296`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -908,7 +961,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamTaskSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/saturn/agent-team/src/types.ts:208`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:294`](../packages/saturn/agent-team/src/types.ts)
 
 ### `todo/*`
 

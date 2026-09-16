@@ -31,6 +31,8 @@ describe('gen-tool-catalog collectToolCatalog', () => {
       'cordis_undefine', 'create_goal', 'describe_image', 'edit', 'exit_plan_mode', 'followup_task', 'get_goal', 'glob', 'grep',
       'interrupt_agent', 'interrupt_agent', 'job_kill', 'job_list', 'job_output',
       'list_agents', 'list_agents', 'list_subagent_models', 'lsp',
+      'media_generate_audio', 'media_generate_image', 'media_generate_video',
+      'media_job_status', 'media_motion_transfer', 'merge_teammate',
       'plugin_install', 'plugin_search', 'plugin_status', 'plugin_uninstall',
       'pwsh', 'pwsh', 'ralph',
       'read', 'read_image', 'run_code', 'schedule_create', 'schedule_delete',

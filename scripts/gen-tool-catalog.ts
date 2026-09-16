@@ -65,6 +65,7 @@ import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import type TeamService from '@saturnai/dsh-agent-team'
 import * as ToolTeam from '@saturnai/dsh-tool-agent-team'
+import * as ToolMedia from '@saturnai/dsh-tool-media'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import { registerListSubagentModels } from '../packages/subagent/tool-subagent/src/list-models.ts'
@@ -577,7 +578,28 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     scope: ctx => catalogChildScopes.get(ctx) as Agent,
     note:
-      'All ten tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names.',
+      'All eleven tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names.',
+  },
+  {
+    pkg: '@saturnai/dsh-tool-media',
+    dir: 'tool-media',
+    source: 'packages/saturn/tool-media/src/index.ts',
+    requires: [
+      'ctx.tools',
+      'ctx.approval (execution time, optional — preferred spend-approval route when the call carries an Agent)',
+      'ctx.userQuestions (execution time, optional — the agentless spend-approval fallback)',
+      'ctx.credentials (execution time, optional — falls back to the launch environment)',
+    ],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // No provider sub-block is configured: every schema below is the shared
+      // shape shipped regardless of which of gemini/openai/higgsfield a
+      // deployment enables (a provider with no config simply fails its own
+      // calls at execution time with a credential error, not at mount).
+      await ctx.plugin(ToolMedia, {})
+    },
+    note:
+      'Every one of the five tools costs money and is gated behind a spend-approval prompt showing the estimated USD cost before any billable network call — `ctx.approval` when the call carries an Agent (preferred), else the agentless `ctx.userQuestions` fallback; a call fails closed when neither route is composed. `media_generate_audio` and `media_motion_transfer` route to `higgsfield` only and require an explicit `params.modelPath` (no default is published for either).',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-todo',

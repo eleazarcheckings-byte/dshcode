@@ -42,7 +42,8 @@
 | `@deepseek-ai/dsh-tool-subagent` | `list_subagent_models`、`subagent` | `ctx.tools`、`ctx.subagents`、`ctx.systemPrompt`、`用于模型发现和所选路由校验的 ctx.llm` | `tool/call`、`tool/result`、`child session events through the chosen provider` | `subagent`、`subagent_fork` | 注册的委派工具名称取决于加载时 `toolName` 配置（默认为 `subagent`）；上述默认 schema 关闭模型选择，而发现 schema 则展示为已启用 Session 中可用的固定配套工具。Web preset 会在每个新顶层 Session 创建时读取插件页偏好，并为其子 Session 保留该决定；`subagent_fork` 始终使用固定路由。每个实例通过 `modelSelectionSettings`、`backgroundMode` 与 `enableRunInBackground` 独立控制是否读取模型选择设置及其后台行为。 |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message` | `ctx.tools`、`ctx.subagents`、`ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 这些是控制可继续后台 subagent 的全局命名工具：绑定提供方的 `tool-subagent` 实例注册不同的委派工具；本包注册一次 `send_message` 和 `interrupt_agent`，另由 `list_agents` 通过单独加载的 `/list-agents` 插件提供，其目录行使用 sessionProjections 和实时 Agent 注册表。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令、PTY 发送和 subagent 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
-| `@saturnai/dsh-tool-agent-team` | `followup_task`、`interrupt_agent`、`list_agents`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/message/queued`、`team/message/delivered`、`team/task`、`tool/result` | - | 这 10 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
+| `@saturnai/dsh-tool-agent-team` | `followup_task`、`interrupt_agent`、`list_agents`、`merge_teammate`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/message/queued`、`team/message/delivered`、`team/task`、`tool/result` | - | 这 11 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
+| `@saturnai/dsh-tool-media` | `media_generate_audio`、`media_generate_image`、`media_generate_video`、`media_job_status`、`media_motion_transfer` | `ctx.tools`、`ctx.approval（执行期，可选——当调用携带 Agent 时优先使用的支出审批路径）`、`ctx.userQuestions（执行期，可选——无 Agent 时的支出审批兜底路径）`、`ctx.credentials（执行期，可选——回退到启动环境）` | `tool/call`、`tool/result` | - | 五个工具中的每一个都会产生费用，并且在任何计费网络调用之前都会被一道显示预估美元成本的支出审批提示拦住——调用携带 Agent 时优先用 `ctx.approval`，否则用无 Agent 的 `ctx.userQuestions` 兜底；两条路径都未组合时调用会失败关闭。`media_generate_audio` 与 `media_motion_transfer` 只路由到 `higgsfield`，且都要求显式传入 `params.modelPath`（两者均未发布默认值）。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
@@ -1928,6 +1929,31 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/saturn/tool-agent-team/src/index.ts`](../packages/saturn/tool-agent-team/src/index.ts)
 
+### `merge_teammate`
+
+将一名隔离 teammate 的工作合入你自己的工作目录。报告其 diff 中的每个文件，要么应用整个 diff，要么完全不应用，并拒绝任何已被另一成员认领的文件。仅限 Team Lead 调用。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "target": {
+      "type": "string",
+      "description": "Teammate name."
+    },
+    "dry_run": {
+      "type": "boolean",
+      "description": "Report the files and their owners without changing anything."
+    }
+  },
+  "required": [
+    "target"
+  ]
+}
+```
+
+来源：[`packages/saturn/tool-agent-team/src/index.ts`](../packages/saturn/tool-agent-team/src/index.ts)
+
 ### `send_message`
 
 向另一名 Team member 发送持久信息，但不启动 idle member。
@@ -1980,6 +2006,14 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
       "enum": [
         "fresh",
         "fork"
+      ]
+    },
+    "isolation": {
+      "type": "string",
+      "description": "shared puts the teammate in your working directory, where its edits are immediately visible to everyone. worktree gives it a private checkout of the current commit, invisible until you call merge_teammate; use it when the work rewrites files others are reading, and only in a git repository. Defaults to shared.",
+      "enum": [
+        "shared",
+        "worktree"
       ]
     }
   },
@@ -2178,8 +2212,181 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/saturn/tool-agent-team/src/index.ts`](../packages/saturn/tool-agent-team/src/index.ts)
 
-这 10 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。
+这 11 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。
 
+<a id="saturnaidsh-tool-media"></a>
+
+## `@saturnai/dsh-tool-media`
+
+### `media_generate_audio`
+
+通过 higgsfield 提供方，根据文本提示生成一段音频（语音或音乐）。会产生费用——生成开始前会请用户批准预估成本。需要 params.modelPath（精确的 Higgsfield 音频模型路径），因为没有配置默认值。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The audio to generate — the words to speak, or a description of the music."
+    },
+    "provider": {
+      "type": "string",
+      "description": "Explicit backend override; omit to use the configured default for this media kind.",
+      "enum": [
+        "gemini",
+        "openai",
+        "higgsfield"
+      ]
+    },
+    "model": {
+      "type": "string",
+      "description": "Explicit model id/path override for the resolved provider."
+    },
+    "params": {
+      "type": "object",
+      "description": "Provider-specific extras — see the tool-media README for the accepted fields per provider (aspect ratio, duration, resolution, reference image, higgsfield modelPath/body, pricePerImageUsd, …).",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+来源：[`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+### `media_generate_image`
+
+根据文本提示生成一张图片。会产生费用——生成开始前会请用户批准预估成本。返回工作区下的一个文件引用，而不是图片字节内容。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The image to generate, described in detail."
+    },
+    "provider": {
+      "type": "string",
+      "description": "Explicit backend override; omit to use the configured default for this media kind.",
+      "enum": [
+        "gemini",
+        "openai",
+        "higgsfield"
+      ]
+    },
+    "model": {
+      "type": "string",
+      "description": "Explicit model id/path override for the resolved provider."
+    },
+    "params": {
+      "type": "object",
+      "description": "Provider-specific extras — see the tool-media README for the accepted fields per provider (aspect ratio, duration, resolution, reference image, higgsfield modelPath/body, pricePerImageUsd, …).",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+来源：[`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+### `media_generate_video`
+
+根据文本提示生成一段短视频（可选地以首帧图片为种子）。会产生费用——生成开始前会请用户批准预估成本。返回工作区下的一个文件引用。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The video to generate, described in detail (subject, action, camera, style)."
+    },
+    "provider": {
+      "type": "string",
+      "description": "Explicit backend override; omit to use the configured default for this media kind.",
+      "enum": [
+        "gemini",
+        "openai",
+        "higgsfield"
+      ]
+    },
+    "model": {
+      "type": "string",
+      "description": "Explicit model id/path override for the resolved provider."
+    },
+    "params": {
+      "type": "object",
+      "description": "Provider-specific extras — see the tool-media README for the accepted fields per provider (aspect ratio, duration, resolution, reference image, higgsfield modelPath/body, pricePerImageUsd, …).",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+来源：[`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+### `media_job_status`
+
+按之前一次媒体生成任务返回的 id，查询该任务的状态与输出产物。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "The job id a previous media_generate_* / media_motion_transfer call returned."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+来源：[`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+### `media_motion_transfer`
+
+仅限 higgsfield 的动作迁移或物体替换，作用于一段源视频（“Genjutsu”能力）：保留动作/镜头/时序，并根据参考素材重建演员/场景/产品，或只替换其中一个元素而保持其余不变。会产生费用——生成开始前会请用户批准预估成本。需要 params.modelPath（精确的 Higgsfield 端点路径）与 params.body（该端点所需的精确请求体——参考/驱动素材的 URL 等），因为截至 2026-09-15，docs.higgsfield.ai 尚未为该功能发布固定路径。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "What should change (or stay the same) in the rebuilt footage."
+    },
+    "model": {
+      "type": "string",
+      "description": "Explicit model id/path override for the resolved provider."
+    },
+    "params": {
+      "type": "object",
+      "description": "Provider-specific extras — see the tool-media README for the accepted fields per provider (aspect ratio, duration, resolution, reference image, higgsfield modelPath/body, pricePerImageUsd, …).",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+来源：[`packages/saturn/tool-media/src/index.ts`](../packages/saturn/tool-media/src/index.ts)
+
+五个工具中的每一个都会产生费用，并且在任何计费网络调用之前都会被一道显示预估美元成本的支出审批提示拦住——调用携带 Agent 时优先用 `ctx.approval`，否则用无 Agent 的 `ctx.userQuestions` 兜底；两条路径都未组合时调用会失败关闭。`media_generate_audio` 与 `media_motion_transfer` 只路由到 `higgsfield`，且都要求显式传入 `params.modelPath`（两者均未发布默认值）。
 
 <a id="deepseek-aidsh-tool-todo"></a>
 
