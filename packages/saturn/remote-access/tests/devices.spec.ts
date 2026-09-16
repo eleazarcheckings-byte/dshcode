@@ -57,9 +57,10 @@ describe('device ledger', () => {
     const l = await ledger()
     const now = Date.now()
     const paired = await l.store.redeemPairingToken(l.store.issuePairingToken(now, 600_000), DEVICE, now)
-    // A 32-byte token is 43 base64url characters, and the last one carries only
-    // two significant bits — it is always one of A, Q, g, w. Hard-coding a
-    // replacement therefore reproduced the real token one run in four; pick a
+    // A 32-byte token is 43 base64url characters: 256 bits = 42 × 6 + 4, so the
+    // last character carries four significant bits and is one of sixteen values
+    // (A E I M Q U Y c g k o s w 0 4 8). Hard-coding 'A' as the replacement
+    // therefore reproduced the real token about one run in sixteen; pick a
     // character the token does not already end in.
     const nearMiss = `${paired.deviceToken.slice(0, -1)}${paired.deviceToken.endsWith('A') ? 'Q' : 'A'}`
     expect(nearMiss).not.toBe(paired.deviceToken)
