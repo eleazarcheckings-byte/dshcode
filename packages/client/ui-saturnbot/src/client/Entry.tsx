@@ -5,6 +5,13 @@ import type { SaturnBotEntryProps } from './contracts.ts'
 import { Dashboard } from './Dashboard.tsx'
 import css from './Entry.module.css'
 
+/** The frame custom property the Session header (and the pricing lamp's rail) read as their trailing inset. */
+const TRAILING_INSET = '--dsh-shell-trailing-inset'
+/** The seat's own `right` in Entry.module.css (`.launcherSeat`). */
+const LAUNCHER_CORNER_INSET = 18
+/** Breathing room between the launcher and whatever the frame places at the inset. */
+const LAUNCHER_GAP = 12
+
 /** Mount one dashboard in its own window, or a top-right launcher in the main harness. */
 export function SaturnBotEntry({
   useBot, useWorkspaces, standalone, openWindow, pickDirectory, t,
@@ -26,11 +33,28 @@ export function SaturnBotEntry({
     const overlay = root.current.closest('[data-shell-overlay]')
     const frame = overlay?.parentElement
     if (!standalone && frame !== null && frame !== undefined) {
-      const previous = frame.style.getPropertyValue('--dsh-shell-trailing-inset')
-      frame.style.setProperty('--dsh-shell-trailing-inset', '134px')
+      const seat = root.current
+      const previous = frame.style.getPropertyValue(TRAILING_INSET)
+      const release = () => {
+        if (previous) frame.style.setProperty(TRAILING_INSET, previous)
+        else frame.style.removeProperty(TRAILING_INSET)
+      }
+      // Publish the measured footprint, not a guess: the corner inset plus the
+      // seat's own width (it follows the brand label's locale) plus a gap, so
+      // whatever the frame places at this inset -- the Session header's
+      // utilities, the pricing lamp -- stops short of the button. No box means
+      // the phone sheet hid the launcher: reserve nothing.
+      const reserve = () => {
+        const width = Math.round(seat.getBoundingClientRect().width)
+        if (width === 0) release()
+        else frame.style.setProperty(TRAILING_INSET, `${LAUNCHER_CORNER_INSET + width + LAUNCHER_GAP}px`)
+      }
+      reserve()
+      const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(reserve)
+      observer?.observe(seat)
       return () => {
-        if (previous) frame.style.setProperty('--dsh-shell-trailing-inset', previous)
-        else frame.style.removeProperty('--dsh-shell-trailing-inset')
+        observer?.disconnect()
+        release()
       }
     }
     const siblings = [...(overlay?.parentElement?.children ?? [])].filter(
