@@ -35,8 +35,6 @@
   // belongs to the host aggregate, which excludes this program's `*.client.*`
   // in turn. `exclude` wins over `include`, so the test glob above stays broad.
   "exclude": [
-    // Companion-apps lane (SPEC §8 M1) in progress in a sibling process: excluded until its handoff lands as a project reference + path alias.
-    "packages/client/ui-remote-access/**",
     "packages/client/*/tests/**/*.host.spec.ts"
   ],
   "references": [
@@ -115,6 +113,7 @@
     { "path": "./packages/client/web" },
     { "path": "./packages/context/file-reference" },
     { "path": "./apps/web" },
-    { "path": "./packages/client/ui-saturnbot" }
+    { "path": "./packages/client/ui-saturnbot" },
+    { "path": "./packages/client/ui-remote-access" }
   ]
 }

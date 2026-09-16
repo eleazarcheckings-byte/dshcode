@@ -112,8 +112,6 @@
   // suffixes are mutually exclusive, so each aggregate excludes the other's
   // and the package test glob above needs no per-file entry.
   "exclude": [
-    // Companion-apps lane (SPEC §8 M1) in progress in a sibling process: excluded until its handoff lands as a project reference.
-    "packages/saturn/remote-access/**",
     "packages/client/*/src/**",
     "packages/*/*/tests/**/*.client.ts",
     "packages/*/*/tests/**/*.client.tsx",
@@ -351,6 +349,7 @@
     { "path": "./packages/saturn/design-brain" },
     { "path": "./packages/saturn/model-router" },
     { "path": "./packages/saturn/review" },
-    { "path": "./packages/saturn/tool-media" }
+    { "path": "./packages/saturn/tool-media" },
+    { "path": "./packages/saturn/remote-access" }
   ]
 }
