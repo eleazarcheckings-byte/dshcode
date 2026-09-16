@@ -46,6 +46,12 @@ function face(overrides: Partial<AccountSectionInjected> = {}): AccountSectionIn
   }
 }
 
+function injectedFace(slots: SlotRegistry): AccountSectionInjected {
+  const injectFn = slots.entries('settings.section')[0]?.inject
+  if (injectFn === undefined) throw new Error('account section inject missing')
+  return (injectFn as unknown as () => AccountSectionInjected)()
+}
+
 function t(key: keyof typeof en, values?: Record<string, string | number>): string {
   return Object.entries(values ?? {}).reduce<string>(
     (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
@@ -79,8 +85,7 @@ describe('ui-settings-account plugin', () => {
     const slots = ctx.get('slots') as SlotRegistry
     slots.register({ name: 'root', children: { 'settings.section': { kind: 'list', scope: 'root' } } } as never, () => null)
     await ctx.plugin({ inject: [...inject], apply }).await()
-    const injected = slots.entries('settings.section')[0]!.inject as () => AccountSectionInjected
-    const host = injected()
+    const host = injectedFace(slots)
     await expect(host.status()).resolves.toEqual({ version: 1, connected: false, reason: 'oauth-unavailable' })
     await expect(host.signIn()).resolves.toMatchObject({ connected: false })
     await expect(host.signOut()).resolves.toMatchObject({ connected: false })
@@ -103,7 +108,7 @@ describe('ui-settings-account plugin', () => {
     const slots = ctx.get('slots') as SlotRegistry
     slots.register({ name: 'root', children: { 'settings.section': { kind: 'list', scope: 'root' } } } as never, () => null)
     await ctx.plugin({ inject: [...inject], apply }).await()
-    const host = (slots.entries('settings.section')[0]!.inject as () => AccountSectionInjected)()
+    const host = injectedFace(slots)
     await expect(host.status()).resolves.toEqual(CONNECTED)
     await host.signIn()
     await host.signOut()
@@ -122,7 +127,7 @@ describe('ui-settings-account plugin', () => {
     const slots = ctx.get('slots') as SlotRegistry
     slots.register({ name: 'root', children: { 'settings.section': { kind: 'list', scope: 'root' } } } as never, () => null)
     await ctx.plugin({ inject: [...inject], apply }).await()
-    const host = (slots.entries('settings.section')[0]!.inject as () => AccountSectionInjected)()
+    const host = injectedFace(slots)
     await expect(host.status()).resolves.toEqual({ version: 1, connected: false, reason: 'oauth-unavailable' })
     await expect(host.signIn()).resolves.toMatchObject({ connected: false })
     await expect(host.signOut()).resolves.toMatchObject({ connected: false })
