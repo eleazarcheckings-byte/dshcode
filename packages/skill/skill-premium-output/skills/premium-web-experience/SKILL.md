@@ -10,6 +10,10 @@ Write a short working brief in the task: who uses this, what they should do firs
 
 Save this direction as a durable artifact at `.saturn/design-plan.md` before implementation begins, not only as prose in the conversation turn. Update the file as the direction develops instead of letting later decisions live only in chat history; a reviewer and a later session both need to find it there.
 
+## Study the references with eyes
+
+When a design brain connection is available and compose, search, or pick returned reference slugs, call `design_study_references` on 1-5 of them before writing the direction — never invent a slug it did not return. The tool fetches each reference's real thumbnail and returns it as an image, not a filename; look at the images it returns, not just their names. For each reference, extract named structural moves — exact layout mechanics, spacing rhythm, a specific interaction — never a mood adjective. Save what the images actually show to `.saturn/reference-study.md` before implementation begins, alongside `design-plan.md`. When no design brain connection is available, say so and continue from the supplied reference and brief alone.
+
 For a menu, tooltip, popover, or other layered overlay, reach for CSS anchor positioning (`anchor-name`/`position-anchor`) together with the Popover API as the default recipe, before a JavaScript positioning library.
 
 Make the page feel authored through its content and composition. An editorial site might use generous type and image pacing; a tool might use dense but clear controls and restrained surfaces. A premium result does not require a dark theme, giant gradients, glass panels, or motion. Do not copy Saturn's palette or star field into unrelated projects.
@@ -55,6 +59,10 @@ On Windows, `spawn EPERM` during browser launch can mean the execution policy bl
 Capture waits for fonts and finite running entrance animations within the configured timeout, while infinite ambience and script-driven canvas motion remain active. A settling timeout is reported, so inspect that screenshot as an unfinished state. For an authenticated preview, explicitly provide an authorized Playwright session export with `--storage-state`; the helper does not discover credentials or include session state in its report.
 
 The report and desktop/mobile/reduced-motion screenshots support review; the script cannot judge taste, verify business logic by looking at a page, or certify accessibility. Open and inspect the generated images, then use browser interaction tools to test the primary task. A screenshot file existing is not evidence that anyone reviewed it. Only use a remote preview with the user's authorization and the helper's explicit remote option.
+
+## Look at what you built
+
+The helper's stdout and `report.md` print the captured screenshots as a labelled path list (`desktop`, `mobile`, `reduced-motion`) precisely so the agent — never the script — can act on it: read each one with `read_image` before judging the result. `report.json`'s `visualQualityAssessed` stays `false` on principle; the helper only ever reports DOM and console facts, never a visual verdict, so a `false` here is not a defect to fix. The visual judgment is real only once an agent (this one, or the independent reviewer below) has actually looked at the images it named.
 
 ## Independent review before handoff
 

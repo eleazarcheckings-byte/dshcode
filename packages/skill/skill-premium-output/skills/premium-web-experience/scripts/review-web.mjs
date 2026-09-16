@@ -8,6 +8,7 @@ const HELP = `Usage: node review-web.mjs --url http://127.0.0.1:3000 --out ./art
 Run from the target project's directory. Uses its installed playwright or @playwright/test, then the skill's installation. Never installs dependencies or browsers.
 --storage-state reuses only the explicitly supplied Playwright session state in each viewport. Session state is never discovered automatically or copied into the report.
 Produces desktop, mobile, and reduced-motion viewport screenshots plus report.json and report.md in a new review-* subdirectory.
+Stdout and report.md both print captured screenshots as a labelled {name, path} list — open each path with read_image (or an equivalent image tool) before judging the result; this script never assesses visual quality itself.
 Before capture, waits within --timeout for fonts and finite running entrance animations; infinite or paused animations keep their current state.
 Each view also reports "measure": the median rendered characters-per-line over the first 20 lines
 of the main prose container ({measure_ch, pass: <= 75}), or null when no sampleable prose is found.
@@ -307,8 +308,28 @@ function hasFindings(view) {
   return !view.dom || view.issues.length > 0 || view.dom.horizontalOverflow || view.dom.counts.failedImages > 0 || view.dom.counts.unlabeledControls > 0 || view.dom.mains !== 1 || view.dom.h1 !== 1 || view.dom.omittedElements > 0
 }
 
-function markdown(report) {
-  const lines = ['# Browser review evidence', '', `Status: **${report.status}**`, '', 'Automated checks do not assess visual quality, brand fit, contrast, animation quality, full accessibility, or user journeys. Inspect every screenshot and test the important interactions before calling the work complete.', '', `Target: ${report.target}`, '']
+/** Absolute path to one captured view's screenshot, or `null` when capture never produced one. */
+function screenshotPath(directory, view) {
+  return view.screenshot ? resolve(directory, view.screenshot) : null
+}
+
+/** The captured screenshots as a labelled `{name, path}` list, for a caller to hand each `path` to
+ * `read_image` (or an equivalent image tool) — this script only ever reports DOM and console facts;
+ * it never looks at pixels itself, so an agent (never this script) is who must actually look. */
+function screenshotList(directory, report) {
+  return report.views
+    .map(view => ({ name: view.name, path: screenshotPath(directory, view) }))
+    .filter(entry => entry.path !== null)
+}
+
+function markdown(report, directory) {
+  const lines = ['# Browser review evidence', '', `Status: **${report.status}**`, '', 'Automated checks do not assess visual quality, brand fit, contrast, animation quality, full accessibility, or user journeys. This script never looks at pixels itself — an agent must open every screenshot listed below with read_image (or an equivalent image tool) and test the important interactions before calling the work complete.', '', `Target: ${report.target}`, '']
+  const screenshots = screenshotList(directory, report)
+  if (screenshots.length > 0) {
+    lines.push('## Screenshots to inspect', '', 'Read each path below with read_image before judging this result:', '')
+    for (const entry of screenshots) lines.push(`- ${entry.name}: ${entry.path}`)
+    lines.push('')
+  }
   if (report.error) lines.push(`Unavailable: ${report.error}`, '')
   if (report.remediation) lines.push(report.remediation, '')
   for (const view of report.views) {
@@ -356,8 +377,8 @@ export async function runReview(options, cwd = process.cwd()) {
     if (browser) await browser.close()
   }
   await writeFile(resolve(directory, 'report.json'), `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx', mode: 0o600 })
-  await writeFile(resolve(directory, 'report.md'), markdown(report), { flag: 'wx', mode: 0o600 })
-  return { directory, report, exitCode: report.status === 'checks-complete' ? 0 : report.status === 'unavailable' ? 2 : 1 }
+  await writeFile(resolve(directory, 'report.md'), markdown(report, directory), { flag: 'wx', mode: 0o600 })
+  return { directory, report, screenshots: screenshotList(directory, report), exitCode: report.status === 'checks-complete' ? 0 : report.status === 'unavailable' ? 2 : 1 }
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
@@ -366,7 +387,14 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
     if (options.help) process.stdout.write(`${HELP}\n`)
     else {
       const result = await runReview(options)
-      process.stdout.write(`${JSON.stringify({ status: result.report.status, directory: result.directory, report: resolve(result.directory, 'report.json'), visualQualityAssessed: false })}\n`)
+      process.stdout.write(`${JSON.stringify({
+        status: result.report.status,
+        directory: result.directory,
+        report: resolve(result.directory, 'report.json'),
+        visualQualityAssessed: false,
+        screenshots: result.screenshots,
+        lookNote: 'This script never assesses visual quality. Read each screenshots[].path above with read_image before judging the result.',
+      })}\n`)
       process.exitCode = result.exitCode
     }
   } catch (error) {
