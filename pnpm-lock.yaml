@@ -272,6 +272,9 @@ importers:
       '@deepseek-ai/dsh-tool-bash-persistent':
         specifier: workspace:^
         version: link:../../packages/shell/tool-bash-persistent
+      '@deepseek-ai/dsh-tool-browser':
+        specifier: workspace:^
+        version: link:../../packages/browser/tool-browser
       '@deepseek-ai/dsh-tool-cordis':
         specifier: workspace:^
         version: link:../../packages/extensions/tool-cordis
@@ -822,6 +825,9 @@ importers:
       '@deepseek-ai/dsh-tool-bash-persistent':
         specifier: workspace:^
         version: link:../../packages/shell/tool-bash-persistent
+      '@deepseek-ai/dsh-tool-browser':
+        specifier: workspace:^
+        version: link:../../packages/browser/tool-browser
       '@deepseek-ai/dsh-tool-cordis':
         specifier: workspace:^
         version: link:../../packages/extensions/tool-cordis
@@ -1520,6 +1526,34 @@ importers:
         specifier: ^15.0.0
         version: 15.0.0
 
+  packages/browser/tool-browser:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      playwright-core:
+        specifier: 1.61.1
+        version: 1.61.1
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@deepseek-ai/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../../vendor/loader
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:^
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:^
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:^
+        version: link:../../core/tools
+
   packages/bundle/acp-app:
     dependencies:
       '@deepseek-ai/dsh-acp':
@@ -1743,6 +1777,9 @@ importers:
       '@deepseek-ai/dsh-tool-bash':
         specifier: workspace:^
         version: link:../../shell/tool-bash
+      '@deepseek-ai/dsh-tool-browser':
+        specifier: workspace:^
+        version: link:../../browser/tool-browser
       '@deepseek-ai/dsh-tool-call-timeout-policy':
         specifier: workspace:^
         version: link:../../guard/timeout-policy
@@ -2269,6 +2306,9 @@ importers:
       '@saturnai/dsh-client-ui-saturnbot':
         specifier: workspace:^
         version: link:../../client/ui-saturnbot
+      '@saturnai/dsh-client-ui-settings-account':
+        specifier: workspace:^
+        version: link:../../client/ui-settings-account
       '@saturnai/dsh-client-ui-skin-saturn':
         specifier: workspace:^
         version: link:../../client/ui-skin-saturn
@@ -4214,6 +4254,42 @@ importers:
       react:
         specifier: ^18.2.0
         version: 18.3.1
+
+  packages/client/ui-settings-account:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-client-locale':
+        specifier: workspace:^
+        version: link:../locale
+      '@deepseek-ai/dsh-client-test-runtime':
+        specifier: workspace:^
+        version: link:../../test-support/client-runtime
+      '@deepseek-ai/dsh-client-ui-primitives':
+        specifier: workspace:^
+        version: link:../ui-primitives
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: workspace:^
+        version: link:../ui-renderer
+      '@deepseek-ai/dsh-client-ui-settings':
+        specifier: workspace:^
+        version: link:../ui-settings
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: workspace:^
+        version: link:../ui-slots
+      '@types/react':
+        specifier: ~18.3.1
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ~18.3.0
+        version: 18.3.7(@types/react@18.3.31)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
 
   packages/client/ui-settings-archive:
     devDependencies:
@@ -12295,6 +12371,9 @@ importers:
       '@deepseek-ai/dsh-tool-bash-persistent':
         specifier: workspace:^
         version: link:../../packages/shell/tool-bash-persistent
+      '@deepseek-ai/dsh-tool-browser':
+        specifier: workspace:^
+        version: link:../../packages/browser/tool-browser
       '@deepseek-ai/dsh-tool-call-timeout-policy':
         specifier: workspace:^
         version: link:../../packages/guard/timeout-policy

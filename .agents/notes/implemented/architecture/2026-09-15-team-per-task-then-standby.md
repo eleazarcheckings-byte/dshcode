@@ -31,7 +31,7 @@ The tests pin the policy's words rather than its spirit: the team floor ("at lea
 
 ## Consequences
 
-Every task in an ON session now costs at least two specialist contexts plus a reviewer context, including small tasks that a single hand could have finished sooner. That is the deliberate trade: the product's claim is a verified team result on every prompt, and the price of the floor is paid in tokens, not in trust. The standby means a session never advances the work between prompts — an operator who wants continuous progress asks for it, in a prompt, and gets a team for it.
+A fresh session folds inactive; the ON shape above is what the toggle turns on ([Saturn product-law defaults](../feature/2026-09-15-saturn-product-law-defaults.md)). Every task in an ON session now costs at least two specialist contexts plus a reviewer context, including small tasks that a single hand could have finished sooner. That is the deliberate trade: the product's claim is a verified team result on every prompt, and the price of the floor is paid in tokens, not in trust. The standby means a session never advances the work between prompts — an operator who wants continuous progress asks for it, in a prompt, and gets a team for it.
 
 The harness addendum's quality guardrail is restated to match: the smallest coherent team, never a single hand. The engine copies of the coordinator-stance text on saturnai.tools carry the same paragraph and are updated by the process that owns the engine.
 

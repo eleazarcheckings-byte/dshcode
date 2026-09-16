@@ -66,7 +66,7 @@ The smoke restores the packaged manifest, unlinks temporary profile junctions wi
 
 `node apps/desktop/scripts/test-electron-picker.mjs` runs the directory-picker binding tests inside Electron's Node runtime on both platforms. COM calls are mocked; selected paths use real koffi decoding. The Windows packaged smoke additionally opens and aborts the actual dialog; completing a selection in the installed application remains a manual check.
 
-A `desktop-v*` tag publishes the complete successful matrix and `SHA256SUMS.txt` to [GitHub Releases](https://github.com/whitelonng/dshcode/releases). Manual workflow runs retain their packages as ordinary Actions artifacts without creating a Release.
+A `desktop-v*` tag publishes the complete successful matrix and `SHA256SUMS.txt` to [GitHub Releases](https://github.com/eleazarcheckings-byte/dshcode/releases). Manual workflow runs retain their packages as ordinary Actions artifacts without creating a Release.
 
 ## Packaging
 
@@ -77,6 +77,6 @@ The application uses unpacked resources because the Harness profile fallback cre
 ## Current limitations
 
 - Preview packages are deliberately unsigned. macOS Gatekeeper and Windows SmartScreen may warn about local builds until a future release configures platform signing and macOS notarization.
-- Automatic updates are not configured.
+- Check for updates is user-initiated (Settings → Account, or the window menu on Windows). The feed is `eleazarcheckings-byte/dshcode`. Saturn AI does not download or install silently. When GitHub has no electron-updater `latest.yml`, the UI says the feed is empty.
 - The embedded Web UI carries the Saturn AI brand, and desktop application and installer branding use the same Saturn identity; see the repository [license and branding notice](../../README.md).
 - The recovery dialog, tray, and custom title bar need a manual pass on a native Windows build.

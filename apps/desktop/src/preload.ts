@@ -7,8 +7,13 @@
  */
 import { contextBridge, ipcRenderer } from 'electron'
 import {
+  DESKTOP_ACCOUNT_SIGN_IN_CHANNEL,
+  DESKTOP_ACCOUNT_SIGN_OUT_CHANNEL,
+  DESKTOP_ACCOUNT_STATUS_CHANNEL,
+  DESKTOP_CHECK_UPDATES_CHANNEL,
   DESKTOP_NOTIFICATION_CHANNEL,
   DESKTOP_NOTIFICATION_CLICK_CHANNEL,
+  DESKTOP_OPEN_RELEASE_CHANNEL,
   DESKTOP_RESTART_CHANNEL,
   DESKTOP_SHOW_MENU_CHANNEL,
   DESKTOP_RESTORE_SATURNBOT_CHANNEL,
@@ -36,5 +41,12 @@ contextBridge.exposeInMainWorld('dshDesktop', {
     const handler = (_event: unknown, id: string): void => { listener(id) }
     ipcRenderer.on(DESKTOP_NOTIFICATION_CLICK_CHANNEL, handler)
     return () => { ipcRenderer.removeListener(DESKTOP_NOTIFICATION_CLICK_CHANNEL, handler) }
+  },
+  accountStatus: () => ipcRenderer.invoke(DESKTOP_ACCOUNT_STATUS_CHANNEL),
+  accountSignIn: () => ipcRenderer.invoke(DESKTOP_ACCOUNT_SIGN_IN_CHANNEL),
+  accountSignOut: () => ipcRenderer.invoke(DESKTOP_ACCOUNT_SIGN_OUT_CHANNEL),
+  checkForUpdates: () => ipcRenderer.invoke(DESKTOP_CHECK_UPDATES_CHANNEL),
+  openRelease: (url: string) => {
+    void ipcRenderer.invoke(DESKTOP_OPEN_RELEASE_CHANNEL, url)
   },
 })

@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-当一个 agent 应该在自己的工作目录中运行一支小型具名助手团队、且消息与任务状态需要挺过崩溃与重启时，把本包加入组合。它本身不带工具：请与 `@saturnai/dsh-tool-agent-team` 一起挂载，让模型能够创建 teammate、给它们发消息并使用任务板。
+当一个 agent 应该运行一支小型具名助手团队（隔离默认是私有 git worktree）、且消息与任务状态需要挺过崩溃与重启时，把本包加入组合。它本身不带工具：请与 `@saturnai/dsh-tool-agent-team` 一起挂载，让模型能够创建 teammate、给它们发消息并使用任务板。
 
 ### 何时选择
 

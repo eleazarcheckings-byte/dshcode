@@ -10,7 +10,7 @@ Every teammate ran in the Lead's exact directory. The child session copied the p
 
 ## Decision
 
-`create_teammate` gains `isolation`, defaulting to `shared`. With `worktree`, the roster checks the Lead's HEAD out into `<DSH_HOME>/worktrees/<team>/<member>` and gives the teammate that directory as its durable workspace; the checkout is recorded on the member's roster row and removed when the Team runtime disposes. The pattern is ported from SaturnBot's local adapter, which has created one detached worktree per task since it was written; its process supervision and redaction are not ported, because every argv here is fixed by the module with paths as the only variable.
+`create_teammate` gains `isolation`. The spawn default is `worktree`; `shared` is opt-in ([Saturn product-law defaults](2026-09-15-saturn-product-law-defaults.md)). With `worktree`, the roster checks the Lead's HEAD out into `<DSH_HOME>/worktrees/<team>/<member>` and gives the teammate that directory as its durable workspace; the checkout is recorded on the member's roster row and removed when the Team runtime disposes. The pattern is ported from SaturnBot's local adapter, which has created one detached worktree per task since it was written; its process supervision and redaction are not ported, because every argv here is fixed by the module with paths as the only variable.
 
 A teammate's workspace reaches it through one new optional parameter on `childSessionMeta`, threaded from `ContinuableStartSpec.cwd`. Omitting it, or passing an empty string, keeps the parent's workspace, so every existing caller is unchanged.
 
@@ -24,11 +24,11 @@ Git is invoked with `core.autocrlf=false`. Isolation must be byte-faithful, and 
 
 **Auto-merge on teammate completion.** It would hide exactly the moment that needs a decision. Two members editing one file is information the Lead must act on, and a merge that lands silently converts it back into a surprise.
 
-**Taking a claim automatically for every merged path.** It would make the second merge of one file fail loudly, which is desirable, but it leaves the Lead unable to edit the files it just merged until a lease it does not own lapses. Consulting existing claims without creating new ones keeps ownership something an agent declares.
+**Taking a claim automatically for every merged path.** It would make the second merge of one file fail loudly, which is desirable, but it leaves the Lead unable to edit the files it just merged until a lease it does not own lapses. Merge still consults existing claims without creating new ones. First-party writes and scanned shell mutations auto-claim through the [claims guard](2026-09-15-claims-shell-and-worktree-guard.md).
 
 ## Consequences
 
-Worktree isolation is opt-in per teammate and off by default, so existing Teams behave exactly as before; the roster row simply reads `isolation: "shared"`. A Team that uses it trades immediate visibility for a merge step, and the merge is where the coordination that isolation deferred is paid. Checkouts created by a process that dies without disposing its Team are left on disk under the harness home; the durable roster records their paths, so a later cleanup can find them.
+Worktree isolation is the spawn default. `shared` remains available when members must edit the same checkout; those roster rows read `isolation: "shared"`. A Team that uses worktree trades immediate visibility for a merge step, and the merge is where the coordination that isolation deferred is paid. Checkouts created by a process that dies without disposing its Team are left on disk under the harness home; the durable roster records their paths, so a later cleanup can find them.
 
 ## Verification
 

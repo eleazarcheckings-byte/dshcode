@@ -1,0 +1,131 @@
+/* Settings → Account.
+
+   Identity first, then this install. Hairline rules, one accent, no dashboard
+   chrome. The empty state is a sentence, not a fake user. Checking for
+   updates is a button the person presses; nothing downloads itself.
+
+   One motion: when a session is connected, the ring draws itself once. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0 24px;
+  max-width: 68ch;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.mark[data-on] {
+  color: var(--saturn-accent, #dda43a);
+}
+
+.ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.mark[data-on] .ring ellipse {
+  stroke-dasharray: 100;
+  animation: seal var(--saturn-dur-3, 320ms) var(--saturn-ease-out, cubic-bezier(0, 0, 0, 1)) both;
+}
+
+@keyframes seal {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font: var(--dsw-font-sm-strong-14, 600 14px/20px system-ui);
+  color: var(--dsw-alias-label-primary);
+}
+
+.lede {
+  margin: 0;
+  font: var(--dsw-font-xs-13, 13px/20px system-ui);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.state {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+  font: var(--dsw-font-xs-13, 13px/20px system-ui);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.state[data-on] {
+  color: var(--saturn-accent, #dda43a);
+}
+
+.reason,
+.error {
+  margin: 0;
+  font: var(--dsw-font-xs-13, 13px/20px system-ui);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.identity {
+  margin: 0;
+  font: var(--dsw-font-xs-13, 13px/20px system-ui);
+  color: var(--dsw-alias-label-primary);
+}
+
+.mono {
+  font-family: var(--saturn-font-mono, var(--dsw-font-family-mono, ui-monospace, monospace));
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.install {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+}
+
+.subtitle {
+  margin: 0;
+  font: var(--dsw-font-xxxs-strong-11, 600 11px/16px system-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark[data-on] .ring ellipse {
+    animation: none;
+  }
+}

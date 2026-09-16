@@ -230,6 +230,21 @@ export const DESKTOP_NOTIFICATION_CHANNEL = 'desktop:notification'
 /** IPC channel the main process pushes a clicked notification's request id back to the renderer. */
 export const DESKTOP_NOTIFICATION_CLICK_CHANNEL = 'desktop:notification-click'
 
+/** IPC channel the renderer invokes to read the izzy.la product session. */
+export const DESKTOP_ACCOUNT_STATUS_CHANNEL = 'desktop:account-status'
+
+/** IPC channel the renderer invokes to start Sign in with izzy.la. */
+export const DESKTOP_ACCOUNT_SIGN_IN_CHANNEL = 'desktop:account-sign-in'
+
+/** IPC channel the renderer invokes to drop the product session. */
+export const DESKTOP_ACCOUNT_SIGN_OUT_CHANNEL = 'desktop:account-sign-out'
+
+/** IPC channel the renderer invokes to check the GitHub update feed. */
+export const DESKTOP_CHECK_UPDATES_CHANNEL = 'desktop:check-updates'
+
+/** IPC channel the renderer invokes to open an allowlisted GitHub release. */
+export const DESKTOP_OPEN_RELEASE_CHANNEL = 'desktop:open-release'
+
 /** What the renderer learns about the desktop window frame. */
 export interface DesktopBridgePayload {
   /** 'custom' when the window renders its own title-bar row (Windows). */
@@ -287,7 +302,7 @@ export function desktopIpcSenderIsApplication(senderUrl: string | undefined, app
   }
 }
 
-/** The four actions the title-bar window menu wires. */
+/** The actions the title-bar window menu wires. */
 export interface WindowMenuActions {
   /** The application product name the menu labels are composed from. */
   productName: string
@@ -299,22 +314,26 @@ export interface WindowMenuActions {
   restart: () => void
   /** Request a real application exit through the Harness shutdown controller. */
   quit: () => void
+  /** User-initiated check against the GitHub update feed. Never silent. */
+  checkUpdates: () => void
 }
 
 /**
  * Build the window menu template popped by the title-bar menu button. The
- * rows group identity first, then the two application-lifecycle actions the
- * shell owns (restart to apply profile and patch changes, hide to the tray),
- * then the exit; no accelerator is declared because Electron registers a
- * popup menu's accelerators only from an application menu, and a displayed
- * binding that does not fire is worse than none.
- * @param actions - the product name and the about, restart, hide, and quit callbacks.
+ * rows group identity first, then the user-initiated update check, then the
+ * two application-lifecycle actions the shell owns (restart to apply profile
+ * and patch changes, hide to the tray), then the exit; no accelerator is
+ * declared because Electron registers a popup menu's accelerators only from
+ * an application menu, and a displayed binding that does not fire is worse
+ * than none.
+ * @param actions - the product name and the about, update, restart, hide, and quit callbacks.
  * @returns the menu template for `Menu.buildFromTemplate`.
  */
 export function buildWindowMenu(actions: WindowMenuActions): TrayMenuTemplateItem[] {
   return [
     { label: `About ${actions.productName}\u2026`, click: actions.about },
     { type: 'separator' },
+    { label: 'Check for Updates\u2026', click: actions.checkUpdates },
     { label: `Restart ${actions.productName}`, click: actions.restart },
     { label: 'Hide to Tray', click: actions.hide },
     { type: 'separator' },

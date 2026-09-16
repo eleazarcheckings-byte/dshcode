@@ -986,12 +986,12 @@ export interface Config {
   /** Deployment thinking policy; `disabled` limits every conversation request to `off`. */
   thinking?: 'enabled' | 'disabled'
   /** Default thinking effort (default `high`); `off` disables thinking per request. */
-  reasoningEffort?: 'off' | 'low' | 'high' | 'max'
+  reasoningEffort?: 'off' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   /** Default per-request output cap (default 256,000); a model's own cap and explicit request values win. */
   maxTokens?: number
   /** Positive context capacity used when the selected model has no exact value (default 1,000,000). */
   defaultContextWindow?: number
-  /** Advisory models shown by discovery consumers; defaults to V4 Flash, V4 Pro, and V4 Flash Vision Exp. */
+  /** Advisory models shown by discovery consumers; defaults to Flash, V4 Pro, and legacy Flash aliases. */
   models?: DeepSeekCatalogModel[]
   /** Maximum provider idle time while one stream read is outstanding (default five minutes). */
   streamIdleTimeoutMs?: number
@@ -1038,8 +1038,8 @@ export interface DeepSeekCatalogModel {
    * route default. `false` declares a non-reasoning model; a map declares the
    * offered levels (its keys) with their wire spellings, which for this wire
    * route are fixed — `off` uses the empty spelling (thinking disabled), and
-   * `low`/`high`/`max` are the `reasoning_effort` literals. Absent keeps the route's
-   * `reasoningEffort` for this model.
+   * every live API level is its own `reasoning_effort` literal. Absent keeps
+   * the route's `reasoningEffort` for this model.
    */
   reasoningEfforts?: false | Partial<Record<DeepSeekReasoningLevel, string | null>>
   /** Total-pixel budget for one deterministic request preview, or the 512-by-512 `low` preset. */
@@ -1049,12 +1049,20 @@ export interface DeepSeekCatalogModel {
 }
 
 /** One reasoning level the direct DeepSeek wire route can dispatch. */
-export type DeepSeekReasoningLevel = 'off' | 'low' | 'high' | 'max'
+export type DeepSeekReasoningLevel =
+  | 'off'
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max'
 ```
 
 依赖：[`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-来源：[`packages/llm/llm-deepseek/src/index.ts:125`](../packages/llm/llm-deepseek/src/index.ts)
+来源：[`packages/llm/llm-deepseek/src/index.ts:150`](../packages/llm/llm-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-llm-pi-ai"></a>
 
@@ -2722,6 +2730,34 @@ export interface Config {
 
 来源：[`packages/shell/tool-bash-persistent/src/index.ts:432`](../packages/shell/tool-bash-persistent/src/index.ts)
 
+<a id="deepseek-aidsh-tool-browser"></a>
+
+## `@deepseek-ai/dsh-tool-browser`
+
+需要：`tools`
+
+```ts config-catalog
+/** Deployment configuration for the browser verify tools. */
+export interface Config {
+  /** Launch Chromium headless. Defaults to true. */
+  headless?: boolean
+  /** Cooperative timeout budget (ms) for both tools. Defaults to 30000. */
+  timeoutMs?: number
+  /** Absolute Chromium/Chrome/Edge binary, when the deployment pins one. */
+  executablePath?: string
+  /** Playwright browser channel (`chrome`, `msedge`, `chromium`, …), when set. */
+  channel?: string
+  /** Character cap on one accessibility tree. Defaults to 50000. */
+  snapshotMaxChars?: number
+  /** Byte cap on one PNG screenshot. Defaults to 2097152. */
+  screenshotMaxBytes?: number
+  /** Directory for exclusive PNG writes; defaults to a private directory under os.tmpdir(). */
+  screenshotDir?: string
+}
+```
+
+来源：[`packages/browser/tool-browser/src/index.ts:37`](../packages/browser/tool-browser/src/index.ts)
+
 <a id="deepseek-aidsh-tool-describe-image"></a>
 
 ## `@deepseek-ai/dsh-tool-describe-image`
@@ -3443,7 +3479,7 @@ export interface Config {
 ```ts config-catalog
 /** Team-service deployment limits. */
 export interface Config {
-  /** Maximum immutable teammate names retained by one Team. */
+  /** Maximum immutable teammate names retained by one Team. Defaults to 4. */
   readonly maxMembers?: number
   /** Maximum non-deleted tasks retained by one Team. */
   readonly maxTasks?: number
@@ -3462,7 +3498,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/saturn/agent-team/src/types.ts:154`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:155`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="saturnaidsh-design-brain"></a>
 
@@ -3515,7 +3551,7 @@ export interface OrchestrateModeConfig {
 }
 ```
 
-来源：[`packages/saturn/orchestrate/src/index.ts:44`](../packages/saturn/orchestrate/src/index.ts)
+来源：[`packages/saturn/orchestrate/src/index.ts:42`](../packages/saturn/orchestrate/src/index.ts)
 
 <a id="saturnaidsh-remote-access"></a>
 
@@ -3832,6 +3868,7 @@ export interface HiggsfieldConfig {
 - `@saturnai/dsh-client-ui-orchestrate` ([`packages/client/ui-orchestrate/src/index.ts`](../packages/client/ui-orchestrate/src/index.ts))
 - `@saturnai/dsh-client-ui-remote-access` ([`packages/client/ui-remote-access/src/index.ts`](../packages/client/ui-remote-access/src/index.ts))
 - `@saturnai/dsh-client-ui-saturnbot` ([`packages/client/ui-saturnbot/src/index.ts`](../packages/client/ui-saturnbot/src/index.ts))
+- `@saturnai/dsh-client-ui-settings-account` ([`packages/client/ui-settings-account/src/index.ts`](../packages/client/ui-settings-account/src/index.ts))
 - `@saturnai/dsh-client-ui-skin-saturn` ([`packages/client/ui-skin-saturn/src/index.ts`](../packages/client/ui-skin-saturn/src/index.ts))
 - `@saturnai/dsh-done` — 需要 `sessionProjections` · `systemPrompt` ([`packages/saturn/done/src/index.ts`](../packages/saturn/done/src/index.ts))
 

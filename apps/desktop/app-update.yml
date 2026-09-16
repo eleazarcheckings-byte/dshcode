@@ -1,0 +1,5 @@
+# electron-updater GitHub provider. Packaged builds generate the same file
+# from electron-builder.yml `publish`. Never point this at whitelonng/dshcode.
+provider: github
+owner: eleazarcheckings-byte
+repo: dshcode

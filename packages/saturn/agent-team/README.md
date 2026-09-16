@@ -25,7 +25,7 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Add this package to a composition when one agent should run a small team of named helpers in its own working directory, with messages and task state that survive crashes and restarts. It ships no tools of its own: mount it together with `@saturnai/dsh-tool-agent-team` so the model can create teammates, message them, and use the task board.
+Add this package to a composition when one agent should run a small team of named helpers whose isolation defaults to a private git worktree, with messages and task state that survive crashes and restarts. It ships no tools of its own: mount it together with `@saturnai/dsh-tool-agent-team` so the model can create teammates, message them, and use the task board.
 
 ### When to choose it
 

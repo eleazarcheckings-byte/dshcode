@@ -251,3 +251,8 @@
   config:
     fetch: true
     searchTimeoutMs: 60000
+
+# Headless Chromium verify: navigate + accessibility snapshot (optional PNG path).
+# Playwright launches on first navigate; this standing mount shares one tab.
+- id: tool-browser
+  name: '@deepseek-ai/dsh-tool-browser'

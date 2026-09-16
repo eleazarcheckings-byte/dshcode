@@ -33,6 +33,11 @@ import {
   DESKTOP_NOTIFICATION_CLICK_CHANNEL,
   DESKTOP_SHOW_MENU_CHANNEL,
   DESKTOP_RESTORE_SATURNBOT_CHANNEL,
+  DESKTOP_ACCOUNT_SIGN_IN_CHANNEL,
+  DESKTOP_ACCOUNT_SIGN_OUT_CHANNEL,
+  DESKTOP_ACCOUNT_STATUS_CHANNEL,
+  DESKTOP_CHECK_UPDATES_CHANNEL,
+  DESKTOP_OPEN_RELEASE_CHANNEL,
   ensureMainModuleArgument,
   navigationDisposition,
   isSaturnBotWindowUrl,
@@ -54,6 +59,9 @@ import {
   recoveryDecision,
   withBootTimeout,
 } from './recovery.ts'
+import { loadAccount, signOutAccount, startSignIn } from './account.ts'
+import { isAllowedReleaseUrl, updateDialogCopy } from './update-feed.ts'
+import { checkForUpdates } from './updater.ts'
 
 const PRODUCT_NAME = 'Saturn AI'
 const APP_ID = 'tools.saturnai.desktop'
@@ -190,6 +198,27 @@ function showAbout(): void {
     noLink: true,
     ...(icon === undefined ? {} : { icon }),
   })
+}
+
+/**
+ * User-initiated update check. Never runs at startup, never downloads, never
+ * installs. An empty electron-updater feed is reported as empty.
+ */
+async function showUpdateCheck(): Promise<void> {
+  const check = await checkForUpdates({ current: app.getVersion(), platform: process.platform })
+  const copy = updateDialogCopy(check)
+  const open = copy.openRelease !== undefined
+  const { response } = await dialog.showMessageBox({
+    type: check.status === 'error' ? 'warning' : 'info',
+    title: `${PRODUCT_NAME} updates`,
+    message: copy.message,
+    detail: copy.detail,
+    buttons: open ? ['Open release', 'Close'] : ['Close'],
+    defaultId: 0,
+    cancelId: open ? 1 : 0,
+    noLink: true,
+  })
+  if (open && response === 0 && copy.openRelease !== undefined) openExternal(copy.openRelease)
 }
 
 /**
@@ -577,6 +606,7 @@ async function startDesktop(): Promise<void> {
     Menu.buildFromTemplate(buildWindowMenu({
       productName: PRODUCT_NAME,
       about: showAbout,
+      checkUpdates: () => { void showUpdateCheck() },
       hide: () => { mainWindow?.hide() },
       restart: () => {
         quitArmed = true
@@ -625,6 +655,37 @@ async function startDesktop(): Promise<void> {
       }
     })
     notification.show()
+  })
+  const disconnected = { version: 1 as const, connected: false as const, reason: 'oauth-unavailable' as const }
+  ipcMain.handle(DESKTOP_ACCOUNT_STATUS_CHANNEL, async (event) => {
+    if (applicationUrl === undefined) return disconnected
+    if (!desktopIpcSenderIsApplication(event.senderFrame?.url, new URL(applicationUrl).origin)) return disconnected
+    return loadAccount(resolveDshHome())
+  })
+  ipcMain.handle(DESKTOP_ACCOUNT_SIGN_IN_CHANNEL, async (event) => {
+    if (applicationUrl === undefined) return disconnected
+    if (!desktopIpcSenderIsApplication(event.senderFrame?.url, new URL(applicationUrl).origin)) return disconnected
+    const { session } = await startSignIn(resolveDshHome())
+    return session
+  })
+  ipcMain.handle(DESKTOP_ACCOUNT_SIGN_OUT_CHANNEL, async (event) => {
+    if (applicationUrl === undefined) return disconnected
+    if (!desktopIpcSenderIsApplication(event.senderFrame?.url, new URL(applicationUrl).origin)) return disconnected
+    return signOutAccount(resolveDshHome())
+  })
+  ipcMain.handle(DESKTOP_CHECK_UPDATES_CHANNEL, async (event) => {
+    const current = app.getVersion()
+    if (applicationUrl === undefined) return { status: 'error', current, message: 'desktop not ready' }
+    if (!desktopIpcSenderIsApplication(event.senderFrame?.url, new URL(applicationUrl).origin)) {
+      return { status: 'error', current, message: 'desktop not ready' }
+    }
+    return checkForUpdates({ current, platform: process.platform })
+  })
+  ipcMain.handle(DESKTOP_OPEN_RELEASE_CHANNEL, (event, url: unknown) => {
+    if (applicationUrl === undefined) return
+    if (!desktopIpcSenderIsApplication(event.senderFrame?.url, new URL(applicationUrl).origin)) return
+    if (typeof url !== 'string' || !isAllowedReleaseUrl(url)) return
+    openExternal(url)
   })
   await createMainWindow(applicationUrl)
 }

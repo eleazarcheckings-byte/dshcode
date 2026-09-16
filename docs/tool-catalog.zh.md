@@ -46,6 +46,7 @@
 | `@saturnai/dsh-tool-media` | `media_generate_audio`、`media_generate_image`、`media_generate_video`、`media_job_status`、`media_motion_transfer` | `ctx.tools`、`ctx.approval（执行期，可选——当调用携带 Agent 时优先使用的支出审批路径）`、`ctx.userQuestions（执行期，可选——无 Agent 时的支出审批兜底路径）`、`ctx.credentials（执行期，可选——回退到启动环境）` | `tool/call`、`tool/result` | - | 五个工具中的每一个都会产生费用，并且在任何计费网络调用之前都会被一道显示预估美元成本的支出审批提示拦住——调用携带 Agent 时优先用 `ctx.approval`，否则用无 Agent 的 `ctx.userQuestions` 兜底；两条路径都未组合时调用会失败关闭。`media_generate_audio` 与 `media_motion_transfer` 只路由到 `higgsfield`，且都要求显式传入 `params.modelPath`（两者均未发布默认值）。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
+| `@deepseek-ai/dsh-tool-browser` | `browser_navigate`、`browser_snapshot` | `ctx.tools` | `tool/call`、`tool/result` | - | browser_navigate 与 browser_snapshot 共享一个 Playwright Chromium 标签页。Chromium 在第一次导航时启动，因此 schema 采集不会拉起浏览器；没有 Chromium 的主机在第一次导航时带着安装指引失败。 |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
@@ -2010,7 +2011,7 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
     },
     "isolation": {
       "type": "string",
-      "description": "shared puts the teammate in your working directory, where its edits are immediately visible to everyone. worktree gives it a private checkout of the current commit, invisible until you call merge_teammate; use it when the work rewrites files others are reading, and only in a git repository. Defaults to shared.",
+      "description": "worktree (default) gives a private checkout of the current commit, invisible until you call merge_teammate; only in a git repository. shared is opt-in: it puts the teammate in your working directory, where its edits are immediately visible to everyone. Defaults to worktree.",
       "enum": [
         "shared",
         "worktree"
@@ -2533,6 +2534,51 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 ```
 
 来源：[`packages/workflow/tool-workflow/src/index.ts`](../packages/workflow/tool-workflow/src/index.ts)
+
+<a id="deepseek-aidsh-tool-browser"></a>
+
+## `@deepseek-ai/dsh-tool-browser`
+
+### `browser_navigate`
+
+在共享的无头浏览器标签页中打开一个 http(s) URL，并等到文档加载完成。在 browser_snapshot 之前调用，以检查刚改过的页面或公开 URL。只接受 http 和 https；file URL、data URL 以及带用户凭据的 URL 会被拒绝。该标签页在本次会话的调用之间复用——每次导航都会替换上一页。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Absolute http(s) URL to open in the shared browser tab."
+    }
+  },
+  "required": [
+    "url"
+  ]
+}
+```
+
+来源：[`packages/browser/tool-browser/src/index.ts`](../packages/browser/tool-browser/src/index.ts)
+
+### `browser_snapshot`
+
+把当前浏览器标签页采集为无障碍树（Playwright ARIA snapshot）。请先调用 browser_navigate。将 screenshot 设为 true 还会写入 PNG 并返回其路径；图像字节本身不会返回。用它核验已渲染 UI，而不是搜索或抓取文档——那些是 web_search 和 web_fetch。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "screenshot": {
+      "type": "boolean",
+      "description": "When true, also write a PNG of the current page and return screenshotPath."
+    }
+  }
+}
+```
+
+来源：[`packages/browser/tool-browser/src/index.ts`](../packages/browser/tool-browser/src/index.ts)
+
+browser_navigate 与 browser_snapshot 共享一个 Playwright Chromium 标签页。Chromium 在第一次导航时启动，因此 schema 采集不会拉起浏览器；没有 Chromium 的主机在第一次导航时带着安装指引失败。
 
 <a id="deepseek-aidsh-tool-web"></a>
 

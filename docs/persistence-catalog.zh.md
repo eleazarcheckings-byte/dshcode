@@ -593,6 +593,26 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/api/session-controller/src/types.ts:41`](../packages/api/session-controller/src/types.ts)
 
+<a id="modelvision-route--log-only"></a>
+
+#### `model/vision-route` — log-only
+
+```ts persistence-catalog
+/**
+ * Pre-dispatch vision reroute: the request carried image content the
+ * selected model cannot see, so the model router switched the wire route.
+ * Log-only: it never enters derived model history.
+ */
+'model/vision-route': {
+  provider: string
+  model: string
+  from: { provider: string; model: string }
+  reason?: string
+}
+```
+
+来源：[`packages/core/agent/src/types.ts:70`](../packages/core/agent/src/types.ts)
+
 ### `orchestrate/*`
 
 <a id="orchestratemode--log-only"></a>

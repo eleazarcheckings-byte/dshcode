@@ -169,23 +169,36 @@ describe('desktop preload bridge policy', () => {
     expect(desktopIpcSenderIsApplication('not a url', origin)).toBe(false)
   })
 
-  it('builds the window menu with about, restart, hide, and quit actions', () => {
+  it('builds the window menu with about, check for updates, restart, hide, and quit actions', () => {
     const about = vi.fn()
     const hide = vi.fn()
     const restart = vi.fn()
     const quit = vi.fn()
-    const menu = buildWindowMenu({ productName: 'Saturn AI', about, hide, restart, quit })
+    const checkUpdates = vi.fn()
+    const menu = buildWindowMenu({ productName: 'Saturn AI', about, hide, restart, quit, checkUpdates })
 
     expect(menu.map(item => item.type === 'separator' ? '---' : item.label))
-      .toEqual(['About Saturn AI\u2026', '---', 'Restart Saturn AI', 'Hide to Tray', '---', 'Quit Saturn AI'])
-    const [aboutItem, , restartItem, hideItem, , quitItem] = menu
-    if (aboutItem === undefined || restartItem === undefined || hideItem === undefined || quitItem === undefined
-      || aboutItem.type === 'separator' || restartItem.type === 'separator'
-      || hideItem.type === 'separator' || quitItem.type === 'separator') {
+      .toEqual([
+        'About Saturn AI\u2026',
+        '---',
+        'Check for Updates\u2026',
+        'Restart Saturn AI',
+        'Hide to Tray',
+        '---',
+        'Quit Saturn AI',
+      ])
+    const [aboutItem, , checkItem, restartItem, hideItem, , quitItem] = menu
+    if (aboutItem === undefined || checkItem === undefined || restartItem === undefined
+      || hideItem === undefined || quitItem === undefined
+      || aboutItem.type === 'separator' || checkItem.type === 'separator'
+      || restartItem.type === 'separator' || hideItem.type === 'separator'
+      || quitItem.type === 'separator') {
       throw new Error('menu items must be actions')
     }
     aboutItem.click?.()
     expect(about).toHaveBeenCalledOnce()
+    checkItem.click?.()
+    expect(checkUpdates).toHaveBeenCalledOnce()
     restartItem.click?.()
     expect(restart).toHaveBeenCalledOnce()
     hideItem.click?.()
@@ -201,6 +214,7 @@ describe('desktop preload bridge policy', () => {
       hide: vi.fn(),
       restart: vi.fn(),
       quit: vi.fn(),
+      checkUpdates: vi.fn(),
     })
     expect(menu.every(item => !('accelerator' in item))).toBe(true)
   })

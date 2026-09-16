@@ -42,6 +42,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@saturnai/dsh-tool-media` | `media_generate_audio`, `media_generate_image`, `media_generate_video`, `media_job_status`, `media_motion_transfer` | `ctx.tools`, `ctx.approval (execution time, optional — preferred spend-approval route when the call carries an Agent)`, `ctx.userQuestions (execution time, optional — the agentless spend-approval fallback)`, `ctx.credentials (execution time, optional — falls back to the launch environment)` | `tool/call`, `tool/result` | - | Every one of the five tools costs money and is gated behind a spend-approval prompt showing the estimated USD cost before any billable network call — `ctx.approval` when the call carries an Agent (preferred), else the agentless `ctx.userQuestions` fallback; a call fails closed when neither route is composed. `media_generate_audio` and `media_motion_transfer` route to `higgsfield` only and require an explicit `params.modelPath` (no default is published for either). |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
+| `@deepseek-ai/dsh-tool-browser` | `browser_navigate`, `browser_snapshot` | `ctx.tools` | `tool/call`, `tool/result` | - | browser_navigate and browser_snapshot share one Playwright Chromium tab. Chromium launches on first navigate so schema harvest does not start a browser; a host without Chromium fails at first navigate with install guidance. |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
@@ -2009,7 +2010,7 @@ Create one named, durable teammate. Only the Team Lead may call this tool.
     },
     "isolation": {
       "type": "string",
-      "description": "shared puts the teammate in your working directory, where its edits are immediately visible to everyone. worktree gives it a private checkout of the current commit, invisible until you call merge_teammate; use it when the work rewrites files others are reading, and only in a git repository. Defaults to shared.",
+      "description": "worktree (default) gives a private checkout of the current commit, invisible until you call merge_teammate; only in a git repository. shared is opt-in: it puts the teammate in your working directory, where its edits are immediately visible to everyone. Defaults to worktree.",
       "enum": [
         "shared",
         "worktree"
@@ -2531,6 +2532,51 @@ Constraints: concurrency and total-agent caps apply; no filesystem, network, tim
 ```
 
 Source: [`packages/workflow/tool-workflow/src/index.ts`](../packages/workflow/tool-workflow/src/index.ts)
+
+<a id="deepseek-aidsh-tool-browser"></a>
+
+## `@deepseek-ai/dsh-tool-browser`
+
+### `browser_navigate`
+
+Open one http(s) URL in a shared headless browser tab and wait until the document is loaded. Use before browser_snapshot to inspect a page you just changed or a public URL. Only http and https are accepted; file URLs, data URLs, and URLs with user credentials are rejected. The tab is reused across calls in this session — each navigate replaces the previous page.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Absolute http(s) URL to open in the shared browser tab."
+    }
+  },
+  "required": [
+    "url"
+  ]
+}
+```
+
+Source: [`packages/browser/tool-browser/src/index.ts`](../packages/browser/tool-browser/src/index.ts)
+
+### `browser_snapshot`
+
+Capture the current browser tab as an accessibility tree (Playwright ARIA snapshot). Call browser_navigate first. Set screenshot to true to also write a PNG and return its path; the image bytes themselves are not returned. Use this to verify rendered UI, not to search or fetch documents — those are web_search and web_fetch.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "screenshot": {
+      "type": "boolean",
+      "description": "When true, also write a PNG of the current page and return screenshotPath."
+    }
+  }
+}
+```
+
+Source: [`packages/browser/tool-browser/src/index.ts`](../packages/browser/tool-browser/src/index.ts)
+
+browser_navigate and browser_snapshot share one Playwright Chromium tab. Chromium launches on first navigate so schema harvest does not start a browser; a host without Chromium fails at first navigate with install guidance.
 
 <a id="deepseek-aidsh-tool-web"></a>
 

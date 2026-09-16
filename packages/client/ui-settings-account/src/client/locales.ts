@@ -1,0 +1,58 @@
+/** Copy for Settings → Account. Operator register: who this machine is, what it is running. */
+
+export const en = {
+  nav: 'Account',
+  title: 'izzy.la account',
+  lede: 'Saturn AI uses izzy.la for identity. This machine keeps its own session. Other products stay separate.',
+  disconnected: 'Not connected.',
+  oauthUnavailable: 'This install has no Saturn AI OAuth client on izzy.la, so sign-in cannot complete.',
+  oauthIncomplete: 'Sign-in started on izzy.la but this install cannot finish the code exchange yet.',
+  malformed: 'The stored session was unreadable, so this install is not connected.',
+  signIn: 'Sign in with izzy.la',
+  signOut: 'Sign out',
+  connectedAs: 'Connected as {name}',
+  connectedEmail: '{email}',
+  connectedSub: 'Subject {sub}',
+  installTitle: 'This install',
+  installVersion: 'Version {version}',
+  checkUpdates: 'Check for updates',
+  checking: 'Checking…',
+  upToDate: 'This install is current ({version}).',
+  upToDateNoFeed: 'This install matches the latest GitHub release. This channel has no auto-update feed yet.',
+  available: 'Version {version} is available.',
+  availableNoFeed: 'A newer installer ({version}) is on GitHub. This channel has no auto-update feed yet.',
+  emptyFeed: 'No update feed is published for this channel yet.',
+  updateError: 'Could not check for updates.',
+  openRelease: 'Open the release',
+  loadError: 'The desktop shell did not answer. Reopen this page to try again.',
+}
+
+/** The dictionary key set of this page. */
+export type AccountKey = keyof typeof en
+
+export const zh: Record<AccountKey, string> = {
+  nav: '账户',
+  title: 'izzy.la 账户',
+  lede: 'Saturn AI 用 izzy.la 证明身份。本机保存自己的会话。其他产品互不混用。',
+  disconnected: '未连接。',
+  oauthUnavailable: '此安装在 izzy.la 上没有 Saturn AI 的 OAuth 客户端，因此无法完成登录。',
+  oauthIncomplete: '已在 izzy.la 开始登录，但此安装还不能完成授权码交换。',
+  malformed: '已保存的会话无法读取，因此此安装未连接。',
+  signIn: '使用 izzy.la 登录',
+  signOut: '退出',
+  connectedAs: '已连接为 {name}',
+  connectedEmail: '{email}',
+  connectedSub: '主体 {sub}',
+  installTitle: '此安装',
+  installVersion: '版本 {version}',
+  checkUpdates: '检查更新',
+  checking: '正在检查…',
+  upToDate: '此安装已是最新（{version}）。',
+  upToDateNoFeed: '此安装与 GitHub 上的最新发布一致。此频道尚未提供自动更新源。',
+  available: '有新版本 {version} 可用。',
+  availableNoFeed: 'GitHub 上有更新的安装包（{version}）。此频道尚未提供自动更新源。',
+  emptyFeed: '此频道尚未发布更新源。',
+  updateError: '无法检查更新。',
+  openRelease: '打开发布页',
+  loadError: '桌面壳没有响应。请重新打开此页面重试。',
+}

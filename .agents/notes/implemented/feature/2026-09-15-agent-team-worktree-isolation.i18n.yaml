@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-15-agent-team-worktree-isolation.md
-2026-09-15-agent-team-worktree-isolation.md: 667cd3abcb21d489964ac79ad9b22b858140aa31
-2026-09-15-agent-team-worktree-isolation.zh.md: a61881df2f4313dd4484da468b6cbc04ae0e5ab0
+2026-09-15-agent-team-worktree-isolation.md: 872f411c36ef8f118ad4072cb99feee4be9f7c88
+2026-09-15-agent-team-worktree-isolation.zh.md: 475f73a7e517ff863026a4300f73d6697aeac278

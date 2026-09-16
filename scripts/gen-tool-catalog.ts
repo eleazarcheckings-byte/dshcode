@@ -69,6 +69,7 @@ import * as ToolMedia from '@saturnai/dsh-tool-media'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import { registerListSubagentModels } from '../packages/subagent/tool-subagent/src/list-models.ts'
+import * as ToolBrowser from '@deepseek-ai/dsh-tool-browser'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
 import VmWorkflowEngine from '@deepseek-ai/dsh-workflow-worker-thread'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
@@ -628,6 +629,18 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(VmWorkflowEngine, { provider: 'mock' })
       await ctx.plugin(ToolWorkflow)
     },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-browser',
+    dir: 'tool-browser',
+    source: 'packages/browser/tool-browser/src/index.ts',
+    requires: ['ctx.tools'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(ToolBrowser)
+    },
+    note:
+      'browser_navigate and browser_snapshot share one Playwright Chromium tab. Chromium launches on first navigate so schema harvest does not start a browser; a host without Chromium fails at first navigate with install guidance.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-web',

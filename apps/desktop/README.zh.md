@@ -66,7 +66,7 @@ pnpm --filter @dshcode/desktop run dist:win:x64
 
 `node apps/desktop/scripts/test-electron-picker.mjs` 在两个平台的 Electron Node 运行时中执行目录选择器绑定测试。COM 调用使用 mock，所选路径使用真实 koffi 解码。Windows 打包冒烟测试还会打开并中止实际对话框；在已安装应用中完成一次选择仍需手动检查。
 
-`desktop-v*` tag 会把完整且成功的构建矩阵与 `SHA256SUMS.txt` 发布到 [GitHub Releases](https://github.com/whitelonng/dshcode/releases)。手动运行工作流时，安装包只作为普通 Actions 产物保留，不会创建 Release。
+`desktop-v*` tag 会把完整且成功的构建矩阵与 `SHA256SUMS.txt` 发布到 [GitHub Releases](https://github.com/eleazarcheckings-byte/dshcode/releases)。手动运行工作流时，安装包只作为普通 Actions 产物保留，不会创建 Release。
 
 ## 打包
 
@@ -77,6 +77,6 @@ pnpm --filter @dshcode/desktop run dist:win:x64
 ## 当前限制
 
 - 预览版安装包目前明确保持未签名状态。在后续版本配置平台签名及 macOS 公证前，macOS Gatekeeper 与 Windows SmartScreen 可能会对本地构建发出警告。
-- 尚未配置自动更新。
+- 检查更新由用户发起（设置 → 账户，或 Windows 窗口菜单）。源是 `eleazarcheckings-byte/dshcode`。Saturn AI 不会静默下载或安装。当 GitHub 尚未发布 electron-updater 的 `latest.yml` 时，界面会如实说明该频道没有更新源。
 - 内嵌 Web UI 使用 Saturn AI 品牌，桌面应用与安装器也使用相同的 Saturn 身份标识；详见仓库的[许可证与品牌声明](../../README.zh.md)。
 - 恢复对话框、托盘与自绘标题栏需要在原生 Windows 构建上手动验证。

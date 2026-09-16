@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-`create_teammate` 新增 `isolation`，默认为 `shared`。取 `worktree` 时，roster 会把 Lead 的 HEAD 检出到 `<DSH_HOME>/worktrees/<team>/<member>`，并把该目录作为 teammate 的持久 workspace；该检出记录在成员的 roster 行上，并在 Team 运行时释放时删除。这一模式移植自 SaturnBot 的 local adapter，它自诞生起就为每个任务创建一个 detached worktree；其进程监管与脱敏未被移植，因为这里的每条 argv 都由模块固定，只有路径是变量。
+`create_teammate` 新增 `isolation`。派生默认值是 `worktree`；`shared` 为选用（[Saturn 产品法默认值](2026-09-15-saturn-product-law-defaults.zh.md)）。取 `worktree` 时，roster 会把 Lead 的 HEAD 检出到 `<DSH_HOME>/worktrees/<team>/<member>`，并把该目录作为 teammate 的持久 workspace；该检出记录在成员的 roster 行上，并在 Team 运行时释放时删除。这一模式移植自 SaturnBot 的 local adapter，它自诞生起就为每个任务创建一个 detached worktree；其进程监管与脱敏未被移植，因为这里的每条 argv 都由模块固定，只有路径是变量。
 
 teammate 的 workspace 通过 `childSessionMeta` 上一个新的可选参数抵达，并从 `ContinuableStartSpec.cwd` 贯穿传递。省略该参数或传入空字符串即保留父级 workspace，因此所有既有调用方行为不变。
 
@@ -24,11 +24,11 @@ teammate 的 workspace 通过 `childSessionMeta` 上一个新的可选参数抵�
 
 **teammate 完成时自动 merge。** 这会恰好掩盖需要做决定的那一刻。两个成员编辑同一个文件是 Lead 必须处理的信息，静默落地的 merge 会把它重新变成意外。
 
-**为每个被 merge 的路径自动取得 claim。** 这确实能让同一文件的第二次 merge 高声失败，但也会让 Lead 在一个并非自己持有的租约到期前无法编辑刚刚 merge 进来的文件。只查询既有 claim、不创建新 claim，才能让归属始终是 agent 主动声明的东西。
+**为每个被 merge 的路径自动取得 claim。** 这确实能让同一文件的第二次 merge 高声失败，但也会让 Lead 在一个并非自己持有的租约到期前无法编辑刚刚 merge 进来的文件。merge 仍然只查询既有 claim、不创建新 claim。第一方写入与被扫描的 shell 变更通过 [claims 守卫](2026-09-15-claims-shell-and-worktree-guard.zh.md) 自动取得租约。
 
 ## 影响
 
-worktree 隔离按 teammate 选用且默认关闭，因此既有 Team 的行为完全不变，roster 行只是显示 `isolation: "shared"`。采用它的 Team 以一次 merge 步骤换取即时可见性，而 merge 正是偿付被隔离推迟的协调成本之处。若进程在未释放 Team 的情况下退出，其创建的检出会留在 harness home 下的磁盘上；持久 roster 记录了它们的路径，后续清理可以找到它们。
+worktree 隔离是派生默认值。`shared` 在成员必须编辑同一检出时仍然可用，那些 roster 行显示 `isolation: "shared"`。采用 worktree 的 Team 以一次 merge 步骤换取即时可见性，而 merge 正是偿付被隔离推迟的协调成本之处。若进程在未释放 Team 的情况下退出，其创建的检出会留在 harness home 下的磁盘上；持久 roster 记录了它们的路径，后续清理可以找到它们。
 
 ## 验证
 

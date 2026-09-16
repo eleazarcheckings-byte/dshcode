@@ -16,6 +16,8 @@ files:
   - package.json
   # Runtime tray icons resolved from the bundled lib directory's ../assets.
   - assets/**/*
+  # Pinned electron-updater GitHub channel (eleazarcheckings-byte/dshcode).
+  - app-update.yml
 extraResources:
   - from: licenses
     to: licenses
@@ -68,3 +70,10 @@ nsis:
   installerIcon: build/installerIcon.ico
   uninstallerIcon: build/uninstallerIcon.ico
   installerHeaderIcon: build/installerHeaderIcon.ico
+publish:
+  provider: github
+  owner: eleazarcheckings-byte
+  repo: dshcode
+  releaseType: release
+  # Packaging still uses `--publish never`; this block only names the
+  # electron-updater GitHub feed. Never retarget to whitelonng/dshcode.

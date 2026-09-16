@@ -44,7 +44,7 @@ describe('Agent Teams profile bundle', () => {
     const inserted = patches.flatMap(patch => patch.insert ?? [])
     expect(inserted.find(entry => entry.id === 'agent-team')).toMatchObject({
       name: '@saturnai/dsh-agent-team',
-      config: { maxMembers: 8 },
+      config: { maxMembers: 4 },
     })
     expect(inserted.find(entry => entry.id === 'tool-agent-team')).toMatchObject({
       name: '@saturnai/dsh-tool-agent-team',

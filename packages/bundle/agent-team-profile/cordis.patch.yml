@@ -31,7 +31,7 @@
     - id: agent-team
       name: '@saturnai/dsh-agent-team'
       config:
-        maxMembers: 8
+        maxMembers: 4
         maxTasks: 256
         maxPendingMessagesPerMember: 64
         maxMessageBytes: 65536
