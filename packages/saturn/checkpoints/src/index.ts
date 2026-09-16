@@ -89,7 +89,7 @@ const checkpointEntrySchema: ZodType<CheckpointEntry> = zod.object({
     }).strict(),
     zod.object({ kind: zod.literal('absent') }).strict(),
   ]),
-}).strict() as unknown as ZodType<CheckpointEntry>
+}).strict()
 
 const checkpointRecordSchema: ZodType<CheckpointRecord> = zod.object({
   id: zod.string().min(1).max(64),
@@ -99,12 +99,12 @@ const checkpointRecordSchema: ZodType<CheckpointRecord> = zod.object({
   workspaceRoot: zod.string().min(1).max(MAX_PATH).nullable(),
   entries: zod.array(checkpointEntrySchema).max(MAX_ENTRIES),
   skipped: zod.array(zod.string().min(1).max(MAX_PATH)).max(MAX_ENTRIES),
-}).strict() as unknown as ZodType<CheckpointRecord>
+}).strict()
 
 const checkpointsUnitStateSchema: ZodType<CheckpointsUnitState> = zod.object({
   byId: zod.record(zod.string(), checkpointRecordSchema),
   order: zod.array(zod.string()),
-}).strict() as unknown as ZodType<CheckpointsUnitState>
+}).strict()
 
 const checkpointSummarySchema: ZodType<CheckpointsProjection['entries'][number]> = zod.object({
   id: zod.string().min(1).max(64),
@@ -118,7 +118,7 @@ const checkpointsViewSchema: ZodType<CheckpointsProjection> = zod.object({
   count: zod.number().int().nonnegative(),
   latest: checkpointSummarySchema.nullable(),
   entries: zod.array(checkpointSummarySchema).max(MAX_WIRE_CHECKPOINTS),
-}).strict() as unknown as ZodType<CheckpointsProjection>
+}).strict()
 
 /** The compact fact a client row renders: identity, reason, and how many files it covers. */
 function summarize(record: CheckpointRecord): CheckpointsProjection['entries'][number] {
