@@ -44,8 +44,8 @@ function browser() {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D)
   return {
     context, request, cancel, hidden, motion, bounds, resizeDisconnect, intersectionDisconnect,
-    resize: () => resize!([], {} as ResizeObserver),
-    intersect: (value: boolean) => intersection!([{ isIntersecting: value } as IntersectionObserverEntry], {} as IntersectionObserver),
+    resize: () => { resize!([], {} as ResizeObserver) },
+    intersect: (value: boolean) => { intersection!([{ isIntersecting: value } as IntersectionObserverEntry], {} as IntersectionObserver) },
     reduce: () => { motion.matches = true; motionChanged!() },
   }
 }

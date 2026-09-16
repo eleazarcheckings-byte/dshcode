@@ -45,10 +45,10 @@ function desktopBridge(): DesktopAccountBridge | undefined {
 function faceFromBridge(bridge: DesktopAccountBridge | undefined): AccountFace {
   if (bridge === undefined) {
     return {
-      status: async () => DISCONNECTED,
-      signIn: async () => DISCONNECTED,
-      signOut: async () => DISCONNECTED,
-      checkUpdates: async () => NO_DESKTOP_UPDATES,
+      status: () => Promise.resolve(DISCONNECTED),
+      signIn: () => Promise.resolve(DISCONNECTED),
+      signOut: () => Promise.resolve(DISCONNECTED),
+      checkUpdates: () => Promise.resolve(NO_DESKTOP_UPDATES),
       openRelease: () => {},
     }
   }

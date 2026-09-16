@@ -360,7 +360,7 @@ describe('continueTurn inject', () => {
       error: new RemoteError('session/agent-busy', 'busy', { reason: 'busy' }),
     })
     await expect(b.injected.continueTurn(1)).resolves.toBe(false)
-    const handle = b.session.beginSubmission.mock.results[0]?.value
+    const handle = b.session.beginSubmission.mock.results[0]?.value as { abandon: () => void } | undefined
     expect(handle?.abandon).toHaveBeenCalledOnce()
     await b.runtime.dispose()
   })
@@ -372,7 +372,7 @@ describe('continueTurn inject', () => {
     ])
     b.session.prompt.mockRejectedValueOnce(new Error('transport down'))
     await expect(b.injected.continueTurn(1)).resolves.toBe(false)
-    const handle = b.session.beginSubmission.mock.results[0]?.value
+    const handle = b.session.beginSubmission.mock.results[0]?.value as { abandon: () => void } | undefined
     expect(handle?.abandon).toHaveBeenCalledOnce()
     await b.runtime.dispose()
   })

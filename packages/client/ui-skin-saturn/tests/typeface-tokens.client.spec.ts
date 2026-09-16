@@ -19,7 +19,7 @@ const PLUGIN = '@saturnai/dsh-client-ui-skin-saturn'
 function skinCss(): string {
   const tag = document.querySelector(`style[data-plugin="${PLUGIN}"]`)
   expect(tag, 'the skin must inject its stylesheet on import').not.toBeNull()
-  return (tag as HTMLStyleElement).textContent!
+  return tag.textContent
 }
 
 describe('Saturn type system', () => {

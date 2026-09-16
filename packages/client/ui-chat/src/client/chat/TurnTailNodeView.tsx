@@ -48,7 +48,7 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
   const resumable = canContinueTurn(data.endReason)
   const idleTail = useSession(snapshot => !snapshot.running) && isLatestTurn && !anyOpenTurn
   const [continuePending, setContinuePending] = useState(false)
-  const onContinue = continuePending || continueTurn === undefined
+  const onContinue = continuePending
     ? undefined
     : () => {
       setContinuePending(true)

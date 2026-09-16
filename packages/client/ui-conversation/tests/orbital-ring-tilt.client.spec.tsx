@@ -15,7 +15,8 @@ import { OrbitalCanvas } from '../src/client/skeleton/OrbitalCanvas.tsx'
 function makeCtxStub() {
   const rotateCalls: number[] = []
   const gradient = { addColorStop() {} }
-  const ctx = new Proxy({} as Record<string, unknown>, {
+  const store: Record<string, unknown> = {}
+  const ctx = new Proxy(store, {
     get(target, prop) {
       if (prop === 'rotate') return (angle: number) => { rotateCalls.push(angle) }
       if (prop === 'createRadialGradient' || prop === 'createLinearGradient') return () => gradient

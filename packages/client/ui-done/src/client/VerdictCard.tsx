@@ -19,7 +19,6 @@
 
 import type { DoneProof } from '@saturnai/dsh-done/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { DoneKey } from './locales.ts'
 import css from './VerdictCard.module.css'
 
 /** The proof to render, plus the strip's locale seat. */
@@ -82,7 +81,7 @@ export function VerdictCard({ proof, t }: VerdictCardProps) {
             data-criterion={score.criterion}
             data-score={score.score}
           >
-            <span className={css.criterion}>{t(`verdict.criterion.${score.criterion}` as DoneKey)}</span>
+            <span className={css.criterion}>{t(`verdict.criterion.${score.criterion}`)}</span>
             <span className={css.score} title={t('verdict.score.aria', { score: score.score })}>
               {t('verdict.score', { score: score.score })}
             </span>

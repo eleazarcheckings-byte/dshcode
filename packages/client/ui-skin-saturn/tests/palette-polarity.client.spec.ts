@@ -41,7 +41,7 @@ function declaredScales(): Map<string, { index: number; value: string }[]> {
   const tag = document.querySelector(`style[data-plugin="${PLUGIN}"]`)
   expect(tag, 'the skin must inject its stylesheet on import').not.toBeNull()
   const scales = new Map<string, { index: number; value: string }[]>()
-  for (const match of (tag as HTMLStyleElement).textContent!.matchAll(/--dsw-static-([a-z0-9-]+):(#[0-9a-f]{6})/g)) {
+  for (const match of tag.textContent.matchAll(/--dsw-static-([a-z0-9-]+):(#[0-9a-f]{6})/g)) {
     const parsed = INDEXED.exec(match[1]!)
     if (parsed === null) continue
     const family = parsed[1]!
