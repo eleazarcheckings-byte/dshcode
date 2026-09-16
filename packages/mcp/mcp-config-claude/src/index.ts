@@ -87,11 +87,17 @@ export interface ConfigInput {
 
 /** Config after Schemastery resolves defaults. */
 export interface Config {
+  /** Path to a Claude-Code-shaped config file (a `.claude.json` or `settings.json`) whose `mcpServers` key holds the map. */
   readonly configPath: string
+  /** Only these server names are mounted; `null` means "not configured" (every row considered). An explicit empty array mounts nothing. */
   readonly include: readonly string[] | null
+  /** These server names are never mounted, even when `include` allows them. Resolved to `[]` when the author omitted it. */
   readonly exclude: readonly string[]
+  /** Per-tool-call timeout forwarded to every mounted child, in milliseconds. */
   readonly toolCallTimeoutMs: number
+  /** Connection-handshake deadline forwarded to every mounted child, in milliseconds. */
   readonly connectTimeoutMs: number
+  /** Reject this plugin's own activation when any row fails to mount, instead of logging and continuing. */
   readonly failOnStartupError: boolean
 }
 

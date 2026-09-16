@@ -774,10 +774,26 @@ export interface Config {
   defaultTimeoutMs?: number
   /** Character cap for the `hook/result` event's persisted stderr summary. */
   stderrSummaryMaxChars?: number
+  /**
+   * Claude Code tool name → the DSH tool names it aliases (e.g. `Bash: ['bash']`,
+   * `Edit: ['edit', 'str_replace_editor']`). A `PreToolUse`/`PostToolUse` matcher evaluates
+   * against both the raw DSH tool name and every configured Claude name aliasing it, and a
+   * synthesised payload's `tool_name` reports the first (key-order) aliasing Claude name, else the
+   * raw DSH name. A configured entry REPLACES the default of the same Claude name; every other
+   * default entry (`DEFAULT_TOOL_ALIASES`) is kept. Rejected at load when a value is not an object
+   * of non-empty string arrays.
+   */
+  toolAliases?: ToolAliases
 }
+
+/**
+ * One Claude Code tool name mapped to the DSH tool names it aliases, in matcher/`tool_name`
+ * precedence order (see {@link claudeToolName}).
+ */
+export type ToolAliases = Record<string, string[]>
 ```
 
-来源：[`packages/hooks/hooks-claude-code/src/index.ts:46`](../packages/hooks/hooks-claude-code/src/index.ts)
+来源：[`packages/hooks/hooks-claude-code/src/index.ts:55`](../packages/hooks/hooks-claude-code/src/index.ts)
 
 <a id="deepseek-aidsh-hooks-codex"></a>
 
@@ -1102,6 +1118,15 @@ export interface PiAiProviderProfile {
    */
   models?: PiAiModelProfile[]
   /**
+   * Serve this route's models from its endpoint's live `GET {baseURL}/models`
+   * listing (bearer auth, cached ten minutes), merged after {@link models},
+   * which then act as the seed shown until a listing succeeds and kept when a
+   * refresh fails. Only OpenAI-compatible protocols have a readable listing.
+   * Built for the Hugging Face router, and equally serves self-hosted TGI,
+   * vLLM, or LM Studio routes.
+   */
+  modelsEndpoint?: boolean
+  /**
    * Installed-catalog customizations by model id: each entry reshapes that
    * one model with the same fields a {@link models} entry takes, while the
    * rest of the catalog keeps serving untouched. Only meaningful on a catalog
@@ -1352,7 +1377,7 @@ export type PiAiThinkingFormat = NonNullable<OpenAICompletionsCompat['thinkingFo
 
 依赖：`Api`（`@earendil-works/pi-ai`）· `CacheRetention`（`@earendil-works/pi-ai`）· `Model`（`@earendil-works/pi-ai`）· `ModelThinkingLevel`（`@earendil-works/pi-ai`）· `OpenAICompletionsCompat`（`@earendil-works/pi-ai`）· [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets`（`@earendil-works/pi-ai`）· `Transport`（`@earendil-works/pi-ai`)
 
-来源：[`packages/llm/llm-pi-ai/src/config.ts:213`](../packages/llm/llm-pi-ai/src/config.ts)
+来源：[`packages/llm/llm-pi-ai/src/config.ts:239`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="deepseek-aidsh-llm-replay"></a>
 
@@ -1562,6 +1587,32 @@ export interface ReconnectConfig {
 ```
 
 来源：[`packages/mcp/mcp-client/src/index.ts:113`](../packages/mcp/mcp-client/src/index.ts)
+
+<a id="deepseek-aidsh-mcp-config-claude"></a>
+
+## `@deepseek-ai/dsh-mcp-config-claude`
+
+需要：`tools`
+
+```ts config-catalog
+/** Config after Schemastery resolves defaults. */
+export interface Config {
+  /** Path to a Claude-Code-shaped config file (a `.claude.json` or `settings.json`) whose `mcpServers` key holds the map. */
+  readonly configPath: string
+  /** Only these server names are mounted; `null` means "not configured" (every row considered). An explicit empty array mounts nothing. */
+  readonly include: readonly string[] | null
+  /** These server names are never mounted, even when `include` allows them. Resolved to `[]` when the author omitted it. */
+  readonly exclude: readonly string[]
+  /** Per-tool-call timeout forwarded to every mounted child, in milliseconds. */
+  readonly toolCallTimeoutMs: number
+  /** Connection-handshake deadline forwarded to every mounted child, in milliseconds. */
+  readonly connectTimeoutMs: number
+  /** Reject this plugin's own activation when any row fails to mount, instead of logging and continuing. */
+  readonly failOnStartupError: boolean
+}
+```
+
+来源：[`packages/mcp/mcp-config-claude/src/index.ts:89`](../packages/mcp/mcp-config-claude/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -1823,6 +1874,26 @@ export interface Config {
 依赖：[`SandboxMode`](subsystems/sandbox.zh.md)
 
 来源：[`packages/sandbox/sandbox-policy/src/index.ts:70`](../packages/sandbox/sandbox-policy/src/index.ts)
+
+<a id="deepseek-aidsh-schedule-durable"></a>
+
+## `@deepseek-ai/dsh-schedule-durable`
+
+需要：`tools` · `storageDomain`
+
+```ts config-catalog
+/** Plugin configuration. */
+export interface Config {
+  /**
+   * How often the live process re-checks for due tasks, in milliseconds.
+   * Restart catch-up does not depend on this value: the first reconciliation
+   * pass after mount always runs immediately, regardless of the interval.
+   */
+  pollIntervalMs?: number
+}
+```
+
+来源：[`packages/schedule/schedule-durable/src/index.ts:59`](../packages/schedule/schedule-durable/src/index.ts)
 
 <a id="deepseek-aidsh-sdk-app"></a>
 
@@ -2737,11 +2808,11 @@ export interface Config {
 需要：`tools`
 
 ```ts config-catalog
-/** Deployment configuration for the browser verify tools. */
+/** Deployment configuration for the browser control tools. */
 export interface Config {
   /** Launch Chromium headless. Defaults to true. */
   headless?: boolean
-  /** Cooperative timeout budget (ms) for both tools. Defaults to 30000. */
+  /** Cooperative timeout budget (ms) for every tool. Defaults to 30000. */
   timeoutMs?: number
   /** Absolute Chromium/Chrome/Edge binary, when the deployment pins one. */
   executablePath?: string
@@ -2753,10 +2824,18 @@ export interface Config {
   screenshotMaxBytes?: number
   /** Directory for exclusive PNG writes; defaults to a private directory under os.tmpdir(). */
   screenshotDir?: string
+  /** Character cap on one `browser_page_text` read. Defaults to 50000. */
+  pageTextMaxChars?: number
+  /** Cap on console messages retained per tab and returned per call. Defaults to 100. */
+  consoleLimit?: number
+  /** Cap on network requests retained per tab and returned per call. Defaults to 100. */
+  networkLimit?: number
+  /** Auto-fetch Chromium on first launch when none is found and no `executablePath`/`channel` is pinned. Defaults to true. */
+  autoDownload?: boolean
 }
 ```
 
-来源：[`packages/browser/tool-browser/src/index.ts:37`](../packages/browser/tool-browser/src/index.ts)
+来源：[`packages/browser/tool-browser/src/index.ts:53`](../packages/browser/tool-browser/src/index.ts)
 
 <a id="deepseek-aidsh-tool-describe-image"></a>
 
@@ -2791,6 +2870,28 @@ export interface Config {
 ```
 
 来源：[`packages/vision/tool-describe-image/src/index.ts:42`](../packages/vision/tool-describe-image/src/index.ts)
+
+<a id="deepseek-aidsh-tool-document"></a>
+
+## `@deepseek-ai/dsh-tool-document`
+
+需要：`tools` · `fs`
+
+```ts config-catalog
+/** Plugin config (all optional — see the defaults in {@link apply}). */
+export interface Config {
+  /** Absolute (or cwd-relative) root both tools confine reads to. Defaults to `process.cwd()`. */
+  workspaceRoot?: string
+  /** Inclusive byte cap on the whole file read into memory for either tool; also bounds a PDF content stream's inflated size. */
+  maxFileBytes?: number
+  /** Inclusive character cap on one rendered notebook-cell output before truncation. */
+  maxOutputChars?: number
+  /** Inclusive character cap on `read_pdf`'s assembled text across selected pages before truncation. */
+  maxTextChars?: number
+}
+```
+
+来源：[`packages/fs/tool-document/src/index.ts:50`](../packages/fs/tool-document/src/index.ts)
 
 <a id="deepseek-aidsh-tool-fs"></a>
 
@@ -3517,10 +3618,93 @@ export interface Config {
   toolCallTimeoutMs: number
   /** Optional deployment headers, redacted from settings and status responses. */
   headers: Record<string, string>
+  /** Base URL (trailing slash) `design_study_references` fetches `<slug>.jpg` thumbnails from. */
+  thumbnailBaseUrl: string
 }
 ```
 
-来源：[`packages/saturn/design-brain/src/index.ts:20`](../packages/saturn/design-brain/src/index.ts)
+来源：[`packages/saturn/design-brain/src/index.ts:33`](../packages/saturn/design-brain/src/index.ts)
+
+<a id="saturnaidsh-gates"></a>
+
+## `@saturnai/dsh-gates`
+
+需要：`tools`
+
+```ts config-catalog
+/** Plugin config. All fields optional; `static Config` supplies the defaults. */
+export interface Config {
+  /** Keep the shipped rules (default `true`). `false` leaves only `rules`. */
+  includeDefaults?: boolean
+  /** Rules appended after the shipped ones, matched in the order given. */
+  rules?: GateRule[]
+  /** Ids of shipped rules to drop; an id that names no shipped rule fails at load. */
+  disableRules?: string[]
+  /** Tool-name patterns exempt from the `ask` rules. A `deny` rule is never exemptible. */
+  allow?: string[]
+  /** Argument fields a pattern rule reads, joined with newlines before matching. */
+  commandFields?: string[]
+  /**
+   * Abstain on a shell call that already carries a `sandbox_permissions`
+   * escalation (default `true`), because that call's own body resolves one
+   * approval before it runs anything — see {@link CompiledPolicy}.
+   */
+  deferToSandboxEscalation?: boolean
+  /** Tool-name patterns whose body resolves an escalation approval of its own. */
+  escalationTools?: string[]
+  /**
+   * The sandbox modes an escalation may name for the deferral to apply
+   * (default `workspace-write`, `danger-full-access`). A request outside this
+   * vocabulary never reaches a human, so it does not excuse a Gate-class call.
+   */
+  escalationModes?: string[]
+}
+
+/**
+ * One policy rule. A rule with no `pattern` matches on the tool name alone —
+ * the shape every MCP rule uses, because an MCP tool's name already states its
+ * effect. A rule WITH a pattern additionally requires the regular expression
+ * to match the call's inspected text (the configured command fields), which is
+ * how one shell tool carries both `ls` and a force push.
+ */
+export interface GateRule {
+  /** Stable identifier, unique across the whole policy; named in the reason the model reads. */
+  id: string
+  /** The consequence class this rule guards. */
+  class: GateClass
+  /** `ask` (the default) or `deny`. */
+  action?: GateAction
+  /** Tool-name patterns, where `*` matches any run of characters and everything else is literal. */
+  tools: string[]
+  /** Optional regular expression over the call's inspected text, matched case-insensitively. */
+  pattern?: string
+  /** One sentence, written for the model, saying what the call would do. */
+  reason: string
+}
+
+/**
+ * What kind of consequence makes a call a Gate. The five classes are the ones
+ * whose consequence leaves the session: a secret read, money moved, something
+ * made public, a message that reaches a real person, an identity or name
+ * changed, or an effect nothing can undo.
+ */
+export type GateClass =
+  | 'credentials'
+  | 'spend'
+  | 'publish'
+  | 'outbound'
+  | 'destructive'
+  | 'identity'
+
+/**
+ * What a matched rule does. `ask` routes the call to the user and runs it only
+ * if they allow it; `deny` refuses it outright, for the few effects no
+ * approval should be able to buy from inside a session.
+ */
+export type GateAction = 'ask' | 'deny'
+```
+
+来源：[`packages/saturn/gates/src/policy.ts:25`](../packages/saturn/gates/src/policy.ts)
 
 <a id="saturnaidsh-model-router"></a>
 
