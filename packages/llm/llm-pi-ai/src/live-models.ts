@@ -23,11 +23,26 @@
  * @module dsh-llm-pi-ai/live-models
  */
 
+import { createHash } from 'node:crypto'
 import { LlmError, normalizeApiKey, QUOTA_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
 import type { PiAiModality, PiAiModelProfile } from './catalog.ts'
 
 /** How long one successful listing serves before the next request refreshes it. */
 export const LIVE_MODEL_TTL_MS = 10 * 60 * 1000
+
+/**
+ * How long a failed listing waits before the next request tries again. Short,
+ * because the usual cause (a token missing a permission, a rate limit) is
+ * fixed by the user within seconds, and the seeds keep serving meanwhile.
+ */
+export const LIVE_MODEL_RETRY_MS = 30 * 1000
+
+/**
+ * Failure code for a request the endpoint understood and refused for this
+ * account (HTTP 403: a gated model, a missing permission). Distinct from
+ * `AUTH`, which means the credential itself is invalid.
+ */
+export const ACCESS_DENIED_CODE = 'ACCESS_DENIED'
 
 /** Host of the Hugging Face router, whose failures get actionable messages. */
 export const HUGGINGFACE_ROUTER_HOST = 'router.huggingface.co'
@@ -221,7 +236,7 @@ const FAILURES: Readonly<Record<number, { kind: RouterFailureKind; code: string;
   },
   403: {
     kind: 'gated',
-    code: 'AUTH',
+    code: ACCESS_DENIED_CODE,
     text: 'this model is gated; accept its license on huggingface.co with the account that owns the token',
   },
   404: {
@@ -266,6 +281,52 @@ export function routerFailure(status: number, detail?: string): LlmError {
   )
 }
 
+/**
+ * Build the failure for one listing status on an endpoint that is not the
+ * Hugging Face router (TGI, vLLM, LM Studio, a gateway). Same codes as the
+ * router map, provider-neutral wording, no localization tag.
+ * @param status - HTTP status.
+ * @param detail - the response's `error` text, when any.
+ * @returns the coded failure.
+ */
+export function endpointFailure(status: number, detail?: string): LlmError {
+  const status_ = status >= 100 && status <= 599 ? { status } : {}
+  const suffix = detail === undefined || detail.length === 0 ? '' : `: ${detail}`
+  switch (status) {
+    case 401:
+      return new LlmError(`the provider rejected the API key (401); check the key stored for this route${suffix}`, 'AUTH', status_)
+    case 402:
+      return new LlmError(`the provider reports no remaining credit or quota (402)${suffix}`, QUOTA_EXCEEDED_CODE, status_)
+    case 403:
+      return new LlmError(`the provider refused access (403); the key may lack permission for this listing${suffix}`, ACCESS_DENIED_CODE, status_)
+    case 429:
+      return new LlmError(`the provider is rate limiting this key (429); retry later${suffix}`, 'RATE_LIMIT', status_)
+    default:
+      return new LlmError(
+        `the model listing answered ${String(status)}${suffix}`,
+        status >= 500 ? 'SERVER' : 'DISCOVERY_FAILED',
+        status_,
+      )
+  }
+}
+
+/**
+ * Whether a route's listing failures get the Hugging Face router's tagged
+ * wording: the `huggingface` route key (which may proxy the router under
+ * another host) or the router's own host.
+ * @param route - provider route key.
+ * @param baseURL - route endpoint.
+ * @returns true for the Hugging Face router.
+ */
+export function isHuggingFaceListing(route: string, baseURL: string): boolean {
+  if (route === 'huggingface') return true
+  try {
+    return new URL(baseURL).host === HUGGINGFACE_ROUTER_HOST
+  } catch {
+    return false
+  }
+}
+
 /** Where and how one route's listing is fetched. */
 export interface LiveModelSource {
   /** Route endpoint; the listing is `{baseURL}/models`. */
@@ -282,17 +343,26 @@ export interface LiveModelCacheOptions {
   fetch?: typeof fetch
   /** Clock in milliseconds; `Date.now` by default. */
   now?: () => number
-  /** Listing lifetime; {@link LIVE_MODEL_TTL_MS} by default. */
+  /** Lifetime of a successful listing; {@link LIVE_MODEL_TTL_MS} by default. */
   ttlMs?: number
+  /** Wait after a failed listing; {@link LIVE_MODEL_RETRY_MS} by default. */
+  retryMs?: number
   /** Observe a failed refresh; the message never carries the token. */
   onFailure?: (route: string, error: LlmError) => void
 }
 
 interface RouteEntry {
   models?: readonly LiveModel[]
-  fetchedAt?: number
-  attemptedAt?: number
+  /** When the next listing may be requested (success: TTL; failure: backoff). */
+  nextAt?: number
+  /** SHA-256 of the key the entry was fetched with; the key itself is never kept. */
+  keyPrint?: string
   inflight?: Promise<void>
+}
+
+/** A one-way fingerprint of a key, so a change is noticed without retaining the secret. */
+function fingerprint(key: string): string {
+  return createHash('sha256').update(key).digest('hex')
 }
 
 /** Pull a readable error string out of a failed reply body without trusting its shape. */
@@ -322,6 +392,7 @@ export class LiveModelCache {
   private readonly fetchImpl: typeof fetch
   private readonly now: () => number
   private readonly ttlMs: number
+  private readonly retryMs: number
   private readonly onFailure: ((route: string, error: LlmError) => void) | undefined
   private generationValue = 0
 
@@ -329,6 +400,7 @@ export class LiveModelCache {
     this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init))
     this.now = options.now ?? Date.now
     this.ttlMs = options.ttlMs ?? LIVE_MODEL_TTL_MS
+    this.retryMs = options.retryMs ?? LIVE_MODEL_RETRY_MS
     this.onFailure = options.onFailure
   }
 
@@ -359,9 +431,12 @@ export class LiveModelCache {
   }
 
   /**
-   * Refresh one route's list when it is older than the TTL. Failures are
-   * reported and swallowed: the last good list keeps serving. Concurrent
-   * callers share one request.
+   * Refresh one route's list when it is due: a successful listing serves for
+   * the TTL, a failed one is retried after the short backoff. The route's key
+   * is resolved on every call; when its value changes the entry is due at
+   * once, and when the key is removed the live list is dropped (the seeds
+   * serve). Failures are reported and swallowed: the last good list keeps
+   * serving. Concurrent callers share one request.
    * @param route - provider route key.
    * @param source - the endpoint and token resolution.
    * @param signal - optional cancellation.
@@ -370,37 +445,35 @@ export class LiveModelCache {
     const entry = this.routes.get(route) ?? {}
     this.routes.set(route, entry)
     if (entry.inflight !== undefined) return entry.inflight
-    const last = entry.attemptedAt
-    if (last !== undefined && this.now() - last < this.ttlMs) return Promise.resolve()
-    const run = this.fetchListing(route, entry, source, signal).finally(() => { delete entry.inflight })
+    const run = this.refreshDue(route, entry, source, signal).finally(() => { delete entry.inflight })
     entry.inflight = run
     return run
   }
 
-  private async fetchListing(route: string, entry: RouteEntry, source: LiveModelSource, signal?: AbortSignal): Promise<void> {
+  private async refreshDue(route: string, entry: RouteEntry, source: LiveModelSource, signal?: AbortSignal): Promise<void> {
     let secret: string | undefined
     try {
       const raw = await source.apiKey()
       // No token, no call: a keyless route stays on its seeds and is asked
       // again on the next request, so storing a token takes effect at once.
-      if (raw === undefined || raw.length === 0) return
+      // A list fetched with a key that has since been removed is dropped.
+      if (raw === undefined || raw.length === 0) {
+        this.forget(entry)
+        return
+      }
       const checked = normalizeApiKey(raw)
       if (!checked.ok) throw new LlmError('the stored token is not a usable API key', 'INVALID_CREDENTIAL')
       secret = checked.value
-      entry.attemptedAt = this.now()
-      const url = `${source.baseURL.replace(/\/+$/u, '')}/models`
-      const headers = new Headers(source.headers === undefined ? undefined : Object.entries(source.headers))
-      headers.set('accept', 'application/json')
-      headers.set('authorization', `Bearer ${secret}`)
-      const response = await this.fetchImpl(url, { method: 'GET', headers, ...signal === undefined ? {} : { signal } })
-      const text = await response.text()
-      if (!response.ok) throw routerFailure(response.status, errorDetail(text))
-      const models = mapModelListing(JSON.parse(text) as unknown)
-      if (models.length === 0) throw new LlmError('the model listing named no live model', 'DISCOVERY_FAILED')
-      entry.models = models
-      entry.fetchedAt = entry.attemptedAt
-      this.generationValue += 1
+      const print = fingerprint(secret)
+      if (entry.keyPrint !== print) {
+        // A different key may see a different listing (or none): due now.
+        entry.keyPrint = print
+        delete entry.nextAt
+      }
+      if (entry.nextAt !== undefined && this.now() < entry.nextAt) return
+      await this.fetchListing(route, entry, source, secret, signal)
     } catch (error: unknown) {
+      entry.nextAt = this.now() + this.retryMs
       const failure = error instanceof LlmError
         ? error
         : new LlmError('could not read the model listing', 'DISCOVERY_FAILED')
@@ -408,5 +481,40 @@ export class LiveModelCache {
         failure.failure.status === undefined ? {} : { status: failure.failure.status })
       this.onFailure?.(route, safe)
     }
+  }
+
+  /** Drop a route's live list and key fingerprint, advancing the generation when a list existed. */
+  private forget(entry: RouteEntry): void {
+    const had = entry.models !== undefined
+    delete entry.models
+    delete entry.nextAt
+    delete entry.keyPrint
+    if (had) this.generationValue += 1
+  }
+
+  private async fetchListing(
+    route: string,
+    entry: RouteEntry,
+    source: LiveModelSource,
+    secret: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const url = `${source.baseURL.replace(/\/+$/u, '')}/models`
+    const headers = new Headers(source.headers === undefined ? undefined : Object.entries(source.headers))
+    headers.set('accept', 'application/json')
+    headers.set('authorization', `Bearer ${secret}`)
+    const response = await this.fetchImpl(url, { method: 'GET', headers, ...signal === undefined ? {} : { signal } })
+    const text = await response.text()
+    if (!response.ok) {
+      const detail = errorDetail(text)
+      throw isHuggingFaceListing(route, source.baseURL)
+        ? routerFailure(response.status, detail)
+        : endpointFailure(response.status, detail)
+    }
+    const models = mapModelListing(JSON.parse(text) as unknown)
+    if (models.length === 0) throw new LlmError('the model listing named no live model', 'DISCOVERY_FAILED')
+    entry.models = models
+    entry.nextAt = this.now() + this.ttlMs
+    this.generationValue += 1
   }
 }
