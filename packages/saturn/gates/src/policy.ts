@@ -9,7 +9,7 @@
  */
 
 import z from '@deepseek-ai/schemastery'
-import { DEFAULT_COMMAND_FIELDS, DEFAULT_ESCALATION_TOOLS, DEFAULT_RULES } from './roster.ts'
+import { DEFAULT_COMMAND_FIELDS, DEFAULT_ESCALATION_MODES, DEFAULT_ESCALATION_TOOLS, DEFAULT_RULES } from './roster.ts'
 import type { GateAction, GateCall, GateClass, GateMatch, GateRule } from './types.ts'
 
 /** Every {@link GateClass}, for runtime validation of a rule that bypassed the schema. */
@@ -29,7 +29,7 @@ export interface Config {
   rules?: GateRule[]
   /** Ids of shipped rules to drop; an id that names no shipped rule fails at load. */
   disableRules?: string[]
-  /** Tool-name patterns exempt from every rule, checked before classification. */
+  /** Tool-name patterns exempt from the `ask` rules. A `deny` rule is never exemptible. */
   allow?: string[]
   /** Argument fields a pattern rule reads, joined with newlines before matching. */
   commandFields?: string[]
@@ -41,6 +41,12 @@ export interface Config {
   deferToSandboxEscalation?: boolean
   /** Tool-name patterns whose body resolves an escalation approval of its own. */
   escalationTools?: string[]
+  /**
+   * The sandbox modes an escalation may name for the deferral to apply
+   * (default `workspace-write`, `danger-full-access`). A request outside this
+   * vocabulary never reaches a human, so it does not excuse a Gate-class call.
+   */
+  escalationModes?: string[]
 }
 
 /** Schema for one rule inside {@link Config}. */
@@ -62,6 +68,7 @@ export const Config: z<Config> = z.object({
   commandFields: z.array(z.string()).default([...DEFAULT_COMMAND_FIELDS]),
   deferToSandboxEscalation: z.boolean().default(true),
   escalationTools: z.array(z.string()).default([...DEFAULT_ESCALATION_TOOLS]),
+  escalationModes: z.array(z.string()).default([...DEFAULT_ESCALATION_MODES]),
 })
 
 /** One rule with its matchers compiled. */
@@ -80,7 +87,7 @@ interface CompiledRule {
 export interface CompiledPolicy {
   /** Rules in match order; the first match claims the call, a deny beats every ask. */
   readonly rules: readonly CompiledRule[]
-  /** Tool-name matchers checked before any rule. */
+  /** Tool-name matchers that exempt a call from the `ask` rules only. */
   readonly allow: readonly RegExp[]
   /** Argument fields a pattern rule reads. */
   readonly commandFields: readonly string[]
@@ -88,6 +95,8 @@ export interface CompiledPolicy {
   readonly deferToSandboxEscalation: boolean
   /** Tool-name matchers for the tools whose body resolves an escalation approval. */
   readonly escalationTools: readonly RegExp[]
+  /** The sandbox modes an escalation may name for the deferral to apply. */
+  readonly escalationModes: ReadonlySet<string>
 }
 
 /**
@@ -180,6 +189,7 @@ export function compilePolicy(config: Config): CompiledPolicy {
     commandFields: [...commandFields],
     deferToSandboxEscalation: config.deferToSandboxEscalation ?? true,
     escalationTools: (config.escalationTools ?? DEFAULT_ESCALATION_TOOLS).map(wildcardToRegExp),
+    escalationModes: new Set(config.escalationModes ?? DEFAULT_ESCALATION_MODES),
   }
 }
 
@@ -208,15 +218,22 @@ function inspectedText(fields: readonly string[], args: unknown): string {
  * otherwise the first matching rule's `ask` is returned. An unmatched call
  * returns `undefined`, which is the ordinary case and means the call is none
  * of the Gate's business.
+ *
+ * `allow` exempts a tool from the `ask` rules and ONLY from those. A `deny`
+ * rule names an effect that takes the machine rather than the session, and a
+ * deployment that adds `allow: ['bash']` to quiet noisy prompts is asking for
+ * fewer questions, not for a disarmed fork bomb — so the exemption is applied
+ * per rule instead of short-circuiting the scan.
  * @param policy - the compiled policy.
  * @param call - the pending call's name and arguments.
  * @returns the claiming rule's match, or `undefined` when nothing claims it.
  */
 export function classify(policy: CompiledPolicy, call: GateCall): GateMatch | undefined {
-  if (policy.allow.some(matcher => matcher.test(call.name))) return undefined
+  const exempt = policy.allow.some(matcher => matcher.test(call.name))
   let text: string | undefined
   let ask: GateMatch | undefined
   for (const compiled of policy.rules) {
+    if (exempt && compiled.action !== 'deny') continue
     if (!compiled.tools.some(matcher => matcher.test(call.name))) continue
     if (compiled.pattern !== undefined) {
       text ??= inspectedText(policy.commandFields, call.arguments)
@@ -236,9 +253,16 @@ export function classify(policy: CompiledPolicy, call: GateCall): GateMatch | un
 
 /**
  * Whether this call already carries a sandbox escalation its own tool body
- * will resolve through the approval seam. Both fields are required together
- * by the escalating tools, so a lone `sandbox_permissions` (which those tools
- * reject before running anything) is not treated as one.
+ * will resolve through the approval seam — the only condition under which the
+ * Gate abstains from a call a rule claimed, so the test is deliberately narrow.
+ *
+ * Three things must hold, and each one is a way the claim can be false. The
+ * tool must be one whose body actually resolves an escalation. The mode must
+ * be one the sandbox family can be escalated TO: a request naming anything
+ * else is refused by that family's widening check without a human seeing it,
+ * so honouring it would let two invented arguments silence any `ask` rule.
+ * And the justification must be there, because the escalating tools require it
+ * and reject the call before running anything without it.
  * @param policy - the compiled policy.
  * @param call - the pending call's name and arguments.
  * @returns true when the call's own body will raise one approval for it.
@@ -249,6 +273,6 @@ export function carriesSandboxEscalation(policy: CompiledPolicy, call: GateCall)
   const record = call.arguments as Record<string, unknown>
   const mode = record['sandbox_permissions']
   const justification = record['justification']
-  return typeof mode === 'string' && mode.length > 0
+  return typeof mode === 'string' && policy.escalationModes.has(mode)
     && typeof justification === 'string' && justification.trim().length > 0
 }

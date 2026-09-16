@@ -41,6 +41,16 @@ export const DEFAULT_COMMAND_FIELDS: readonly string[] = ['command', 'script', '
 export const DEFAULT_ESCALATION_TOOLS: readonly string[] = ['bash', 'pwsh']
 
 /**
+ * The sandbox modes an escalation can actually name (`ESCALATION_TARGETS` in
+ * `@deepseek-ai/dsh-sandbox`, restated here rather than imported so the policy
+ * keeps no runtime edge to the sandbox family). A request naming anything else
+ * is refused by the sandbox's own widening check without a human ever seeing
+ * it, so it must not be allowed to excuse a Gate-class call: without this list,
+ * two made-up arguments would silence any `ask` rule.
+ */
+export const DEFAULT_ESCALATION_MODES: readonly string[] = ['workspace-write', 'danger-full-access']
+
+/**
  * The default policy. Every rule states, in `reason`, what the call would do —
  * that sentence is what the model and the user read when the call stops.
  */
@@ -241,7 +251,11 @@ export const DEFAULT_RULES: readonly GateRule[] = [
     id: 'destructive-recursive-delete',
     class: 'destructive',
     tools: [...SHELL_TOOLS],
-    pattern: String.raw`\brm\s+(?=(?:-\S+\s+)*-\S*r)(?=(?:-\S+\s+)*-\S*f)(?:-\S+\s+)+(?:/|~|\$HOME|%USERPROFILE%|[A-Za-z]:[\\/]|\*)`,
+    // The path alternation covers every way out of the workspace an agent
+    // actually writes: absolute, home-relative, drive-lettered, a bare glob —
+    // and `..`, which is the shortest of them and was the one this rule used
+    // to miss while its reason already promised to catch it.
+    pattern: String.raw`\brm\s+(?=(?:-\S+\s+)*-\S*r)(?=(?:-\S+\s+)*-\S*f)(?:-\S+\s+)+(?:/|~|\$HOME|%USERPROFILE%|[A-Za-z]:[\\/]|\*|\.\.[\\/]|\.\.(?:\s|$))`,
     reason: 'This command recursively deletes a path outside the workspace.',
   },
   {

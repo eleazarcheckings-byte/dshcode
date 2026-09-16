@@ -130,6 +130,11 @@ export function apply(ctx: Context, config: Config): void {
     const match = classify(policy, exec)
     if (match === undefined) return next()
     if (match.action !== 'deny' && policy.deferToSandboxEscalation && carriesSandboxEscalation(policy, exec)) {
+      // The one path where the Gate claims a call and says nothing to the
+      // human: the escalation's own prompt is the single question, and it
+      // names the sandbox change rather than this class. Logged so the class
+      // is at least on the record for whoever reads the trail afterwards.
+      ctx.logger.info(`gate ${match.class}: deferred to the call's own sandbox escalation "${exec.name}" (rule ${match.ruleId})`)
       return next()
     }
     const decision = decide(ctx, exec, match)
