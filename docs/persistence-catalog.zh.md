@@ -621,17 +621,15 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 ```ts persistence-catalog
 /**
- * Whether multi-task (always-orchestrate) mode is in force from this point
- * on: log-only, non-surface, whole-value replace. The last
- * `orchestrate/mode` wins; a log with none folds to **active** through the
- * projection unit's init — the standing posture of this harness
- * (`~/.dsh/SATURN-HARNESS-ADDENDUM.md`), so a fresh or resumed session is
- * orchestrated unless someone turns it off.
+ * Whether multi-task mode is in force from this point on: log-only,
+ * non-surface, whole-value replace. The last `orchestrate/mode` wins; a log
+ * with none folds to **inactive** through the projection unit's init, so a
+ * fresh session is a single straight thread until someone turns it on.
  */
 'orchestrate/mode': { active: boolean }
 ```
 
-来源：[`packages/saturn/orchestrate/src/types.ts:21`](../packages/saturn/orchestrate/src/types.ts)
+来源：[`packages/saturn/orchestrate/src/types.ts:19`](../packages/saturn/orchestrate/src/types.ts)
 
 ### `permission/*`
 
@@ -937,7 +935,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMemberSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/saturn/agent-team/src/types.ts:292`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:293`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagedelivered--log-only"></a>
 
@@ -955,7 +953,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMessageId](subsystems/agent-team.zh.md)
 
-来源：[`packages/saturn/agent-team/src/types.ts:298`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:299`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teammessagequeued--log-only"></a>
 
@@ -968,7 +966,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamMessageSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/saturn/agent-team/src/types.ts:296`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:297`](../packages/saturn/agent-team/src/types.ts)
 
 <a id="teamtask--log-only"></a>
 
@@ -981,7 +979,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 类型：[TeamId](subsystems/agent-team.zh.md) · [TeamTaskSnapshot](subsystems/agent-team.zh.md)
 
-来源：[`packages/saturn/agent-team/src/types.ts:294`](../packages/saturn/agent-team/src/types.ts)
+来源：[`packages/saturn/agent-team/src/types.ts:295`](../packages/saturn/agent-team/src/types.ts)
 
 ### `todo/*`
 
