@@ -6,6 +6,7 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { liveModelHasTools, splitRoutedModelId } from './huggingface.ts'
 import type {
   CredentialInfo, LlmDiscoveredModel, LlmModelDiscoveryRequest,
   SettingsNamespaceView, SettingsPathOpView,
@@ -71,6 +72,17 @@ export interface ModelsOperations {
    * @returns the candidates, or the refusal.
    */
   discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<ModelDiscoveryOutcome>
+  /**
+   * Which of a live-listing route's models some live provider serves with
+   * tool calls. The discovery wire carries only ids and capacities, so this
+   * reads the Host model catalog, whose live entries describe themselves in
+   * the adapter's `<n>K context · tools · via a, b` line. Optional: a card
+   * without it renders no tools badge.
+   * @param provider - provider route key.
+   * @returns base model ids (routing suffix removed) with tool support;
+   * empty when the catalog is refused or names none.
+   */
+  liveModelTools?(provider: string): Promise<ReadonlySet<string>>
 }
 
 /**
@@ -104,6 +116,16 @@ export function createModelsOperations(ctx: ClientContext): ModelsOperations {
       return response.ok
         ? { kind: 'found', models: response.value }
         : { kind: 'refused', message: response.error.message }
+    },
+    liveModelTools: async (provider) => {
+      const response = await ctx.remote.session.modelCatalog()
+      const tools = new Set<string>()
+      if (!response.ok) return tools
+      const group = response.value.groups.find(candidate => candidate.id === provider)
+      for (const model of group?.models ?? []) {
+        if (liveModelHasTools(model.description)) tools.add(splitRoutedModelId(model.id).base)
+      }
+      return tools
     },
   }
 }

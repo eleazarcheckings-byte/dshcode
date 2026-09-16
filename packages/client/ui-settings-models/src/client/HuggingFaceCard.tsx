@@ -64,6 +64,7 @@ export function HuggingFaceCard({ operations, namespace, keyConfigured, readOnly
   const [policy, setPolicy] = useState<RoutingPolicy>('fastest')
   const [typed, setTyped] = useState('')
   const [typedInvalid, setTypedInvalid] = useState(false)
+  const [withTools, setWithTools] = useState<ReadonlySet<string>>(() => new Set())
   const id = useId()
 
   useEffect(() => {
@@ -81,6 +82,17 @@ export function HuggingFaceCard({ operations, namespace, keyConfigured, readOnly
       }
       setFailure(outcome.message)
     })
+    return () => { live = false }
+  }, [keyConfigured, operations])
+
+  // Tool support is a badge, not a gate: when the catalog cannot say, the
+  // list renders without badges and no error is shown.
+  useEffect(() => {
+    if (!keyConfigured || operations.liveModelTools === undefined) return
+    let live = true
+    operations.liveModelTools(HF_ROUTE).then((tools) => {
+      if (live) setWithTools(tools)
+    }, () => { /* no tool facts; the list still renders */ })
     return () => { live = false }
   }, [keyConfigured, operations])
 
@@ -199,6 +211,7 @@ export function HuggingFaceCard({ operations, namespace, keyConfigured, readOnly
               {model.contextWindow === undefined
                 ? null
                 : <span className={styles['rowTag']}>{`${compact(model.contextWindow)} ${t('hf.context')}`}</span>}
+              {withTools.has(model.id) ? <span className={styles['rowTag']}>{t('hf.tools')}</span> : null}
               <button
                 type="button"
                 className={styles['secondaryButton']}

@@ -82,6 +82,24 @@ export function parseLiveDescription(description: string | undefined): LiveDescr
   return { ...context === undefined ? {} : { context }, tools, providers }
 }
 
+/**
+ * Whether a model's description is the adapter's live line
+ * (`131K context · tools · via a, b`) and names tool support. Any other
+ * description — including prose that happens to mention tools — is not
+ * a tool fact.
+ * @param description - a catalog model's description.
+ * @returns true only for a live line carrying the `tools` part.
+ */
+export function liveModelHasTools(description: string | undefined): boolean {
+  if (description === undefined || description.length === 0) return false
+  let tools = false
+  for (const part of description.split(' · ')) {
+    if (part === 'tools') tools = true
+    else if (!/^\d+(?:\.\d+)?[KM] context$/u.test(part) && !/^via .+$/u.test(part)) return false
+  }
+  return tools
+}
+
 /** The locale keys a tagged router failure maps to. */
 export type HuggingFaceErrorKey =
   | 'hf.error.unauthorized' | 'hf.error.credits' | 'hf.error.gated' | 'hf.error.notFound' | 'hf.error.rateLimited'

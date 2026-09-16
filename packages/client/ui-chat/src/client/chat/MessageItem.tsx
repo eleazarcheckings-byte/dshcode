@@ -41,11 +41,21 @@ interface RetryCountdown {
   seconds: number
 }
 
+/**
+ * The Hugging Face router failure kinds the llm-pi-ai adapter tags as
+ * `[huggingface:<kind>]`; each has localized `hf.error.<kind>` copy.
+ */
+const HUGGINGFACE_FAILURE = /^\s*\[huggingface:(unauthorized|credits|gated|notFound|rateLimited)\]/u
+
 function failureMessage(
   message: string,
   code: unknown,
   t: ChatViewSlotProps['t'],
 ): string {
+  // A tagged router failure says exactly what went wrong (a gated model is a
+  // 403, not an invalid key), so it wins over the generic AUTH replacement.
+  const kind = HUGGINGFACE_FAILURE.exec(message)?.[1]
+  if (kind !== undefined) return t(`hf.error.${kind}`)
   return code === 'AUTH' ? t('message.failure.auth') : message
 }
 
