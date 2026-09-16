@@ -2,7 +2,7 @@
   "name": "@dshcode/desktop",
   "productName": "Saturn AI",
   "description": "Saturn AI desktop shell for the dsh web platform",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Saturn AI",
   "repository": {
     "type": "git",
