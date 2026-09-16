@@ -56,6 +56,7 @@ export type { ClaimCheckRequest, ClaimPathConflict } from './service.ts'
 export { ClaimsAccess } from './service.ts'
 export { claimWorkspace, resetClaimWorkspaces } from './workspace.ts'
 export { DEFAULT_TTL_MS, MAX_TTL_MS, MIN_TTL_MS, ROOT_SCOPE } from './ledger.ts'
+export { AUTO_CLAIM_LANE, AUTO_CLAIM_NOTE } from './auto-claim.ts'
 export { CLAIM_STORE_DIR, workspaceKey } from './store.ts'
 
 /** Cordis plugin name used by Loader diagnostics. */
@@ -84,10 +85,10 @@ const MAX_NOTE = 400
 const POLICY = [
   'File ownership is a LEASE held in a durable ledger, not a courtesy exchanged in messages. Before you write a file another agent might also write, you must hold a claim on it.',
   '',
-  '1. BEFORE YOUR FIRST EDIT in a lane, call claim_scope with a short lane name and the exact file or directory prefixes you will write. A claim that collides with a live one is DENIED. If you are denied, pick a different lane or wait for the reported lease to lapse — NEVER write anyway, and never treat the denial as a warning.',
+  '1. BEFORE YOUR FIRST EDIT in a lane, call claim_scope with a short lane name and the exact file or directory prefixes you will write. A first mutating write — or a bash, pwsh, or terminal command whose arguments name a file it will change — auto-takes a claim for your session if you do not already hold one covering that path, with the same two-hour lease as claim_scope. A claim that collides with a live peer claim is DENIED. Re-claiming a surface you already hold extends the lease and never deadlocks against yourself. If you are denied, pick a different lane or wait for the reported lease to lapse — NEVER write anyway, and never treat the denial as a warning.',
   '2. IMMEDIATELY BEFORE EACH WRITE BURST, call claim_check on your claim. If it reports a file as moved, that file changed since the ledger last observed it: re-read it and rebase before writing. Never write a buffer you read minutes ago.',
   '3. RELEASE YOUR CLAIM with release_scope the moment your unit verifies. Claims also lapse on their own when the lease expires (two hours by default), so an abandoned lane frees itself without a human.',
-  '4. ONE WRITER PER SURFACE. If you and another agent both need a file, the second should ask the first to hand the surface over. There is no shared write, and a scope you did not claim is not yours.',
+  '4. ONE WRITER PER SURFACE. If you and another agent both need a file, the second should ask the first to hand the surface over. There is no shared write. The first mutating write of an unclaimed path takes the lease for you; a peer that already holds it is denied.',
   '5. First-party write, edit, and str_replace_editor calls cannot modify another session\'s active claimed scope, and neither can a bash, pwsh, and terminal command whose arguments name a claimed file: a redirection target, or an operand of rm, mv, cp, sed -i, Set-Content, Remove-Item and their kin, is checked against the ledger before the command runs. What the arguments cannot show, this cannot guard — a formatter, a code generator, or a build script that writes files still needs explicit coordination, and is never a way around a denied write. Preserve the user\'s commit and review preferences.',
   '6. A claim names a surface in the REPOSITORY, not only in your own checkout. Every linked git worktree of one repository shares one ledger, so an isolated teammate still coordinates with everyone else through the same lanes.',
 ].join('\n')

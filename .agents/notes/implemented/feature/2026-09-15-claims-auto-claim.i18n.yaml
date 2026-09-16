@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-15-claims-auto-claim.md
+2026-09-15-claims-auto-claim.md: 6556b112775ff8c9770fbc1a4ff29925272c623a
+2026-09-15-claims-auto-claim.zh.md: 085bff93d5f4e0a3c847d7d80708e3aa493524a0

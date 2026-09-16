@@ -28,11 +28,11 @@ kind: "package-reference"
 
 ### 协议
 
-`claim_scope` 为具名 lane 取得 workspace 相对前缀的独占权；与现存 claim 重叠即被拒绝（DENIED），且不会取得任何东西。`claim_check` 重新 stat claim 的文件并报告发生位移的项，使持有者在写入前重新基线化，而不是写出几分钟前读到的缓冲区。`release_scope` 在该单元验证通过后立即释放 lane；`claim_list` 展示每个在册持有者及其剩余租期。租约默认两小时后自行失效，session 被释放时也会释放其持有的全部 claim。
+`claim_scope` 为具名 lane 取得 workspace 相对前缀的独占权；与现存**同伴** claim 重叠即被拒绝（DENIED），且不会取得任何东西。对尚未被占用的路径，第一次会修改文件的写入（或已被扫描到的 shell 修改）会为当前 session 自动取得 claim，租期仍是两小时；持有者再次写入同一界面只延长租约，绝不会自己锁死自己。`claim_check` 重新 stat claim 的文件并报告发生位移的项，使持有者在写入前重新基线化，而不是写出几分钟前读到的缓冲区。`release_scope` 在该单元验证通过后立即释放 lane；`claim_list` 展示每个在册持有者及其剩余租期。租约默认两小时后自行失效，session 被释放时也会释放其持有的全部 claim。
 
 ### 强制了什么
 
-同伴的活跃 claim 会在派发之前拒绝会修改文件的第一方工具调用，并且 ledger 事务贯穿该次派发，因此别的进程无法在检查与写入之间抢走该 scope。shell 调用则按其参数能够证明的内容扫描：输出重定向的目标，以及以修改文件为目的的命令的操作数（`rm`、`mv`、`cp`、`tee`、`sed -i`、`git checkout`、`Set-Content`、`Remove-Item` 及同类）。`bash` 与 `pwsh` 按各自的词汇表来读，因为它们的可执行文件是事实；而 `terminal` 的命令行两种词汇表都读，因为终端背后是会话当时打开的那个 shell，主机平台并不能决定它。读取从不被阻断，而且 shell 检查会在命令运行前释放 ledger——一次构建若持有跨进程锁，会在其整个时长里拖住其他所有 session 的 claim。
+同伴的活跃 claim 会在派发之前拒绝会修改文件的第一方工具调用，并且 ledger 事务贯穿该次派发，因此别的进程无法在检查与写入之间抢走该 scope。尚未被占用的路径不会放行：当前 session 会为该修改路径自动取得租约（TTL 与 `claim_scope` 相同的两小时），若它已经持有覆盖该路径的 claim，则只延长租约。shell 调用则按其参数能够证明的内容扫描：输出重定向的目标，以及以修改文件为目的的命令的操作数（`rm`、`mv`、`cp`、`tee`、`sed -i`、`git checkout`、`Set-Content`、`Remove-Item` 及同类）。被扫描到的 shell 修改同样自动取得 claim；shell 检查仍会在命令运行前释放 ledger——一次构建若持有跨进程锁，会在其整个时长里拖住其他所有 session 的 claim。`bash` 与 `pwsh` 按各自的词汇表来读，因为它们的可执行文件是事实；而 `terminal` 的命令行两种词汇表都读，因为终端背后是会话当时打开的那个 shell，主机平台并不能决定它。读取从不被阻断。
 
 ### claim 空间
 
@@ -41,7 +41,7 @@ claim 命名的是仓库中的界面，而不是仓库某一个检出中的界�
 <a id="understand-the-implementation"></a>
 ## 理解实现
 
-`ledger.ts` 负责算术——scope 规范化、按路径分量比较的重叠判定、过期，以及工具渲染的视图。`store.ts` 负责持久性：每个 workspace 一份 JSON 文档，在跨进程写者锁下原子替换；只有当锁记录的属主可被证明已消失时，等待者才可以打破它。`write-guard.ts` 与 `shell-guard.ts` 是 `tools/execute` 总线上的两个强制点。`workspace.ts` 依据 git 自身的 `commondir` 记录解析 claim 空间，凡是读不到的情况都回退为目录本身。`service.ts` 发布 `ctx.claims`，为代表他人写入 workspace 的 host 代码提供只读接口——Agent Teams 的 `merge_teammate` 正是通过它询问传入 diff 中哪些路径已被同伴占有。
+`ledger.ts` 负责算术——scope 规范化、按路径分量比较的重叠判定、过期，以及工具渲染的视图。`store.ts` 负责持久性：每个 workspace 一份 JSON 文档，在跨进程写者锁下原子替换；只有当锁记录的属主可被证明已消失时，等待者才可以打破它。`write-guard.ts` 与 `shell-guard.ts` 是 `tools/execute` 总线上的两个强制点；两者都会为当前 session 自动认领尚未占用的修改路径（TTL 不变），并延长已覆盖的持有者租约。`workspace.ts` 依据 git 自身的 `commondir` 记录解析 claim 空间，凡是读不到的情况都回退为目录本身。`service.ts` 发布 `ctx.claims`，为代表他人写入 workspace 的 host 代码提供只读接口——Agent Teams 的 `merge_teammate` 正是通过它询问传入 diff 中哪些路径已被同伴占有。
 
 <a id="model-experience"></a>
 ## 模型体验
@@ -50,7 +50,7 @@ claim 命名的是仓库中的界面，而不是仓库某一个检出中的界�
 
 #### 模型看到什么
 
-一段常驻 policy 段落把协议写成可执行的规则：首次编辑前先 `claim_scope`，每次写入前先 `claim_check`，验证后即 `release_scope`，一个界面只有一个写者，以及 shell 命令不是绕开拒绝的方法。拒绝信息会指出持有者、lane、claim id、剩余分钟数以及被阻断的确切路径，然后说明应当怎么做——请求移交、收窄 scope，或等待租约到期。
+一段常驻 policy 段落把协议写成可执行的规则：首次编辑前先 `claim_scope`（也可依赖第一次会修改文件的写入自动取得租约），每次写入前先 `claim_check`，验证后即 `release_scope`，一个界面只有一个写者，以及 shell 命令不是绕开拒绝的方法。拒绝信息会指出持有者、lane、claim id、剩余分钟数以及被阻断的确切路径，然后说明应当怎么做——请求移交、收窄 scope，或等待租约到期。
 
 #### Token 影响
 
@@ -72,4 +72,4 @@ policy 段落是静态的，与其他常驻段落一起位于 prompt 前缀中�
 <a id="dev-note"></a>
 ### 开发备注
 
-[运行时决策](../../../.agents/notes/implemented/bug-fix/2026-09-14-saturn-team-file-ownership.zh.md)记录了最初的权衡，[worktree 隔离](../../../.agents/notes/implemented/feature/2026-09-15-agent-team-worktree-isolation.zh.md)记录了 ledger 为何改为以仓库为键。本包不发布运行时 invariant 安装器：ledger 事务与两个派发守卫在每次修改处强制该关系，行为测试直接覆盖被拒绝的写入。
+[运行时决策](../../../.agents/notes/implemented/bug-fix/2026-09-14-saturn-team-file-ownership.zh.md)记录了最初的权衡，[worktree 隔离](../../../.agents/notes/implemented/feature/2026-09-15-agent-team-worktree-isolation.zh.md)记录了 ledger 为何改为以仓库为键，[第一次写入自动认领](../../../.agents/notes/implemented/feature/2026-09-15-claims-auto-claim.zh.md)记录了未占用的修改为何记入 lane `auto`。本包不发布运行时 invariant 安装器：ledger 事务与两个派发守卫在每次修改处强制该关系，行为测试直接覆盖被拒绝的写入。

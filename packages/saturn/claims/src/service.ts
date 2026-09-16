@@ -10,9 +10,10 @@
  * the same ledger, and get back enough to tell the model exactly which paths
  * were refused and who holds them.
  *
- * It is deliberately a reader. Nothing here takes or releases a lease: the only
- * ways to acquire one stay `claim_scope` and its explicit release, so ownership
- * remains something an agent declares rather than something the runtime infers.
+ * It is deliberately a reader. Nothing here takes or releases a lease: acquisition
+ * stays `claim_scope` and the guarded first mutation (auto-claim); release stays
+ * `release_scope`, TTL expiry, and session disposal. Host writers ask; they do
+ * not infer ownership.
  *
  * @module @saturnai/dsh-claims/service
  */

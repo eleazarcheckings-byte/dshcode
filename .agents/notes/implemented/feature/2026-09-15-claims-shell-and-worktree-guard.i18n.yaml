@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-15-claims-shell-and-worktree-guard.md
-2026-09-15-claims-shell-and-worktree-guard.md: ed973e787f6558b70be3d05efe882ac8df8c688d
-2026-09-15-claims-shell-and-worktree-guard.zh.md: dc327fbb1453cff9df4b842bb22cb2d4879e8cf4
+2026-09-15-claims-shell-and-worktree-guard.md: 9439c1985726c6de54baeaedcd3a10753040d720
+2026-09-15-claims-shell-and-worktree-guard.zh.md: 182dfbf624a3de7698a4ca701aafe432b15bae1b

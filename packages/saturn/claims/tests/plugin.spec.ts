@@ -24,6 +24,8 @@ import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import * as StringEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
 import * as ClaimsPlugin from '../src/index.ts'
 import { claimStore } from '../src/store.ts'
+import { AUTO_CLAIM_LANE, AUTO_CLAIM_NOTE } from '../src/auto-claim.ts'
+import { DEFAULT_TTL_MS } from '../src/ledger.ts'
 import type { ClaimLedger } from '../src/types.ts'
 
 /** The branded call id the tool registry mints; the brand is a compile-time fact. */
@@ -277,7 +279,7 @@ describe('peer leases protect first-party filesystem mutations', () => {
     expect((await call(ctx, peer, 'write', { file_path: 'alias/app.ts', content: 'collision' })).isError).toBe(true)
   })
 
-  it('keeps a competing claim outside an in-flight write transaction', async () => {
+  it('keeps a competing claim_scope outside an in-flight write, which auto-claims for the writer', async () => {
     const ctx = await mount()
     const owner = agentIn(ctx, 'owner')
     const peer = agentIn(ctx, 'peer')
@@ -297,9 +299,69 @@ describe('peer leases protect first-party filesystem mutations', () => {
     const pendingClaim = call(ctx, peer, 'claim_scope', { lane: 'app', scopes: ['app.ts'] })
     finish()
     expect((await pendingWrite).isError).toBe(false)
-    expect((await pendingClaim).isError).toBe(false)
-    expect((await call(ctx, owner, 'write', { file_path: 'app.ts', content: 'must not overwrite' })).isError).toBe(true)
-    expect(await readFile(join(work, 'app.ts'), 'utf8')).toBe('completed before claim')
+    expect((await pendingClaim).isError).toBe(true)
+    expect((await pendingClaim).text).toContain('DENIED')
+    expect((await call(ctx, owner, 'write', { file_path: 'app.ts', content: 'holder writes again' })).isError).toBe(false)
+    expect(await readFile(join(work, 'app.ts'), 'utf8')).toBe('holder writes again')
+  })
+})
+
+describe('first mutating write auto-claims for the acting session', () => {
+  it('takes a lease on the first write of an unclaimed path', async () => {
+    const ctx = await mount()
+    const writer = agentIn(ctx, 'writer')
+    expect((await call(ctx, writer, 'write', { file_path: 'notes.md', content: 'first\n' })).isError).toBe(false)
+    const listed = JSON.parse((await call(ctx, writer, 'claim_list', {})).text) as {
+      readonly claims: ReadonlyArray<{
+        readonly lane: string
+        readonly sessionId: string
+        readonly scopes: readonly string[]
+        readonly note: string | null
+        readonly remainingMs: number
+      }>
+    }
+    expect(listed.claims).toHaveLength(1)
+    expect(listed.claims[0]).toMatchObject({
+      lane: AUTO_CLAIM_LANE,
+      sessionId: writer.id,
+      scopes: ['notes.md'],
+      note: AUTO_CLAIM_NOTE,
+    })
+    expect(listed.claims[0]?.remainingMs).toBeGreaterThan(DEFAULT_TTL_MS - 10_000)
+    expect(listed.claims[0]?.remainingMs).toBeLessThanOrEqual(DEFAULT_TTL_MS)
+  })
+
+  it('denies a peer write after the first writer auto-claimed', async () => {
+    const ctx = await mount()
+    const writer = agentIn(ctx, 'writer')
+    const peer = agentIn(ctx, 'peer')
+    expect((await call(ctx, writer, 'write', { file_path: 'notes.md', content: 'first\n' })).isError).toBe(false)
+    const denied = await call(ctx, peer, 'write', { file_path: 'notes.md', content: 'stolen\n' })
+    expect(denied.isError).toBe(true)
+    expect(denied.text).toContain('DENIED: another session holds an active workspace claim')
+    expect(denied.text).toContain(writer.id)
+    expect(await readFile(join(work, 'notes.md'), 'utf8')).toBe('first\n')
+  })
+
+  it('lets the holder write the same path again and extends the lease', async () => {
+    const ctx = await mount()
+    const holder = agentIn(ctx, 'holder')
+    expect((await call(ctx, holder, 'write', { file_path: 'notes.md', content: 'first\n' })).isError).toBe(false)
+    const first = JSON.parse((await call(ctx, holder, 'claim_list', {})).text) as {
+      readonly claims: ReadonlyArray<{ readonly id: string }>
+    }
+    await editLedger(ledger => ({
+      ...ledger,
+      claims: ledger.claims.map(claim => ({ ...claim, expiresAt: Date.now() + 60_000 })),
+    }))
+    expect((await call(ctx, holder, 'write', { file_path: 'notes.md', content: 'second\n' })).isError).toBe(false)
+    expect(await readFile(join(work, 'notes.md'), 'utf8')).toBe('second\n')
+    const second = JSON.parse((await call(ctx, holder, 'claim_list', {})).text) as {
+      readonly claims: ReadonlyArray<{ readonly id: string; readonly remainingMs: number }>
+    }
+    expect(second.claims).toHaveLength(1)
+    expect(second.claims[0]?.id).toBe(first.claims[0]?.id)
+    expect(second.claims[0]?.remainingMs).toBeGreaterThan(60_000)
   })
 })
 

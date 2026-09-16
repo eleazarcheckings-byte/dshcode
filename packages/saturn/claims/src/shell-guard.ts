@@ -8,7 +8,9 @@
  * interpreted here — no attempt is made to know what `node build.mjs` will
  * touch. What is decidable from argv alone is scanned: an output redirection,
  * and the operands of a command whose entire purpose is to change a file. Those
- * land on a peer's claimed surface or they do not.
+ * land on a peer's claimed surface or they do not. An unclaimed scanned
+ * mutation is auto-claimed for the acting session; a covering holder lease is
+ * extended.
  *
  * Which vocabulary a line is read in is never guessed from the host platform.
  * `bash` and `pwsh` are distinct tools backed by distinct executables, so each
@@ -27,10 +29,13 @@
  * @module @saturnai/dsh-claims/shell-guard
  */
 
-import { isAbsolute, relative, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolExecutionInput } from '@deepseek-ai/dsh-tools'
+import { applySessionClaim } from './auto-claim.ts'
 import { expireClaims, findConflicts, normalizeScope } from './ledger.ts'
+import { statIdentity } from './store.ts'
+import type { ClaimBaseline } from './types.ts'
 import type { ClaimStore } from './store.ts'
 import type { ScopeConflict } from './types.ts'
 import { claimWorkspace } from './workspace.ts'
@@ -335,14 +340,31 @@ export function installShellGuard(ctx: Context, store: ClaimStore): void {
     if (scopes.length === 0) return await next()
 
     const now = Date.now()
-    const ledger = expireClaims(await store.read(workspace), now).ledger
-    const peers = ledger.claims.filter(claim => claim.sessionId !== session.id)
-    const conflicts = findConflicts(peers, scopes, now)
-    if (conflicts.length > 0) {
-      const blocked = scopes.filter(scope =>
-        conflicts.some(conflict => conflict.scopes.some(owned => scope === owned || scope.startsWith(`${owned}/`) || owned.startsWith(`${scope}/`) || owned === '.')))
-      throw new Error(renderDenial(exec.name, blocked, conflicts))
-    }
+    const baseline: Record<string, ClaimBaseline | null> = {}
+    for (const scope of scopes) baseline[scope] = await statIdentity(join(workspace, scope))
+    await store.mutate(workspace, (raw) => {
+      const swept = expireClaims(raw, now).ledger
+      const peers = swept.claims.filter(claim => claim.sessionId !== session.id)
+      const conflicts = findConflicts(peers, scopes, now)
+      if (conflicts.length > 0) {
+        const blocked = scopes.filter(scope =>
+          conflicts.some(conflict => conflict.scopes.some(owned => scope === owned || scope.startsWith(`${owned}/`) || owned.startsWith(`${scope}/`) || owned === '.')))
+        throw new Error(renderDenial(exec.name, blocked, conflicts))
+      }
+      // Same rule as the file guard: unclaimed scanned mutations are taken for
+      // this session; a covering holder lease is extended. The lock is still
+      // released before dispatch so a long command cannot stall the ledger.
+      return {
+        ledger: applySessionClaim(swept, {
+          sessionId: session.id,
+          holder: `session:${session.id}`,
+          scopes,
+          now,
+          baseline,
+        }),
+        result: undefined,
+      }
+    })
     exec.signal.throwIfAborted()
     return await next()
   })

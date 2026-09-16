@@ -27,6 +27,8 @@ import ToolRuntime, { defineContentToolFixture } from '@deepseek-ai/dsh-tools'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import * as ClaimsPlugin from '../src/index.ts'
+import { AUTO_CLAIM_LANE, AUTO_CLAIM_NOTE } from '../src/auto-claim.ts'
+import { DEFAULT_TTL_MS } from '../src/ledger.ts'
 
 /** The branded call id the tool registry mints; the brand is a compile-time fact. */
 type CallId = Parameters<Context['tools']['execute']>[0]['callId']
@@ -220,5 +222,62 @@ describe('peer leases protect shell mutations', () => {
     const policy = assembly.sections.find(candidate => candidate.name === ClaimsPlugin.CLAIMS_SECTION)
     expect(renderPrompt({ ...assembly, sections: policy === undefined ? [] : [policy] }))
       .toContain('bash, pwsh, and terminal')
+    expect(renderPrompt({ ...assembly, sections: policy === undefined ? [] : [policy] }))
+      .toContain('auto-takes a claim')
+  })
+})
+
+describe('first scanned shell mutation auto-claims for the acting session', () => {
+  it('takes a lease on the first bash write of an unclaimed path', async () => {
+    const ctx = await mount()
+    const writer = agentIn(ctx, 'shell-writer')
+    expect((await call(ctx, writer, 'bash', { command: 'echo x > src/app.ts', description: 'write' })).isError).toBe(false)
+    const listed = JSON.parse((await call(ctx, writer, 'claim_list', {})).text) as {
+      readonly claims: ReadonlyArray<{
+        readonly lane: string
+        readonly sessionId: string
+        readonly scopes: readonly string[]
+        readonly note: string | null
+        readonly remainingMs: number
+      }>
+    }
+    expect(listed.claims).toHaveLength(1)
+    expect(listed.claims[0]).toMatchObject({
+      lane: AUTO_CLAIM_LANE,
+      sessionId: writer.id,
+      scopes: ['src/app.ts'],
+      note: AUTO_CLAIM_NOTE,
+    })
+    expect(listed.claims[0]?.remainingMs).toBeGreaterThan(DEFAULT_TTL_MS - 10_000)
+    expect(listed.claims[0]?.remainingMs).toBeLessThanOrEqual(DEFAULT_TTL_MS)
+    expect(await appText()).toBe('shell overwrote it\n')
+  })
+
+  it('denies a peer shell write after the first writer auto-claimed', async () => {
+    const ctx = await mount()
+    const writer = agentIn(ctx, 'shell-first')
+    const peer = agentIn(ctx, 'shell-peer')
+    expect((await call(ctx, writer, 'bash', { command: 'echo x > src/app.ts', description: 'write' })).isError).toBe(false)
+    const denied = await call(ctx, peer, 'bash', { command: 'echo y > src/app.ts', description: 'overwrite' })
+    expect(denied.isError).toBe(true)
+    expect(denied.text).toContain('DENIED: another session holds an active workspace claim')
+    expect(denied.text).toContain(writer.id)
+    expect(await appText()).toBe('shell overwrote it\n')
+  })
+
+  it('lets the holder run another mutation on the same path', async () => {
+    const ctx = await mount()
+    const holder = agentIn(ctx, 'shell-holder')
+    expect((await call(ctx, holder, 'bash', { command: 'echo x > src/app.ts', description: 'write' })).isError).toBe(false)
+    const first = JSON.parse((await call(ctx, holder, 'claim_list', {})).text) as {
+      readonly claims: ReadonlyArray<{ readonly id: string }>
+    }
+    expect((await call(ctx, holder, 'bash', { command: 'echo y > src/app.ts', description: 'write again' })).isError).toBe(false)
+    const second = JSON.parse((await call(ctx, holder, 'claim_list', {})).text) as {
+      readonly claims: ReadonlyArray<{ readonly id: string }>
+    }
+    expect(second.claims).toHaveLength(1)
+    expect(second.claims[0]?.id).toBe(first.claims[0]?.id)
+    expect(await appText()).toBe('shell overwrote it\n')
   })
 })

@@ -18,7 +18,9 @@ Reads stay free, deliberately. A guard that denied `cat` would be routed around 
 
 Claim space is the second half. When a session's working directory is a linked `git worktree`, its claims are recorded against the corresponding directory under the repository's main worktree, detected through git's own `.git` file and `commondir` record, cached per directory, and falling back to the directory itself for anything unreadable. Scopes therefore name repository-relative surfaces shared by every checkout. The first-party guard now resolves the claimed scopes in claim space while resolving the model's path in the session's own checkout, which is what lets an isolated teammate write freely inside its worktree while the shared surface stays owned.
 
-`ctx.claims` publishes the ledger as a reader for host code that writes a workspace on someone else's behalf, which is how Agent Teams' `merge_teammate` learns which paths of an incoming diff a peer owns. It takes no leases: acquiring one stays something an agent declares.
+A first mutating first-party write, or a scanned shell mutation, of an unclaimed path auto-takes a lease for the acting session on lane `auto` with the same two-hour TTL as `claim_scope`. Writing a surface the session already holds extends that lease and never deadlocks against itself. A peer's live claim is still denied before any byte lands.
+
+`ctx.claims` publishes the ledger as a reader for host code that writes a workspace on someone else's behalf, which is how Agent Teams' `merge_teammate` learns which paths of an incoming diff a peer owns. That reader takes no leases. Write and shell guards auto-take a session lease on first unclaimed mutation; merge still consults without creating one.
 
 ## Alternatives considered
 

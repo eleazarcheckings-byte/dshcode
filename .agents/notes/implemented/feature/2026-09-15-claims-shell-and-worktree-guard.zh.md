@@ -18,7 +18,9 @@ claim ledger 通过 `write`、`edit` 与 `str_replace_editor` 拒绝冲突写入
 
 claim 空间是另一半。当 session 的工作目录是链接的 `git worktree` 时，其 claim 记录在该仓库主 worktree 下的对应目录上；检测依据是 git 自身的 `.git` 文件与 `commondir` 记录，按目录缓存，凡是读不到的情况都回退为目录本身。因此 scope 命名的是所有检出共享的、以仓库为基准的界面。第一方守卫现在在 claim 空间解析被占有的 scope，同时在 session 自身的检出中解析模型给出的路径——正是这一点让被隔离的 teammate 在自己的 worktree 内自由写入，而共享界面仍然有主。
 
-`ctx.claims` 把 ledger 作为只读接口发布，供代表他人写入 workspace 的 host 代码使用；Agent Teams 的 `merge_teammate` 正是据此得知传入 diff 中哪些路径已被同伴占有。它不取得任何租约：取得租约始终是 agent 主动声明的行为。
+对尚未被占有的路径，第一次变更性的第一方写入，或一次被扫描到的 shell 变更，会为当前 session 在 `auto` lane 上自动取得租约，TTL 与 `claim_scope` 相同（两小时）。写入自己已经覆盖的界面会续租，且永远不会与自己死锁。同伴的有效 claim 仍在任何字节落地之前被拒绝。
+
+`ctx.claims` 把 ledger 作为只读接口发布，供代表他人写入 workspace 的 host 代码使用；Agent Teams 的 `merge_teammate` 正是据此得知传入 diff 中哪些路径已被同伴占有。该读取接口不取得任何租约。write 与 shell 守卫在第一次未占有的变更上为 session 自动取得租约；merge 仍然只查询、不创建。
 
 ## 考虑过的替代方案
 

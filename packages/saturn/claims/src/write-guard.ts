@@ -1,12 +1,14 @@
 /** Peer-lease enforcement around first-party filesystem tool dispatch. */
 
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { FileSystem, FsTarget } from '@deepseek-ai/dsh-fs'
 import type { ToolExecutionInput } from '@deepseek-ai/dsh-tools'
-import { expireClaims, remainingMs } from './ledger.ts'
+import { applySessionClaim, mutationScope, refreshClaimLeases } from './auto-claim.ts'
+import { expireClaims, findConflicts, remainingMs } from './ledger.ts'
 import { claimWorkspace } from './workspace.ts'
+import { statIdentity, type ClaimStore } from './store.ts'
 import type { Claim, ScopeConflict } from './types.ts'
-import type { ClaimStore } from './store.ts'
 
 /** Return the mutation path from the first-party filesystem tool vocabulary. */
 function mutationPath(exec: ToolExecutionInput): string | undefined {
@@ -57,7 +59,9 @@ export async function canonicalConflicts(
 /**
  * Mount a write guard when the host supplies filesystem tools. Hold the ledger
  * transaction through dispatch so another process cannot acquire a claim between
- * the ownership check and the write. Reads and shell execution do not take it.
+ * the ownership check and the write. An unclaimed mutation path is auto-claimed
+ * for the acting session before dispatch; a covering holder lease is extended.
+ * Reads and shell execution do not take this lock.
  * @param ctx - claims plugin context, owning the reversible listener.
  * @param store - shared cross-process claim ledger.
  */
@@ -87,8 +91,25 @@ export function installWriteGuard(ctx: Context, store: ClaimStore): void {
             'Ask the holder to release the claim, choose a different scope, or wait for the lease to expire. Do not bypass the claim using shell commands.',
           ].join('\n'))
         }
+        const own = swept.claims.filter(claim => claim.sessionId === session.id)
+        const covering = await canonicalConflicts(fsCtx.fs, workspace, own, [target], now, exec.signal)
+        const scope = mutationScope(path, cwd)
+        let nextLedger = swept
+        if (covering.length > 0) {
+          // Holder writing again: extend the covering lease, never self-deadlock.
+          nextLedger = refreshClaimLeases(swept, covering.map(hit => hit.claimId), now)
+        } else if (scope !== null && findConflicts(peers, [scope], now).length === 0) {
+          const baseline = { [scope]: await statIdentity(join(workspace, scope)) }
+          nextLedger = applySessionClaim(swept, {
+            sessionId: session.id,
+            holder: `session:${session.id}`,
+            scopes: [scope],
+            now,
+            baseline,
+          })
+        }
         exec.signal.throwIfAborted()
-        return { ledger: swept, result: await next() }
+        return { ledger: nextLedger, result: await next() }
       })
     })
   })
