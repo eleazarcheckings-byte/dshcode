@@ -1862,6 +1862,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-agent-preset AgentPresetSection id \'agent-presets\'',
       '@saturnai/dsh-client-ui-remote-access RemoteSection id \'remote\'',
+      '@saturnai/dsh-client-ui-settings-account AccountSection id \'account\'',
       'client-ui-settings-archive ArchiveSessionsSection id \'archive\'',
       'client-ui-settings-general GeneralSection id \'general\'',
       'client-ui-settings-models ModelsSection id \'models\'',
