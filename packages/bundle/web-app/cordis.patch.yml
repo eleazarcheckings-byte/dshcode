@@ -339,6 +339,9 @@
     # approval with its estimated cost before any network call.
     - id: saturn-tool-media
       name: '@saturnai/dsh-tool-media'
+      # An explicit empty config: the loader passes `undefined` for a row without
+      # one, and the media service reads its provider sub-blocks at load.
+      config: {}
 
     # Saturn AI multi-harness teammates: the native Claude Code / Codex
     # subagent providers, mounted on the Host plane behind the
