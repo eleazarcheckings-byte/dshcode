@@ -1572,6 +1572,25 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'scheduleDurable',
+    summary: 'Owns the open store and the live reconciliation loop; published on `ctx.scheduleDurable`.',
+    description: 'Owns the open store and the live reconciliation loop; published on `ctx.scheduleDurable`.',
+    methods: [
+      {
+        signature: 'list(): DurableTaskRecord[]',
+        description: 'Every persisted task, in no particular order.',
+        parameters: [],
+        returns: 'every task record the store holds.',
+      },
+      {
+        signature: 'async reconcileAll(nowMs: number = Date.now()): Promise<Array<{ id: TaskIdType; outcome: TaskDispatchOutcome }>>',
+        description: 'Reconcile every task against `nowMs`, firing each due task at most once and persisting its re-armed state, then handing each firing to the configured dispatcher. Safe to call repeatedly (a live poll) or once after a cold start (restart catch-up) — both paths are this one method.',
+        parameters: [{ name: 'nowMs', description: 'decision instant, epoch milliseconds; defaults to the wall clock.' }],
+        returns: 'one entry per task fired during this pass.',
+      },
+    ],
+  },
+  {
     key: 'sessionController',
     summary: 'Host service backing the generated `ctx.remote.session` namespace.',
     description: 'Host service backing the generated `ctx.remote.session` namespace.',
@@ -4292,6 +4311,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
   },
   {
+    name: 'CronScheduleSpec',
+    declaration: 'export interface CronScheduleSpec {\n    readonly kind: \'cron\';\n    readonly expression: string;\n}',
+  },
+  {
     name: 'DeepSeekLlmApiExtensionMap',
     declaration: 'export interface DeepSeekLlmApiExtensionMap {\n}',
   },
@@ -4398,6 +4421,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DshEnvironmentKey',
     declaration: 'export type DshEnvironmentKey = `${typeof DSH_ENV_PREFIX}${string}`;',
+  },
+  {
+    name: 'DurableTaskRecord',
+    declaration: 'export interface DurableTaskRecord {\n    readonly id: TaskId;\n    readonly name: string;\n    readonly prompt: string;\n    readonly workspace: string;\n    readonly schedule: ScheduleSpec;\n    readonly status: TaskStatus;\n    readonly nextFireAt: string | null;\n    readonly lastFiredAt: string | null;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
   },
   {
     name: 'DynamicCordisPackage',
@@ -5016,6 +5043,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ObjectJsonSchema = JsonSchemaNode & {\n    type: \'object\';\n};',
   },
   {
+    name: 'OnceScheduleSpec',
+    declaration: 'export interface OnceScheduleSpec {\n    readonly kind: \'once\';\n    readonly at: string;\n}',
+  },
+  {
     name: 'OneShotSubagentDescriptorData',
     declaration: 'export interface OneShotSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'one-shot\';\n    readonly label?: string;\n}',
   },
@@ -5306,6 +5337,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ScheduledToolPreparation',
     declaration: 'export type ScheduledToolPreparation = {\n    kind: \'dispatch\';\n    exec: ToolRunContext;\n} | {\n    kind: \'post-result\';\n    exec: ToolRunContext;\n    result: ToolExecutionResult;\n} | {\n    kind: \'final-result\';\n    exec: ToolRunContext;\n    result: ToolExecutionResult;\n};',
+  },
+  {
+    name: 'ScheduleSpec',
+    declaration: 'export type ScheduleSpec = CronScheduleSpec | OnceScheduleSpec;',
   },
   {
     name: 'Scoped',
@@ -6154,6 +6189,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TableValueOf',
     declaration: 'export type TableValueOf<S extends DomainSpec, N extends keyof S[\'tables\']> = S[\'tables\'][N] extends DomainTableSpec<string, infer V> ? V : never;',
+  },
+  {
+    name: 'TaskDispatchOutcome',
+    declaration: 'export type TaskDispatchOutcome = {\n    readonly kind: \'dispatched\';\n    readonly detail?: string;\n} | {\n    readonly kind: \'failed\';\n    readonly detail: string;\n};',
+  },
+  {
+    name: 'TaskId',
+    declaration: 'export type TaskId = Branded<\'ScheduleDurableTaskId\'>;',
+  },
+  {
+    name: 'TaskStatus',
+    declaration: 'export type TaskStatus = \'active\' | \'paused\' | \'done\';',
   },
   {
     name: 'TeamId',

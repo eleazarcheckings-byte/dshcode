@@ -95,6 +95,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   terminals: 'terminal.md',
   sandbox: 'sandbox.md',
   sandboxPolicy: 'sandbox.md',
+  scheduleDurable: 'schedule.md',
   sessionPersistence: 'persistence.md',
   sessionQuery: 'session-query.md',
   sessionFileReferences: 'session-reference.md',
@@ -659,6 +660,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
 /** TypeScript lib and pinned framework types with no repository-owned data page. */
 export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'AbortSignal',
+  'Array',
   'AsyncIterable',
   'Context',
   'Error',
@@ -708,6 +710,9 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   RemoteMode: 'remote-access listener mode (lan | tunnel) is owned by packages/saturn/remote-access/src/types.ts',
   RemoteStatus: 'remote-access listener, device, and tunnel status is owned by packages/saturn/remote-access/src/types.ts',
   RemotePairingPayload: 'remote-access QR pairing payload is owned by packages/saturn/remote-access/src/types.ts',
+  DurableTaskRecord: 'persisted durable-schedule task record is owned by packages/schedule/schedule-durable/src/types.ts',
+  TaskDispatchOutcome: 'durable-schedule dispatch outcome is owned by packages/schedule/schedule-durable/src/types.ts',
+  TaskIdType: 'durable-schedule task identifier (TaskId alias) is owned by packages/schedule/schedule-durable/src/types.ts',
   RemoteEventInput: 'remote-access notification frame input is owned by packages/saturn/remote-access/src/types.ts',
   CompactionAgentContext: 'compaction service input is owned by packages/compaction/compaction/src/index.ts',
   ManualCompactAgentContext: 'manual compaction service input is owned by packages/compaction/compaction/src/index.ts',

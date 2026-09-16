@@ -147,7 +147,10 @@ export class ScheduleDurableRuntime {
     return (this.ctx.get('scheduleDurableDispatcher') as TaskDispatcher | undefined) ?? recordingDispatcher(this.ctx)
   }
 
-  /** Every persisted task, in no particular order. */
+  /**
+   * Every persisted task, in no particular order.
+   * @returns every task record the store holds.
+   */
   list(): DurableTaskRecord[] {
     return this.store.list()
   }

@@ -190,3 +190,38 @@ The process-local owner derives its earliest timer from the durable fold and rer
 Due work waits for the Agent to become fully idle and claims the maintenance phase before it refolds state, samples the decision, queues one `followup()`, and appends the corresponding dispatch changes. It never calls `steer()` and never interrupts a current turn.
 
 The admitted one-shot or fixed-rate batch starts one normal later turn and appears only through the ordinary conversation transcript; Schedule has no independent durable Web receipt. The read-only active catalog above never represents delivery success. If framing or synchronous queue admission fails, no dispatch is recorded and the reminder stays active. The narrow crash interval after admission but before durable dispatch can repeat reminder content after recovery, so the boundary is best-effort at-least-once rather than exactly-once delivery.
+
+<!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
+
+<a id="cordis-surface"></a>
+
+## Cordis API
+
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+
+<a id="ctxscheduledurable--scheduledurableruntime"></a>
+
+### `ctx.scheduleDurable` — `ScheduleDurableRuntime`
+
+Owns the open store and the live reconciliation loop; published on `ctx.scheduleDurable`.
+
+```ts cordis-catalog
+/**
+ * Every persisted task, in no particular order.
+ * @returns every task record the store holds.
+ */
+list(): DurableTaskRecord[]
+
+/**
+ * Reconcile every task against `nowMs`, firing each due task at most once
+ * and persisting its re-armed state, then handing each firing to the
+ * configured dispatcher. Safe to call repeatedly (a live poll) or once
+ * after a cold start (restart catch-up) — both paths are this one method.
+ * @param nowMs - decision instant, epoch milliseconds; defaults to the wall clock.
+ * @returns one entry per task fired during this pass.
+ */
+async reconcileAll(nowMs: number = Date.now()): Promise<Array<{ id: TaskIdType; outcome: TaskDispatchOutcome }>>
+```
+
+Source: [`packages/schedule/schedule-durable/src/index.ts`](../../packages/schedule/schedule-durable/src/index.ts)
+<!-- END GENERATED cordis-surface -->
