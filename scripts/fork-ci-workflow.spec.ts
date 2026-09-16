@@ -190,11 +190,25 @@ describe('Fork CI workflow', () => {
     expect(staticRuns).not.toContain('pnpm run check:ci:static')
     expect(staticRuns).not.toContain('pnpm run knip')
     expect(staticRuns).not.toContain('pnpm run duplication')
-    // The last shared static gate still held out: the fork's Saturn rebrand
-    // left 12 hard-coded UI strings (brand wordmarks, the desktop title bar's
-    // menu labels, the plugin-installer repair prompts). Untranslate them,
-    // then add the step alongside its shared-gate neighbours.
-    expect(staticRuns).not.toContain('pnpm run verify-client-ui-i18n')
+  })
+
+  it('runs the client UI i18n gate alongside its shared-gate neighbour', () => {
+    if (!isRecord(workflow.jobs)) throw new TypeError('Fork CI workflow must define jobs')
+
+    const staticJob = workflow.jobs.static
+    if (!isRecord(staticJob) || !Array.isArray(staticJob.steps)) throw new TypeError('static job must define steps')
+    const steps = staticJob.steps.filter(isRecord)
+    expect(stepRuns(staticJob)).toContain('pnpm run verify-client-ui-i18n')
+    const clientPackagesIndex = steps.findIndex(step => step.name === 'Client packages')
+    const i18nStep = steps.find(step => step.name === 'Client UI i18n')
+    expect(clientPackagesIndex).toBeGreaterThanOrEqual(0)
+    expect(i18nStep).toMatchObject({
+      if: 'success() || failure()',
+      run: 'pnpm run verify-client-ui-i18n',
+    })
+    const i18nIndex = steps.findIndex(step => step.name === 'Client UI i18n')
+    // Next to its shared-gate neighbour: immediately after `Client packages`.
+    expect(i18nIndex).toBe(clientPackagesIndex + 1)
   })
 
   it('reports every static gate in one run instead of stopping at the first failure', () => {
