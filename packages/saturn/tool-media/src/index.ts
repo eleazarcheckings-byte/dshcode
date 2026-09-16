@@ -154,7 +154,7 @@ export const Config: z<Config> = z.object({
   higgsfield: higgsfieldConfigSchema,
   defaultImageProvider: providerSchema.default('gemini'),
   defaultVideoProvider: providerSchema.default('gemini'),
-}).default({})
+})
 
 /** Resolve one API key: an explicit inline value wins; otherwise the credential seam, falling back to the launch environment. */
 async function resolveApiKey(ctx: Context, label: string, inline: string | undefined, envName: string): Promise<string> {
