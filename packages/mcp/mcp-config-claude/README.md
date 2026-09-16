@@ -38,11 +38,11 @@ Add `dsh-mcp-config-claude` when a Claude-Code-shaped config file already lists 
 
 | Field | Default | Meaning |
 |---|---|---|
-| `configPath` | required | Path to a `.claude.json` or `settings.json`-shaped file whose top-level `mcpServers` key holds the map |
-| `include` | every row | Only these server names (map keys) are considered; an empty or omitted list means every row |
+| `configPath` | required | Path to a `.claude.json` or `settings.json`-shaped file whose top-level `mcpServers` key holds the map (a per-project `mcpServers` map, e.g. `.claude.json`'s `projects["<path>"].mcpServers`, is not read — see Known Limitations) |
+| `include` | omitted (every row) | Only these server names (map keys) are considered; omit or pass `null` for "not configured" (every row). An **explicit empty array mounts nothing** — this plugin composes Gate-relevant tools, so the allowlist fails closed rather than meaning "no filter" |
 | `exclude` | `[]` | These server names are never mounted, even when `include` allows them |
 | `toolCallTimeoutMs` | `60000` | Forwarded to every mounted child as its per-tool-call timeout |
-| `connectTimeoutMs` | unset (the `dsh-mcp-client` default) | Forwarded to every mounted child as its connection-handshake deadline, when set |
+| `connectTimeoutMs` | `30000` | Forwarded to every mounted child as its connection-handshake deadline. Every row needs a bound: rows mount concurrently, and one row whose connect hangs (a captive portal, a blackholed firewall) would otherwise never settle its own child plugin's activation |
 | `failOnStartupError` | `false` | Reject this plugin's own activation when any row fails to mount, instead of logging the failure and continuing |
 
 ### Row shapes read from the config file
@@ -61,7 +61,7 @@ Each `mcpServers` entry is read by its `type` field, exactly as Claude Code writ
 
 - `"stdio"` mounts a `dsh-mcp-client` `StdioConfig` — `command`, `args`, `env`, and `cwd` translate directly, with `args` and `env` defaulting to `[]` and `{}` when absent.
 - `"http"` mounts a `dsh-mcp-client` `StreamableHttpConfig` — `url` and `headers` translate directly, with `headers` defaulting to `{}` when absent.
-- `"sse"` is always skipped: `dsh-mcp-client` implements only `stdio` and `streamable-http`. So is any other or missing `type`, and any row that is not a JSON object.
+- A row with **no `type` field at all** but a non-empty `command` is treated as `"stdio"` — the shape Claude Code's own `.mcp.json` documentation allows, where `type` is optional and defaults to stdio. Any other untyped row (no `command`), any `"sse"` row (`dsh-mcp-client` implements only `stdio` and `streamable-http`), any other unrecognized `type`, and any row that is not a JSON object are all skipped with a named reason.
 - The map key becomes the mounted child's `serverName`, so `awake` above registers tools as `mcp__awake__<tool>` — the same name Claude Code and Codex would use for the identical server.
 
 An `env` or `headers` string value containing `${VAR_NAME}` expands from the current process environment at mount time; an unset variable expands to the empty string, never to the literal placeholder. Expanded values are never written to a log line by this package.
@@ -131,6 +131,7 @@ These limits describe what you cannot do with this plugin and when it needs oper
 - **No OAuth** — a row that needs an OAuth flow to reach its server (rather than a static header) mounts as an `http` row with whatever `headers` the config file supplies, and fails to authenticate at connect time; there is no flow this package can drive on the model's or operator's behalf.
 - **No `sse` transport** — `dsh-mcp-client` implements only `stdio` and `streamable-http`; every `sse` row is skipped with a named reason, never attempted. Migrating a server off `sse` is outside this package's scope.
 - **No org-managed server list** — this package reads exactly one local file; a deployment that wants a centrally managed roster needs its own distribution mechanism for that file, or a different config source entirely.
+- **Top-level `mcpServers` only — no per-project rows** — `.claude.json` can also carry a `projects["<path>"].mcpServers` map scoped to one project directory (Claude Code's own per-project server list); this package reads only the file's top-level `mcpServers` key and never looks inside `projects`. A server configured only at project scope needs its own row copied to the top level (or a dedicated `configPath` pointed at a file shaped that way) to be mounted here.
 - **No live reload of the config file** — the file is read once, at plugin activation; editing it afterward has no effect until the plugin (or the Host) reloads.
 - **No secret redaction inside a malformed row's own error text** — this package never interpolates a raw `env` or `header` value into a log line or skip reason itself, but an upstream error thrown by a dependency this package calls (rare, and only for a structurally invalid config value) is logged verbatim; see the composition tests for the boundary this package does control.
 

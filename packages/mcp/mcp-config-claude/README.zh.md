@@ -38,11 +38,11 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `configPath` | 必填 | 指向一个 `.claude.json` 或 `settings.json` 形态文件的路径,其顶层 `mcpServers` 键持有该映射 |
-| `include` | 每一行 | 只考虑这些服务器名(映射键);空列表或省略表示每一行都考虑 |
+| `configPath` | 必填 | 指向一个 `.claude.json` 或 `settings.json` 形态文件的路径,其顶层 `mcpServers` 键持有该映射(不会读取按项目划分的 `mcpServers` 映射,例如 `.claude.json` 的 `projects["<path>"].mcpServers`——见“已知限制”) |
+| `include` | 省略(每一行) | 只考虑这些服务器名(映射键);省略或传入 `null` 表示“未配置”(考虑每一行)。**显式传入空数组则不挂载任何一行**——本插件会组合出具有 Gate 级权限的工具,因此白名单在语义不明时选择失败关闭,而不是被当作“无过滤”|
 | `exclude` | `[]` | 这些服务器名永不挂载,即便 `include` 允许它们 |
 | `toolCallTimeoutMs` | `60000` | 转发给每个已挂载子实例,作为其单次工具调用超时 |
-| `connectTimeoutMs` | 未设置(`dsh-mcp-client` 的默认值) | 设置时转发给每个已挂载子实例,作为其连接握手截止时间 |
+| `connectTimeoutMs` | `30000` | 转发给每个已挂载子实例,作为其连接握手截止时间。每一行都需要一个上限:各行并发挂载,若某一行的连接挂起(如强制门户网络、被防火墙黑洞的连接),否则该行自身子插件的激活将永远无法完成 |
 | `failOnStartupError` | `false` | 任意一行挂载失败时拒绝本插件自身的激活,而不是记录该失败并继续 |
 
 ### 从配置文件读取的行形态
@@ -61,7 +61,7 @@ kind: "package-reference"
 
 - `"stdio"` 挂载一个 `dsh-mcp-client` 的 `StdioConfig`——`command`、`args`、`env`、`cwd` 直接转译,`args` 与 `env` 缺省时分别默认为 `[]` 与 `{}`。
 - `"http"` 挂载一个 `dsh-mcp-client` 的 `StreamableHttpConfig`——`url` 与 `headers` 直接转译,`headers` 缺省时默认为 `{}`。
-- `"sse"` 总是被跳过:`dsh-mcp-client` 只实现了 `stdio` 与 `streamable-http`。任何其他或缺失的 `type`,以及任何不是 JSON 对象的行,同样被跳过。
+- 一行**完全没有 `type` 字段**但 `command` 非空时,会被当作 `"stdio"` 处理——这是 Claude Code 自身 `.mcp.json` 文档所允许的形态,`type` 是可选的,缺省即为 stdio。任何其他未标类型的行(没有 `command`)、任何 `"sse"` 行(`dsh-mcp-client` 只实现了 `stdio` 与 `streamable-http`)、任何其他无法识别的 `type`,以及任何不是 JSON 对象的行,都会被跳过并附带具体原因。
 - 映射键成为已挂载子实例的 `serverName`,因此上面的 `awake` 会把工具注册为 `mcp__awake__<tool>`——与 Claude Code 和 Codex 为同一台服务器所用的名称完全相同。
 
 `env` 或 `headers` 中含有 `${VAR_NAME}` 的字符串值,会在挂载时从当前进程环境展开;未设置的变量展开为空字符串,绝不会展开为字面占位符。展开后的值绝不会被本包写入任何日志行。
@@ -131,6 +131,7 @@ kind: "package-reference"
 - **无 OAuth** ——需要 OAuth 流程(而非静态请求头)才能接入的服务器行,会以 `http` 行的形式挂载,并带上配置文件提供的任意 `headers`,并在连接时鉴权失败;本包无法代表模型或操作者驱动任何此类流程。
 - **无 `sse` 传输** ——`dsh-mcp-client` 只实现了 `stdio` 与 `streamable-http`;每一行 `sse` 都会被以具名原因跳过,绝不会被尝试。把某台服务器迁出 `sse` 不在本包范围内。
 - **无组织级托管服务器列表** ——本包只读取恰好一个本地文件;想要集中管理服务器名单的部署,需要为该文件自备分发机制,或使用完全不同的配置来源。
+- **只读取顶层 `mcpServers`——不读取按项目划分的行** ——`.claude.json` 还可以携带一个限定于单个项目目录的 `projects["<path>"].mcpServers` 映射(Claude Code 自身的按项目服务器列表);本包只读取文件顶层的 `mcpServers` 键,从不查看 `projects` 内部。只在项目级别配置的服务器,需要把该行复制到顶层(或让 `configPath` 指向一个专门以那种形态写出的文件)才能被本包挂载。
 - **配置文件不会实时重载** ——文件只在插件激活时读取一次;之后编辑它不会有任何效果,直到插件(或 Host)重新加载。
 - **格式错误行自身的错误文本中不做二次脱敏** ——本包本身绝不会把原始的 `env` 或 `header` 值拼进日志行或跳过原因,但本包所调用的某个依赖抛出的上游错误(罕见,且仅出现在结构性无效的配置值上)会被原样记录;本包自身实际控制的边界见组合测试。
 
