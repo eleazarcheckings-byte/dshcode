@@ -4,7 +4,7 @@
 
 DSHCode 是一款面向 macOS 和 Windows 的免费开源桌面 AI Agent 应用。它将 DeepSeek 官方开源项目 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Web UI 与插件运行时打包成一个可直接安装的 Electron 应用——无需 Node.js、无需终端、无需命令行。
 
-<p align="center"><a href="https://github.com/whitelonng/dshcode/releases"><img src="https://img.shields.io/github/v/release/whitelonng/dshcode?style=flat-square&label=release" alt="Release"></a> <a href="LICENSE"><img src="https://img.shields.io/github/license/whitelonng/dshcode?style=flat-square" alt="License"></a> <a href="https://github.com/whitelonng/dshcode/releases"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-4D6BFE?style=flat-square" alt="Platform"></a>  <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/powered_by-Saturn%20AI-DDA43A?style=flat-square" alt="Powered by Saturn AI"></a></p>
+<p align="center"><a href="https://github.com/eleazarcheckings-byte/dshcode/releases"><img src="https://img.shields.io/github/v/release/eleazarcheckings-byte/dshcode?style=flat-square&label=release" alt="Release"></a> <a href="LICENSE"><img src="https://img.shields.io/github/license/eleazarcheckings-byte/dshcode?style=flat-square" alt="License"></a> <a href="https://github.com/eleazarcheckings-byte/dshcode/releases"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-4D6BFE?style=flat-square" alt="Platform"></a>  <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/powered_by-Saturn%20AI-DDA43A?style=flat-square" alt="Powered by Saturn AI"></a></p>
 
 <p align="center"><img src="apps/desktop/assets/icon.svg" alt="DSHCode 应用图标" width="180"></p>
 
@@ -58,9 +58,9 @@ DSHCode 继承了 DeepSeek Harness 的完整能力，并加上了开箱即用的
 
 | 平台 | 安装包 |
 |---|---|
-| macOS Apple Silicon | [DSHCode-*-macos-arm64.dmg](https://github.com/whitelonng/dshcode/releases) |
-| macOS Intel | [DSHCode-*-macos-x64.dmg](https://github.com/whitelonng/dshcode/releases) |
-| Windows x64 | [DSHCode-*-win-x64.exe](https://github.com/whitelonng/dshcode/releases) |
+| macOS Apple Silicon | [Saturn-AI-*-mac-arm64.dmg](https://github.com/eleazarcheckings-byte/dshcode/releases) |
+| macOS Intel | [Saturn-AI-*-mac-x64.dmg](https://github.com/eleazarcheckings-byte/dshcode/releases) |
+| Windows x64 | [Saturn-AI-*-win-x64.exe](https://github.com/eleazarcheckings-byte/dshcode/releases) |
 
 每个版本都会随安装包发布 SHA-256 校验和（`SHA256SUMS.txt`）。
 
@@ -78,7 +78,7 @@ DSHCode 继承了 DeepSeek Harness 的完整能力，并加上了开箱即用的
 开发者仍可从仓库源码运行上游 Web 入口：
 
 ```sh
-git clone https://github.com/whitelonng/dshcode.git
+git clone https://github.com/eleazarcheckings-byte/dshcode.git
 cd dshcode
 pnpm install
 pnpm run build
@@ -98,7 +98,7 @@ pnpm dsh web
 ### 构建桌面安装包
 
 ```sh
-git clone https://github.com/whitelonng/dshcode.git
+git clone https://github.com/eleazarcheckings-byte/dshcode.git
 cd dshcode
 pnpm install
 pnpm run desktop:dist

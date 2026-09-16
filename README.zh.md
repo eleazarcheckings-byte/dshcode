@@ -4,7 +4,7 @@ English | [中文](README.md)
 
 DSHCode is a free, open-source desktop AI agent app for macOS and Windows. It wraps the official open-source [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web UI and plugin runtime in a single installable Electron application — no Node.js, no terminal, no CLI required.
 
-<p align="center"><a href="https://github.com/whitelonng/dshcode/releases"><img src="https://img.shields.io/github/v/release/whitelonng/dshcode?style=flat-square&label=release" alt="Release"></a> <a href="LICENSE"><img src="https://img.shields.io/github/license/whitelonng/dshcode?style=flat-square" alt="License"></a> <a href="https://github.com/whitelonng/dshcode/releases"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-4D6BFE?style=flat-square" alt="Platform"></a>  <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/powered_by-Saturn%20AI-DDA43A?style=flat-square" alt="Powered by Saturn AI"></a></p>
+<p align="center"><a href="https://github.com/eleazarcheckings-byte/dshcode/releases"><img src="https://img.shields.io/github/v/release/eleazarcheckings-byte/dshcode?style=flat-square&label=release" alt="Release"></a> <a href="LICENSE"><img src="https://img.shields.io/github/license/eleazarcheckings-byte/dshcode?style=flat-square" alt="License"></a> <a href="https://github.com/eleazarcheckings-byte/dshcode/releases"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-4D6BFE?style=flat-square" alt="Platform"></a>  <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/powered_by-Saturn%20AI-DDA43A?style=flat-square" alt="Powered by Saturn AI"></a></p>
 
 <p align="center"><img src="apps/desktop/assets/icon.svg" alt="DSHCode application icon" width="180"></p>
 
@@ -58,9 +58,9 @@ See the [Web UI guide](docs/user/guide/index.zh.md) for a walkthrough and the [d
 
 | Platform | Package |
 |---|---|
-| macOS Apple Silicon | [DSHCode-*-macos-arm64.dmg](https://github.com/whitelonng/dshcode/releases) |
-| macOS Intel | [DSHCode-*-macos-x64.dmg](https://github.com/whitelonng/dshcode/releases) |
-| Windows x64 | [DSHCode-*-win-x64.exe](https://github.com/whitelonng/dshcode/releases) |
+| macOS Apple Silicon | [Saturn-AI-*-mac-arm64.dmg](https://github.com/eleazarcheckings-byte/dshcode/releases) |
+| macOS Intel | [Saturn-AI-*-mac-x64.dmg](https://github.com/eleazarcheckings-byte/dshcode/releases) |
+| Windows x64 | [Saturn-AI-*-win-x64.exe](https://github.com/eleazarcheckings-byte/dshcode/releases) |
 
 Every release publishes SHA-256 checksums (`SHA256SUMS.txt`) next to the packages.
 
@@ -78,7 +78,7 @@ Install a DSHCode package, then open `DSHCode` from the macOS Applications folde
 Developers can run the upstream Web entry from a repository checkout:
 
 ```sh
-git clone https://github.com/whitelonng/dshcode.git
+git clone https://github.com/eleazarcheckings-byte/dshcode.git
 cd dshcode
 pnpm install
 pnpm run build
@@ -98,7 +98,7 @@ Each launch starts an HTTP service inside the Electron main process. It binds on
 ### Build desktop packages
 
 ```sh
-git clone https://github.com/whitelonng/dshcode.git
+git clone https://github.com/eleazarcheckings-byte/dshcode.git
 cd dshcode
 pnpm install
 pnpm run desktop:dist
