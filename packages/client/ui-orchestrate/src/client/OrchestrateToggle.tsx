@@ -19,6 +19,15 @@ export type OrchestrateToggleProps =
  * /orchestrate on|off through `command.execute`, so the click and the slash
  * command are one path with one logged result. `aria-pressed` reports the
  * state in force (never the queued target).
+ *
+ * Three visually distinct states (izzy, 2026-09-16: "make sure the button
+ * indicates when its on /off it always looks like the same right now"),
+ * none of them color-only: OFF is a hairline outline with a muted "OFF" mono
+ * tag; ON is filled with the accent and an accent-ink "ON" tag; PENDING
+ * layers a dotted ring, colored by `target`, over whichever of the two the
+ * chip is currently painting, with a title that says the change applies
+ * next turn. See `OrchestrateToggle.module.css` for the `off`/`on`/`pending`
+ * contract and the package README's "State contract" section.
  */
 export function OrchestrateToggle({ useProjection, toggle, t }: OrchestrateToggleProps) {
   const orchestrate = useProjection('orchestrate')
@@ -55,9 +64,13 @@ export function OrchestrateToggle({ useProjection, toggle, t }: OrchestrateToggl
     })
   }
 
+  // Off is its own class (not merely the absence of `.on`): the chip must
+  // paint two genuinely different rules, never the same base tinted by one
+  // modifier — the OFF and ON tag text below carries the same distinction in
+  // words, so neither state ever depends on color alone.
   const className = [
     css.chip,
-    active ? css.on : '',
+    active ? css.on : css.off,
     orchestrate.pending ? css.pending : '',
   ].filter(part => part !== '').join(' ')
 
@@ -67,6 +80,9 @@ export function OrchestrateToggle({ useProjection, toggle, t }: OrchestrateToggl
         type="button"
         className={className}
         aria-pressed={active}
+        // The queued target, for the pending ring's color only — never read
+        // by aria-pressed, which always names the state in force.
+        data-target={target ? 'on' : 'off'}
         aria-label={orchestrate.pending
           ? t('toggle.pending.aria')
           : active ? t('toggle.on.aria') : t('toggle.off.aria')}
@@ -82,6 +98,7 @@ export function OrchestrateToggle({ useProjection, toggle, t }: OrchestrateToggl
           <IconBranchOutline16 size={14} />
         </span>
         <span className={css.label}>{t('toggle.label')}</span>
+        <span className={css.tag}>{t(active ? 'toggle.tag.on' : 'toggle.tag.off')}</span>
       </button>
       {error !== null && <span className={css.error} role="status" title={error}>{t('toggle.failed')}</span>}
     </span>

@@ -10,6 +10,11 @@ export const zh = {
   'toggle.pending.aria': '多任务模式将在下一步生效',
   'toggle.pending.title': '多任务模式将在下一步生效',
   'toggle.failed': '切换多任务模式失败',
+  // Doctrine tokens (matching the verdict-card convention): the ON/OFF word
+  // itself stays untranslated in both dictionaries — it is the visible,
+  // color-independent state tag, not prose.
+  'toggle.tag.on': 'ON',
+  'toggle.tag.off': 'OFF',
 } satisfies Record<string, string>
 
 /** The orchestrate namespace key union. */
@@ -25,4 +30,6 @@ export const en = {
   'toggle.pending.aria': 'Multi-task mode changes from the next step',
   'toggle.pending.title': 'Multi-task mode changes from the next step',
   'toggle.failed': 'Failed to switch multi-task mode',
+  'toggle.tag.on': 'ON',
+  'toggle.tag.off': 'OFF',
 } satisfies Record<OrchestrateKey, string>

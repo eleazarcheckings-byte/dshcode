@@ -1,8 +1,18 @@
 /* Multi-task toggle: one quiet pill in the composer tool row, beside the
-   permission trigger and the plan chip. ON borrows the business tint (the mode
-   is in force); OFF is the plain label the idle permission trigger wears. The
-   28px pill, radius, hover, focus ring, and disabled dimming are the shared
-   chip chrome from ui-conversation's PermissionSelect. */
+   permission trigger and the plan chip.
+
+   Three states, three distinct paintings (izzy, 2026-09-16: "make sure the
+   button indicates when its on /off it always looks like the same right
+   now") — never color alone: `off` and `on` are separate rules with their
+   own background AND border, and each carries a mono OFF/ON tag beside the
+   label so a reader who cannot see the fill still reads the state as text.
+   `pending` layers a dashed ring over whichever of the two is currently
+   painted, colored by the queued target (`data-target`), so a flip in
+   flight is legible as "on its way," never as if it had already landed.
+
+   The 28px pill, radius, hover, focus ring, and disabled dimming are the
+   shared chip chrome from ui-conversation's PermissionSelect; the fill,
+   border, and mono tag are this package's own state contract. */
 
 .wrap {
   display: inline-flex;
@@ -12,23 +22,23 @@
 }
 
 .chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  border: none;
   border-radius: 24px;
   corner-shape: round;
   outline: none;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
   font-size: 13px;
   line-height: 20px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease),
+    border-color var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease),
+    color var(--saturn-dur-1, 120ms) var(--saturn-ease-standard, ease);
 }
 
 .chip:hover:not(:disabled) {
@@ -44,11 +54,27 @@
   cursor: default;
 }
 
-/* In force: the tinted pill, the same weight the active plan chip carries. */
-.on,
+/* OFF: a hairline outline on a plain fill — the resting, unmistakably-not-in-force look. */
+.off {
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.off:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* ON: filled with the product accent, ink flipped to read on top of it — the
+   same weight the active plan chip carries, now with no hairline at all. */
+.on {
+  border-color: transparent;
+  background: var(--saturn-accent, #dda43a);
+  color: var(--saturn-void, #0a0a0a);
+}
+
 .on:hover:not(:disabled) {
-  background: var(--dsw-alias-state-business-tertiary);
-  color: var(--dsw-alias-state-business-primary);
+  background: color-mix(in srgb, var(--saturn-accent, #dda43a) 88%, var(--saturn-void, #0a0a0a));
 }
 
 /* A selection queued for the next step is not yet the mode: the dotted label
@@ -56,6 +82,18 @@
 .pending .label {
   text-decoration: underline dotted;
   text-underline-offset: 2px;
+}
+
+/* The queued flip itself: a dashed ring around the chip, colored by the
+   target it is moving toward — never a solid ring, which would read as
+   already sealed. */
+.pending {
+  outline: 1.5px dashed var(--dsw-alias-border-l2);
+  outline-offset: 2px;
+}
+
+.pending[data-target='on'] {
+  outline-color: var(--saturn-accent, #dda43a);
 }
 
 .icon {
@@ -76,17 +114,44 @@
   white-space: nowrap;
 }
 
+/* The state tag: a small mono word ("ON"/"OFF") that carries the state in
+   text, never only in the fill color, at the size a receipt's stamp word
+   uses elsewhere in the product. */
+.tag {
+  flex: 0 0 auto;
+  color: inherit;
+  opacity: 0.75;
+  font-family: var(--saturn-font-mono, var(--ds-font-family-code));
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+}
+
+.on .tag {
+  opacity: 1;
+}
+
 .error {
   color: var(--dsw-alias-state-error-primary);
   font-size: 12px;
   line-height: 18px;
 }
 
-/* Narrow composer: the pill collapses to its glyph, the same 460px cut where
-   the permission and model triggers drop their labels (the row is the size
-   container — InputBar .row). */
+/* Narrow composer: the pill collapses to its glyph and state tag, the same
+   460px cut where the permission and model triggers drop their labels (the
+   row is the size container — InputBar .row). The tag stays: it is the
+   state, not decoration. */
 @container (max-width: 460px) {
   .label {
     display: none;
+  }
+}
+
+/* The color/border shift between states is a state change, not decoration —
+   under reduced motion it is simply immediate. */
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
   }
 }
