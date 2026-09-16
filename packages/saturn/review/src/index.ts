@@ -110,7 +110,7 @@ async function settleReview(run: SubagentRun): Promise<unknown> {
       if (result.stopReason !== 'completed') {
         throw new Error(
           `the review did not finish (${result.stopReason})`
-          + `${result.diagnostic === undefined ? '' : `: ${result.diagnostic}`}`,
+          + (result.diagnostic === undefined ? '' : `: ${result.diagnostic}`),
         )
       }
       if (result.structured === undefined) {
