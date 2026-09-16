@@ -58,7 +58,7 @@ function expandMap(map: Record<string, string> | undefined): Record<string, stri
 function asStringArray(value: unknown): string[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) return undefined
-  return value as string[]
+  return value
 }
 
 /** Narrow an unknown JSON value to a `Record<string, string>`, or `undefined` if it is not one. */
@@ -86,10 +86,12 @@ export function planOneRow(
   row: unknown,
   options: PlanMountsOptions,
 ): { mount: PlannedMount } | { skip: SkippedServer } {
-  // An empty include list means "not configured" (Schemastery resolves an
-  // omitted `z.array(...)` field to `[]`, not `undefined`), so only a
-  // non-empty list narrows the mounted set.
-  if (options.include !== undefined && options.include.length > 0 && !options.include.includes(serverName)) {
+  // `include` is `undefined` only when the config field itself is `null`
+  // (Schemastery's "not configured" sentinel — see index.ts's Config
+  // schema). Any actual array, including an explicitly empty one, narrows
+  // the mounted set — an empty allowlist fails closed and mounts nothing,
+  // since this plugin composes Gate-relevant tools.
+  if (options.include !== undefined && !options.include.includes(serverName)) {
     return { skip: { serverName, reason: 'not in the configured include list' } }
   }
   if (options.exclude?.includes(serverName) === true) {
@@ -108,7 +110,13 @@ export function planOneRow(
   }
 
   const fields = row as Record<string, unknown>
-  const type = fields.type
+  // Claude Code's own `.mcp.json` shape treats `type` as optional and
+  // defaults an untyped row with a `command` to stdio — mirror that so a
+  // canonical `{ "command": "node", "args": [...] }` row isn't dropped.
+  const rawType = fields.type
+  const type = typeof rawType === 'string'
+    ? rawType
+    : (typeof fields.command === 'string' && fields.command.length > 0 ? 'stdio' : rawType)
 
   if (type === 'sse') {
     return {

@@ -55,12 +55,26 @@ export const inject = ['tools']
 /** Default per-tool-call timeout forwarded to every mounted child, mirroring `dsh-mcp-client`'s own default. */
 const DEFAULT_TOOL_CALL_TIMEOUT_MS = 60_000
 
+/**
+ * Default connection-handshake deadline forwarded to every mounted child.
+ * Rows mount concurrently (see `apply`), but each still needs its own bound:
+ * without one, a hanging TCP connect (a captive portal, a blackholed
+ * firewall) never settles `dsh-mcp-client`'s own `connection.ready`, and
+ * that child plugin's `ctx.plugin(...)` await never resolves.
+ */
+const DEFAULT_CONNECT_TIMEOUT_MS = 30_000
+
 /** Config as authored in `cordis.yml`, before Schemastery fills in defaults. */
 export interface ConfigInput {
   /** Path to a Claude-Code-shaped config file (a `.claude.json` or `settings.json`) whose `mcpServers` key holds the map. */
   configPath: string
-  /** Only these server names are mounted; omit to consider every row. */
-  include?: string[]
+  /**
+   * Only these server names are mounted; omit or pass `null` for "not
+   * configured" (every row considered). An explicit empty array mounts
+   * nothing — this plugin composes Gate-relevant tools, so the allowlist
+   * fails closed rather than silently meaning "no filter".
+   */
+  include?: string[] | null
   /** These server names are never mounted, even when `include` allows them. */
   exclude?: string[]
   /** Per-tool-call timeout forwarded to every mounted child, in milliseconds. */
@@ -74,21 +88,21 @@ export interface ConfigInput {
 /** Config after Schemastery resolves defaults. */
 export interface Config {
   readonly configPath: string
-  readonly include?: readonly string[]
+  readonly include: readonly string[] | null
   readonly exclude: readonly string[]
   readonly toolCallTimeoutMs: number
-  readonly connectTimeoutMs?: number
+  readonly connectTimeoutMs: number
   readonly failOnStartupError: boolean
 }
 
 export const Config: z<ConfigInput, Config> = z.object({
   configPath: z.string().required(),
-  include: z.array(String),
+  include: z.union([z.const(null), z.array(String)]).default(null),
   exclude: z.array(String).default([]),
   toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
-  connectTimeoutMs: z.number().step(1).min(1),
+  connectTimeoutMs: z.number().step(1).min(1).default(DEFAULT_CONNECT_TIMEOUT_MS),
   failOnStartupError: z.boolean().default(false),
-}) as unknown as z<ConfigInput, Config>
+})
 
 /** Live status per registration scope, published once `apply` finishes mounting. */
 const liveStatus = new WeakMap<object, McpConfigClaudeStatus>()
@@ -107,10 +121,16 @@ export function getStatus(ctx: Context): McpConfigClaudeStatus | undefined {
 
 /**
  * Read the configured `mcpServers` map, plan which rows to mount, and mount
- * one `dsh-mcp-client` child per planned row. A row's own config error (an
- * invalid `serverName`, a duplicate namespace) is caught and treated exactly
- * like an unreachable server unless `failOnStartupError` is set, in which
- * case this plugin's own activation rejects on the first failure.
+ * one `dsh-mcp-client` child per planned row — concurrently. `ctx.plugin(...)`
+ * for a stdio or http row blocks on that child's own connection handshake
+ * (`dsh-mcp-client`'s `connection.ready`), which only ever times out when
+ * `connectTimeoutMs` is set — mounting sequentially would let one hanging
+ * row (a captive portal, a blackholed firewall) block every row after it,
+ * and this plugin's own activation, indefinitely. A row's own config error
+ * (an invalid `serverName`, a duplicate namespace) is caught and treated
+ * exactly like an unreachable server unless `failOnStartupError` is set, in
+ * which case this plugin's own activation rejects on the first row to fail,
+ * in plan order.
  * @param ctx - Plugin context carrying the tool registry.
  * @param config - Resolved config path, filters, and per-child timeouts.
  */
@@ -119,8 +139,8 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const options: PlanMountsOptions = {
     exclude: config.exclude,
     toolCallTimeoutMs: config.toolCallTimeoutMs,
-    ...(config.include === undefined ? {} : { include: config.include }),
-    ...(config.connectTimeoutMs === undefined ? {} : { connectTimeoutMs: config.connectTimeoutMs }),
+    connectTimeoutMs: config.connectTimeoutMs,
+    ...(config.include === null ? {} : { include: config.include }),
   }
   const plan = planMounts(serverMap, options)
 
@@ -128,19 +148,31 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     ctx.logger.warn(`mcp-config-claude: skipping "${skip.serverName}" — ${skip.reason}`)
   }
 
+  const results = await Promise.allSettled(
+    plan.mounts.map(async planned =>
+      ctx.plugin(mcpClient, { ...planned.config, failOnStartupError: config.failOnStartupError })),
+  )
+
   const mounted: string[] = []
   const failed: SkippedServer[] = []
-  for (const planned of plan.mounts) {
-    try {
-      await ctx.plugin(mcpClient, { ...planned.config, failOnStartupError: config.failOnStartupError })
+  let firstRejection: Error | undefined
+  for (const [index, result] of results.entries()) {
+    const planned = plan.mounts[index]
+    if (planned === undefined) continue
+    if (result.status === 'fulfilled') {
       mounted.push(planned.serverName)
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      failed.push({ serverName: planned.serverName, reason })
-      ctx.logger.error(`mcp-config-claude: failed to mount "${planned.serverName}": ${reason}`)
-      if (config.failOnStartupError) throw error
+      continue
     }
+    const reason = result.reason instanceof Error ? result.reason.message : String(result.reason)
+    failed.push({ serverName: planned.serverName, reason })
+    ctx.logger.error(`mcp-config-claude: failed to mount "${planned.serverName}": ${reason}`)
+    firstRejection ??= result.reason instanceof Error ? result.reason : new Error(reason)
   }
+  if (config.failOnStartupError && firstRejection !== undefined) throw firstRejection
 
-  liveStatus.set(scopeOf(ctx) ?? ctx.root, { configPath: config.configPath, mounted, skipped: plan.skipped, failed })
+  const owner = scopeOf(ctx) ?? ctx.root
+  ctx.effect(() => {
+    liveStatus.set(owner, { configPath: config.configPath, mounted, skipped: plan.skipped, failed })
+    return () => void liveStatus.delete(owner)
+  }, 'mcp-config-claude.status')
 }
