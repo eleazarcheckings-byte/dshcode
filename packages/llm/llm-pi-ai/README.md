@@ -108,6 +108,10 @@ Profiles are re-read once per operation through the optional settings seam: the 
 
 The plugin answers "which models can this provider serve?" for a route a configuration surface is editing or drafting. A route the installed catalog ships is answered from that catalog with no network call; only a route the catalog does not describe is interrogated over the wire (`openai-completions` and `openai-responses` shapes). A named configured route supplies its stored credential and profile `headers` inside the Host, so deployment headers configured through `settings.yaml` or Cordis config reach `GET /models` without becoming discovery-request or Models-page fields; a key typed into the form still wins over the stored credential. The reply is candidate metadata a surface may offer for adoption — nothing is stored, and `settings.yaml` remains the only thing that decides what a route serves.
 
+### Serve a live model list
+
+A declared route that sets `modelsEndpoint: true` serves its models from the endpoint's own `GET {baseURL}/models` (bearer token, cached ten minutes) instead of a static list; its `models` stay as the seed, shown first, served alone until a listing succeeds, and kept with the last good list when a refresh fails, so a picker is never empty. No call is made while the route has no stored credential. An entry carrying a `providers[]` array (the Hugging Face router) is kept only when one provider is `live`; its context window is the largest live `context_length`, and image input is claimed only when `architecture.input_modalities` names `image`. Such a route also accepts ids it does not list: `org/name:<suffix>` keeps the listed model's facts, and any other `org/name[:suffix]` is served with the route's defaults. The base bundle declares `huggingface` this way (`apiKeyEnv: HF_TOKEN`, router `https://router.huggingface.co/v1`, three seeds). Router 401, 402, 403, 404, and 429 answers become `[huggingface:<kind>]` failures with an actionable message on listing, discovery, and chat streams; clients localize them by the tag.
+
 ### Failures and recovery
 
 A route pi-ai does not ship needs `api`, `baseURL`, and a non-empty `models` list; an unserviceable profile is refused where it is written, naming the route and model. Failures carry stable codes: a credential that cannot be used fails with `INVALID_CREDENTIAL` naming the route and reference, a route whose `apiKeyEnv` reference resolves to nothing fails with `MISSING_CREDENTIAL`, an unconfigured model fails with `UNKNOWN_MODEL`, and terminal provider failures distinguish `QUOTA` from transient `RATE_LIMIT`. `GenerateOptions.stop` is rejected with `UNSUPPORTED_OPTION` because pi-ai's common streaming UI cannot guarantee it across providers.
@@ -183,6 +187,20 @@ Provider tokenization governs exact input. Retained images add the stable attach
 #### KV Cache effect
 
 Conversion preserves logical request order, while image handles and offload placeholders add model-visible text. A changed execution-world path rewrites a historical handle and can prevent reuse from that image even when attachment identity and request bytes stay stable. Changing adapter instance, provider, model, or another upstream token has the same suffix effect. Crossing the image bound replaces an earlier image with placeholder text, so reuse ends at that message until the offloaded prefix stabilizes.
+
+### Live model listing
+
+#### What the model sees
+
+Nothing new. The listing is fetched by the Host for pickers and never enters a request; a routing suffix such as `:cheapest` travels only in the request's `model` field, which the router consumes.
+
+#### Token effect
+
+None: no listing text, description line, or provider name is added to the prompt.
+
+#### KV Cache effect
+
+None from the listing itself. Switching the routing suffix or the live provider changes the serving backend, so provider-side prompt caches from the previous backend are not reused.
 
 ### Provider response
 

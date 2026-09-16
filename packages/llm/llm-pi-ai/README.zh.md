@@ -108,6 +108,10 @@ profile 通过可选 settings seam 每次操作重新读取：base 与用户的 
 
 插件会回答"该提供方可以提供哪些模型？"，供配置界面正在编辑或起草的路由使用。已安装目录提供的路由直接由目录回答，不发网络请求；只有目录未描述的路由才会经网络询问（`openai-completions` 与 `openai-responses` 形状）。已配置且具名的路由会在 Host 内部提供已存凭据与 profile `headers`，因此通过 `settings.yaml` 或 Cordis 配置设置的部署标头可以到达 `GET /models`，但不会成为发现请求或 Models 页面的字段；表单中新键入的密钥仍优先于已存凭据。回答是界面可以提供给用户采纳的候选元数据——不存储任何内容，`settings.yaml` 仍然是决定路由服务内容的唯一事实。
 
+### 提供实时模型列表
+
+设置 `modelsEndpoint: true` 的声明路由从端点自身的 `GET {baseURL}/models`（bearer 令牌，缓存十分钟）提供模型，而不是静态列表；其 `models` 作为种子保留：排在最前，在首次列出成功前单独提供，刷新失败时与最后有效列表一起保留，因此选择器永远不会为空。路由没有已存凭据时不发出任何请求。带 `providers[]` 数组的条目（Hugging Face 路由器）只有在某个提供方为 `live` 时才保留；上下文窗口取在线提供方中最大的 `context_length`，只有 `architecture.input_modalities` 列出 `image` 时才声明图片输入。这种路由也接受未列出的 id：`org/name:<后缀>` 沿用已列出模型的事实，其他 `org/name[:后缀]` 以路由默认值提供。基础 bundle 以这种方式声明 `huggingface`（`apiKeyEnv: HF_TOKEN`，路由器 `https://router.huggingface.co/v1`，三个种子）。路由器的 401、402、403、404 与 429 回答在列出、发现与对话流中都会变为带可操作消息的 `[huggingface:<kind>]` 失败；客户端按标签本地化。
+
 ### 失败与恢复
 
 pi-ai 不提供的路由需要 `api`、`baseURL` 与非空 `models` 列表；无法服务的 profile 会在写入处被拒绝，并点名路由与模型。失败携带稳定 code：无法使用的凭据以 `INVALID_CREDENTIAL` 失败并点名路由与引用，`apiKeyEnv` 引用解析为空的路由以 `MISSING_CREDENTIAL` 失败，未配置模型以 `UNKNOWN_MODEL` 失败，终止性提供方失败则区分 `QUOTA` 与暂时性 `RATE_LIMIT`。`GenerateOptions.stop` 以 `UNSUPPORTED_OPTION` 被拒绝，因为 pi-ai 的通用流式 UI 无法跨提供方保证它。
@@ -183,6 +187,20 @@ pi-ai 不提供的路由需要 `api`、`baseURL` 与非空 `models` 列表；无
 #### KV Cache 影响
 
 转换保持逻辑请求顺序，图片句柄与卸载占位符则会添加模型可见文本。即使附件身份与请求字节保持稳定，执行世界路径变化也会改写历史句柄，并可能从该图片起阻止复用。更换适配器实例、提供方、模型或其他上游 token 具有相同的后缀影响。越过图片上限会把较早图片替换为占位文本，因此复用在该消息处结束，直到被卸载前缀稳定。
+
+### 实时模型列表
+
+#### 模型看到什么
+
+没有新内容。列表由 Host 为选择器获取，从不进入请求；`:cheapest` 等路由后缀只出现在请求的 `model` 字段中，由路由器消费。
+
+#### Token 影响
+
+无：列表文本、描述行或提供方名称都不会加入提示词。
+
+#### KV Cache 影响
+
+列表本身无影响。切换路由后缀或在线提供方会改变服务后端，因此之前后端的提供方侧提示缓存不会被复用。
 
 ### 提供方响应
 
