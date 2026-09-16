@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Connect SaturnAI design guidance and evidence-based review tools to the agents in a web or desktop profile. Users opt in during First Light or from Settings → Models, then retain that choice across restarts. Fresh profiles make no connection request. The bundled premium output guides remain available without this service; tool calls send the selected brief and evidence to the configured external endpoint. The package also registers `design_study_references`, a small first-party tool (not an `mcp__saturnai__*` MCP call) that fetches design-library reference thumbnails as real images so the model studies them with eyes; it stays registered independent of the MCP connection lifecycle above.
+Connect SaturnAI design guidance and evidence-based review tools to the agents in a web or desktop profile. Users opt in during First Light or from Settings → Models, then retain that choice across restarts. Fresh profiles make no connection request and register no tool at all. The bundled premium output guides remain available without this service; tool calls send the selected brief and evidence to the configured external endpoint. The package also registers `design_study_references`, a small first-party tool (not an `mcp__saturnai__*` MCP call) that fetches design-library reference thumbnails as real images so the model studies them with eyes; its network path is independent of the `mcp__saturnai__` MCP transport, but its registration tracks the same opt-in state as the connection lifecycle above.
 
 ## Table of Contents
 
@@ -66,7 +66,7 @@ When SaturnAI is connected and its tools are visible in the requesting scope, th
 
 #### Token effect
 
-The connected section adds one fixed paragraph. Available MCP schemas and explicitly requested tool results add their normal context cost. Disabled connections add no `saturn:design-brain` prompt text, but `design_study_references` itself stays registered — its own description carries that fixed cost regardless of connection state, detailed in the next model-context entry below.
+The connected section adds one fixed paragraph. Available MCP schemas and explicitly requested tool results add their normal context cost. Disabled connections add no `saturn:design-brain` prompt text and register no tools at all — `design_study_references` included, per the next model-context entry below — so a never-opted-in profile pays none of this fixed cost.
 
 #### KV Cache effect
 
@@ -80,7 +80,7 @@ The section is stable while connection state and tool visibility stay the same. 
 
 #### Token effect
 
-Fixed tool-schema cost when registered (see Token effect above), plus per call: one summary line per requested slug and one image per fetched thumbnail — bounded by the 1-6 slug limit, so a call costs at most 6 images.
+Fixed tool-schema cost only while registered — the same opt-in gate as the section above, not the connected MCP tool set specifically — plus per call: one summary line per requested slug and one image per fetched thumbnail, bounded by the 1-6 slug limit, so a call costs at most 6 images.
 
 #### KV Cache effect
 
@@ -93,7 +93,7 @@ Each call's result is a genuinely new turn (fetched bytes and image attachment i
 - The endpoint is Host-controlled. Browser users cannot supply arbitrary URLs or read deployment headers through this API.
 - External reviews use caller-supplied evidence. The harness does not silently capture or upload project files, screenshots, or conversation history when connecting.
 - `design_study_references` requires a mounted `ctx.attachments` service; a deployment without one gets a clear per-call error, not a silent no-op. It never falls back to describing an image in text.
-- `design_study_references` always registers — it is not gated behind the `mcp__saturnai__` MCP connection above, since it talks directly to the fixed thumbnail host. It has no toggle of its own yet; disabling it deployment-wide is deferred (would need a settings field mirroring `saturn-design-brain.enabled`).
+- `design_study_references` registers and unregisters with the same opt-in state as the `saturn:design-brain` connection above (`saturn-design-brain.enabled`, or an independent profile row) rather than through the `mcp__saturnai__` MCP transport directly — it talks straight to the fixed thumbnail host over plain HTTPS regardless of MCP connectivity, but a disabled design brain registers neither.
 
 <a id="dev-note"></a>
 ### Dev Note
@@ -101,6 +101,6 @@ Each call's result is a genuinely new turn (fetched bytes and image attachment i
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-The [decision record](../../../.agents/notes/implemented/feature/2026-09-15-host-owned-design-brain.md) explains ownership and the bounded transport deadline. The [study-with-eyes note](../../../.agents/notes/implemented/feature/2026-09-15-design-brain-study-with-eyes.md) explains why `design_study_references` is a first-party tool rather than a hosted MCP call, and why it stays registered independent of the connection lifecycle.
+The [decision record](../../../.agents/notes/implemented/feature/2026-09-15-host-owned-design-brain.md) explains ownership and the bounded transport deadline. The [study-with-eyes note](../../../.agents/notes/implemented/feature/2026-09-15-design-brain-study-with-eyes.md) explains why `design_study_references` is a first-party tool rather than a hosted MCP call, and why its registration tracks the connection lifecycle's opt-in state even though its own network path does not go through that lifecycle.
 
 </details>

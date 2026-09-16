@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-将 SaturnAI 设计指导和基于证据的评审工具连接到 Web 或桌面配置中的智能体。用户可在 First Light 或「设置 → 模型」中选择启用，选择会在重启后保留。新配置不会发起连接请求。内置高品质产出指南无需此服务；工具调用会将选定的需求和证据发送到配置的外部端点。本包还注册了 `design_study_references`——一个独立的一方工具（并非 `mcp__saturnai__*` MCP 调用），它会将设计库参考缩略图作为真实图像取回，让模型用眼睛研究它们；它的注册与上述 MCP 连接生命周期无关，始终保持可用。
+将 SaturnAI 设计指导和基于证据的评审工具连接到 Web 或桌面配置中的智能体。用户可在 First Light 或「设置 → 模型」中选择启用，选择会在重启后保留。新配置不会发起连接请求，也不会注册任何工具。内置高品质产出指南无需此服务；工具调用会将选定的需求和证据发送到配置的外部端点。本包还注册了 `design_study_references`——一个独立的一方工具（并非 `mcp__saturnai__*` MCP 调用），它会将设计库参考缩略图作为真实图像取回，让模型用眼睛研究它们；它的网络路径与 `mcp__saturnai__` MCP 传输无关，但它的注册会跟随与上述连接生命周期相同的开关状态。
 
 ## 目录
 
@@ -66,7 +66,7 @@ Host 拥有一个串行的连接生命周期。成功要求生产 MCP 监督器�
 
 #### Token 影响
 
-连接后的段落增加一段固定文字。可用 MCP schema 和明确请求的工具结果产生正常的上下文成本。停用的连接不增加 `saturn:design-brain` 提示文字，但 `design_study_references` 本身仍保持注册——无论连接状态如何，其自身描述都会产生固定成本，详见下一个模型上下文条目。
+连接后的段落增加一段固定文字。可用 MCP schema 和明确请求的工具结果产生正常的上下文成本。停用的连接不增加 `saturn:design-brain` 提示文字，也不会注册任何工具——`design_study_references` 同样如此，详见下一个模型上下文条目——因此从未启用过的配置不会承担这份固定成本。
 
 #### KV Cache 影响
 
@@ -80,7 +80,7 @@ Host 拥有一个串行的连接生命周期。成功要求生产 MCP 监督器�
 
 #### Token 影响
 
-注册后的固定工具 schema 成本（见上文 Token 影响），加上每次调用：每个请求的 slug 一行摘要，每个成功取回的缩略图一张图像——受 1-6 个 slug 上限约束，因此一次调用最多产生 6 张图像。
+仅在已注册时才产生固定工具 schema 成本——与上文相同的开关状态，而非专指已连接的 MCP 工具集——加上每次调用：每个请求的 slug 一行摘要，每个成功取回的缩略图一张图像，受 1-6 个 slug 上限约束，因此一次调用最多产生 6 张图像。
 
 #### KV Cache 影响
 
@@ -94,7 +94,7 @@ Host 拥有一个串行的连接生命周期。成功要求生产 MCP 监督器�
 - 端点由 Host 控制。浏览器用户不能通过此 API 提供任意 URL 或读取部署请求头。
 - 外部评审使用调用方提供的证据。连接时不会静默捕获或上传项目文件、截图或对话历史。
 - `design_study_references` 需要挂载 `ctx.attachments` 服务；未挂载该服务的部署会收到明确的逐次调用错误，而不是静默空操作。它绝不会退回到用文字描述图像。
-- `design_study_references` 始终注册——它并不受限于上方的 `mcp__saturnai__` MCP 连接，因为它直接与固定的缩略图主机通信。它目前还没有自己的开关；按部署整体停用该工具尚属后续工作（需要一个类似 `saturn-design-brain.enabled` 的设置字段）。
+- `design_study_references` 的注册与注销跟随与上方 `saturn:design-brain` 连接相同的开关状态（`saturn-design-brain.enabled`，或存在一个独立的 profile 行），而非直接绑定 `mcp__saturnai__` MCP 传输——无论 MCP 是否连接，它都通过普通 HTTPS 直接与固定的缩略图主机通信，但设计大脑处于禁用状态时两者都不会注册。
 
 <a id="dev-note"></a>
 ### 开发备注
@@ -102,6 +102,6 @@ Host 拥有一个串行的连接生命周期。成功要求生产 MCP 监督器�
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
-[决策记录](../../../.agents/notes/implemented/feature/2026-09-15-host-owned-design-brain.zh.md)解释了所有权和有界传输期限。[用眼睛研究的说明](../../../.agents/notes/implemented/feature/2026-09-15-design-brain-study-with-eyes.zh.md)解释了为何 `design_study_references` 是一方工具而非托管 MCP 调用，以及为何它的注册与连接生命周期无关。
+[决策记录](../../../.agents/notes/implemented/feature/2026-09-15-host-owned-design-brain.zh.md)解释了所有权和有界传输期限。[用眼睛研究的说明](../../../.agents/notes/implemented/feature/2026-09-15-design-brain-study-with-eyes.zh.md)解释了为何 `design_study_references` 是一方工具而非托管 MCP 调用，以及为何它的注册会跟随连接生命周期的开关状态，即便它自身的网络路径并不经过该生命周期。
 
 </details>
