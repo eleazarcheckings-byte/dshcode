@@ -5,41 +5,92 @@
 // canonical source both assets/background-runner.js (generated -- see
 // scripts/backgroundRunnerBuild.mjs) and this file import, so a fix here is
 // a fix there too.
+//
+// Mars r3 (M3-apps-mobile-r3.md) R3-F1: the tick's streaming
+// `response.body.getReader()` read is unreachable on iOS --
+// @capacitor/background-runner's JSResponse (its own shipped Swift source,
+// JSResponse.swift) exposes only ok/status/url/text()/json(), and its fetch
+// resolves only once the whole body has buffered (JSFetch.swift), so a
+// fetch against the host's never-closing SSE stream never resolves at all.
+// `parseSseFrames` (the SSE-frame parser the old streaming read used) is
+// gone with that path; the tick now consumes the bounded replay contract
+// (SPEC.md §8) with a single `response.json()` per page instead.
 import { describe, expect, it } from 'vitest'
 import {
   compareEventIds,
   deepLinkForBackgroundEvent,
   hashToNotificationId,
+  hasReplayGap,
   isNewerEventId,
+  isReplayTruncated,
   mapBackgroundEvent,
-  parseSseFrames,
+  parseReplayEvents,
+  resolveReplayCursor,
 } from '../src/lib/backgroundEventsCore.js'
 
-describe('parseSseFrames', () => {
-  it('parses a real SSE-framed payload (id/event/data lines, blank-line separated)', () => {
-    const payload =
-      'id: 7\nevent: approval\ndata: {"id":"7","type":"approval","title":"","body":"needs you","at":"2026-09-15T00:00:00.000Z"}\n\n' +
-      'id: 8\nevent: verdict\ndata: {"id":"8","type":"verdict","title":"","body":"Verdict PASS on run 4","at":"2026-09-15T00:00:01.000Z"}\n\n'
-    const events = parseSseFrames(payload)
-    expect(events).toHaveLength(2)
-    expect(events[0]).toMatchObject({ id: '7', type: 'approval' })
-    expect(events[1]).toMatchObject({ id: '8', type: 'verdict' })
+describe('parseReplayEvents -- GET .../events/replay JSON shape', () => {
+  it('reads the `events` array off a well-formed replay body', () => {
+    const payload = { events: [{ id: '11', type: 'fleet' }], newest: '11', truncated: false }
+    expect(parseReplayEvents(payload)).toEqual([{ id: '11', type: 'fleet' }])
   })
 
-  it('parses a bare JSON array (a poll-friendly host)', () => {
-    const events = parseSseFrames('[{"id":"1","type":"fleet","title":"t","body":"b"}]')
-    expect(events).toEqual([{ id: '1', type: 'fleet', title: 't', body: 'b' }])
+  it('returns an empty array when `events` is missing, not an array, or the payload itself is not an object', () => {
+    expect(parseReplayEvents({ newest: '1' })).toEqual([])
+    expect(parseReplayEvents({ events: 'not-an-array' })).toEqual([])
+    expect(parseReplayEvents(null)).toEqual([])
+    expect(parseReplayEvents(undefined)).toEqual([])
+    expect(parseReplayEvents('[]')).toEqual([])
   })
 
-  it('skips a malformed or truncated data line instead of throwing', () => {
-    const payload = 'data: {not json\n\ndata: {"id":"1"}\n\n'
-    expect(() => parseSseFrames(payload)).not.toThrow()
-    expect(parseSseFrames(payload)).toEqual([{ id: '1' }])
+  it('never throws on a malformed payload', () => {
+    expect(() => parseReplayEvents(42)).not.toThrow()
+    expect(() => parseReplayEvents([])).not.toThrow()
+  })
+})
+
+describe('hasReplayGap / isReplayTruncated -- the contract flags', () => {
+  it('detects `gap: true` when the requested `after` was older than the ring\'s oldest retained id', () => {
+    expect(hasReplayGap({ events: [], newest: '50', gap: true })).toBe(true)
+    expect(hasReplayGap({ events: [], newest: '50' })).toBe(false)
+    expect(hasReplayGap(null)).toBe(false)
   })
 
-  it('returns an empty array for an empty payload', () => {
-    expect(parseSseFrames('')).toEqual([])
-    expect(parseSseFrames('   ')).toEqual([])
+  it('detects `truncated: true` when more than `limit` events were available', () => {
+    expect(isReplayTruncated({ events: [], newest: '50', truncated: true })).toBe(true)
+    expect(isReplayTruncated({ events: [], newest: '50', truncated: false })).toBe(false)
+    expect(isReplayTruncated(undefined)).toBe(false)
+  })
+})
+
+describe('resolveReplayCursor -- advancing `lastSeen` after a page (truncated paging)', () => {
+  it('takes the host-reported `newest` when it is at or ahead of what this page actually scheduled', () => {
+    expect(resolveReplayCursor('12', '10')).toBe('12')
+    expect(resolveReplayCursor('12', '12')).toBe('12')
+  })
+
+  it('falls back to the observed id when `newest` is missing or malformed, never regressing the cursor', () => {
+    expect(resolveReplayCursor(undefined, '10')).toBe('10')
+    expect(resolveReplayCursor(null, '10')).toBe('10')
+    expect(resolveReplayCursor('9', '10')).toBe('10')
+  })
+
+  it('takes the reported `newest` when nothing on this page advanced the observed id (e.g. an empty page)', () => {
+    expect(resolveReplayCursor('20', '')).toBe('20')
+  })
+
+  it('models one truncated-paging tick: two 100-row pages, `after` advancing between them', () => {
+    const page1 = { events: [{ id: '101' }, { id: '102' }], newest: '102', truncated: true }
+    const page2 = { events: [{ id: '103' }], newest: '103', truncated: false }
+    let cursor = '100'
+    for (const page of [page1, page2]) {
+      let observed = cursor
+      for (const event of parseReplayEvents(page)) {
+        if (compareEventIds(event.id, observed) > 0) observed = event.id
+      }
+      cursor = resolveReplayCursor(page.newest, observed)
+      if (!isReplayTruncated(page)) break
+    }
+    expect(cursor).toBe('103')
   })
 })
 
