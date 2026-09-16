@@ -8,7 +8,7 @@ import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import ApprovalService, { setApprovalPolicy, type ApprovalOutcome, type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import ToolRuntime, { defineContentToolFixture, type PreToolDecision } from '@deepseek-ai/dsh-tools'
-import { approveEscalation, type SandboxMode } from '@deepseek-ai/dsh-sandbox'
+import { approveEscalation } from '@deepseek-ai/dsh-sandbox'
 import * as Gates from '../src/index.ts'
 import type { Config } from '../src/index.ts'
 
@@ -79,7 +79,7 @@ async function harness(config: Config = {}, options: { approval?: { policy?: 'as
           {
             requestedMode: args.sandbox_permissions,
             justification: args.justification ?? 'needed',
-            effectiveMode: 'workspace-write' as SandboxMode,
+            effectiveMode: 'workspace-write',
             subject: 'command',
           },
           {
