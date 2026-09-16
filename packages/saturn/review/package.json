@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-review",
   "description": "Independent review of a session's definition of done: a fresh reviewer subagent, the six-criterion rubric, and the countersign it mints on PASS",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

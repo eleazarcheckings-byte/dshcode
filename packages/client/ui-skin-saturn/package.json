@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-client-ui-skin-saturn",
   "description": "Saturn Premium skin for the dsh web GUI: Grok-grade near-black surfaces, hairline strokes, monochrome neutrals with a Saturn-gold accent",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

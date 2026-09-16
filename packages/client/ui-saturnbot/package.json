@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-client-ui-saturnbot",
   "description": "SaturnBot operations dashboard and separate-window launcher",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

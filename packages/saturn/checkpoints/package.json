@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-checkpoints",
   "description": "Per-session code checkpoints: a content-addressed snapshot of the files a turn mutates, the `checkpoints` projection, and the /checkpoint restore command",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

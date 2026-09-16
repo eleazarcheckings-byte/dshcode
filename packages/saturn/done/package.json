@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-done",
   "description": "Per-session definition of done: the `done` projection, the `done:policy` prompt section, the /done command, and the set_definition_of_done tool",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

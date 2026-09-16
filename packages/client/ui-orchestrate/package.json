@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-client-ui-orchestrate",
   "description": "Multi-task toggle for the composer tool row: the conversation.input.left seat over the orchestrate projection and the /orchestrate command channel",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "files": [

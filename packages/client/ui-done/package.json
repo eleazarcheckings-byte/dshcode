@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-client-ui-done",
   "description": "Definition-of-done chip for the Session header: the conversation.session.header.utilities seat over the done projection and the /done command channel, with the turn receipt and checkpoints behind a click",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "files": [

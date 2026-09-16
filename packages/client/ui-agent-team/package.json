@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-client-ui-agent-team",
   "description": "Web Agent Teams roster, task board, and teammate navigation",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",

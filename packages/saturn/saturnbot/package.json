@@ -1,6 +1,6 @@
 {
   "name": "@saturnai/dsh-saturnbot",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "description": "Persistent role-bound SaturnBot execution cycles, approvals, and typed business tools",
   "type": "module",
   "license": "MIT",

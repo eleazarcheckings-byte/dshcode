@@ -1,6 +1,6 @@
 {
   "name": "@saturnai/dsh-remote-access",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "description": "Opt-in remote access to the running harness: a pinned-certificate LAN listener or a bring-your-own cloudflared tunnel, device-token pairing, and a notification stream",
   "type": "module",
   "license": "MIT",

@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-client-ui-fleet",
   "description": "Fleet route surface: one fact-derived line per delegated worker, in the composer's ambient dock, over the session list's subagent lineage, pending interactions, and background jobs",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "files": [

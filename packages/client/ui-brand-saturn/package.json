@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-client-ui-brand-saturn",
   "description": "Saturn AI brand occupants for the dsh Web client brand slots (sidebar mark/name, conversation hero mark)",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

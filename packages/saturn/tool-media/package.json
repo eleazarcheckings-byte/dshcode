@@ -1,7 +1,7 @@
 {
   "name": "@saturnai/dsh-tool-media",
   "description": "Model-facing media generation (image/video/audio, motion-transfer) over ctx.media: gemini, openai, and higgsfield providers behind one seam, gated by a spend-approval prompt before any network call",
-  "version": "0.1.0",
+  "version": "0.1.2-alpha.4",
   "publishConfig": {
     "access": "public"
   },
