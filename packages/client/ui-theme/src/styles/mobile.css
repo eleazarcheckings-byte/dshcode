@@ -214,6 +214,13 @@
     display: none;
   }
 
+  /* The SaturnBot launcher shares that corner. Its dashboard is a separate
+     desktop window, and a phone reaches SaturnBot through the companion app's
+     notifications instead, so the seat stands down with the lamp. */
+  [data-shell-frame][data-mobile] [data-saturnbot-launcher] {
+    display: none;
+  }
+
   [data-shell-frame][data-mobile] [data-composer-seat] {
     /* The seat is sticky at the scrollport floor; padding lifts its content
        clear of the home indicator and of the band the keyboard covers,
