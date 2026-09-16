@@ -104,6 +104,16 @@ export abstract class ReleaseFamily {
   /** Repository-relative glob patterns selecting this family's manifests. */
   abstract readonly patterns: readonly string[]
 
+  /**
+   * The npm scopes this family publishes under, without the trailing slash.
+   *
+   * A member outside them is a defect rather than a name this release can
+   * carry: the scope decides which organization's credentials publish it and
+   * whether a consumer can resolve it at all, so a manifest the glob reached
+   * but no scope claims means the glob and the publish set have drifted apart.
+   */
+  abstract readonly scopes: readonly string[]
+
   /** Git tag prefix this family publishes from. */
   abstract readonly tagPrefix: string
 
@@ -131,7 +141,9 @@ export abstract class ReleaseFamily {
       const name = requireString(manifest, 'name', normalized)
       const version = requireString(manifest, 'version', normalized)
       if (name === WORKSPACE_ROOT_PACKAGE) throw new Error(`${normalized} selected the workspace root`)
-      if (!name.startsWith('@deepseek-ai/')) throw new Error(`${normalized} must name an @deepseek-ai package`)
+      if (!this.scopes.some(scope => name.startsWith(`${scope}/`))) {
+        throw new Error(`${normalized} must name a package in ${this.scopes.join(' or ')}`)
+      }
       if (seen.has(name)) throw new Error(`${name} appears twice in release family ${this.id}`)
       seen.add(name)
       members.push({
@@ -321,6 +333,15 @@ export abstract class ReleaseFamily {
 class DshFamily extends ReleaseFamily {
   readonly id = 'dsh'
   readonly patterns = ['packages/!(experimental)/*/package.json', 'apps/cli/package.json', 'apps/web/package.json'] as const
+
+  /**
+   * Both product scopes, because the harness and the Saturn layer publish as
+   * one payload: `@deepseek-ai/dsh-base` and `@deepseek-ai/dsh-web-app` install
+   * `@saturnai` packages, so a release that named only the harness scope would
+   * publish packages whose own trees cannot be assembled.
+   */
+  readonly scopes = ['@deepseek-ai', '@saturnai'] as const
+
   readonly tagPrefix = 'dsh-v'
 
   /** Require current artifacts from a complete official client build. */
@@ -372,6 +393,10 @@ class DshFamily extends ReleaseFamily {
 class VendorFamily extends ReleaseFamily {
   readonly id = 'vendor'
   readonly patterns = ['vendor/*/package.json'] as const
+
+  /** One scope: the rescope that decoupled these from upstream named exactly this one. */
+  readonly scopes = ['@deepseek-ai'] as const
+
   readonly tagPrefix = 'vendor-'
 
   /**
