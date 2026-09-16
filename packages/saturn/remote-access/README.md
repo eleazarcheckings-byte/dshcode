@@ -52,6 +52,14 @@ The pairing contract, which the mobile companion implements verbatim:
 
 The device posts `{ token, device: { name, platform } }` to `POST <url>/saturn/remote/pair` once and receives `{ deviceToken, sessionCookieName, device }`. Every later request carries `Authorization: Bearer <deviceToken>`; because a WebView cannot attach that header to the subresource loads its document then makes, an authenticated request also leaves with the same credential planted as an HttpOnly cookie under `sessionCookieName`. `GET <url>/saturn/remote/events` is the notification stream, `GET <url>/saturn/remote/devices` lists paired devices, and `DELETE <url>/saturn/remote/devices/<id>` revokes one. Everything else is proxied to the loopback web server.
 
+`GET <url>/saturn/remote/events/replay?after=<id>&limit=<1..200>` is the same notifications read rather than pushed, for a device an operating system would not keep a socket open for. It answers a cursor:
+
+```json
+{ "events": [], "newest": "12", "truncated": false }
+```
+
+`events` carries the frames whose ids are strictly greater than `after`, oldest first and byte-identical to what the stream would have delivered; `after` defaults to `0` and `limit` to `100`. `newest` is the newest id the host still holds, or `after` itself when there is nothing newer. `truncated` says more than `limit` were available, so the device asks again from the last id it read. When the ring had already evicted frames the cursor asked for, the window starts at the oldest frame still held and the answer adds `"gap": true` — the one fact a cursor cannot infer for itself. The response is `application/json` with a `Content-Length`, it carries no heartbeat, and it ends. Authentication is the stream's: a bearer device token or the device session cookie, 401 without one. An `after` that is not a whole number from zero up, or a `limit` outside 1–200, is a 400 rather than a guess.
+
 Tunnel mode spawns `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:<proxy port>` when a `cloudflared` is already on `PATH`. It is never fetched: when none is installed the status reports `tunnel-missing` and the Settings page says where to get one.
 
 <a id="understand-the-implementation"></a>
@@ -97,6 +105,7 @@ None. Remote access constructs no model request and changes no assembled prompt,
 - **The device cookie carries the device token itself.** It is the same secret the device already holds, sent over the same transport, and marked `HttpOnly`; a separate server-side session id would add indirection without reducing exposure, and is deferred.
 - **Only IPv4 addresses reach the certificate.** An IPv6-only network cannot be advertised, and the published address is loopback with `issue: 'no-lan-address'`.
 - **A lapsed upstream session answers 503, not 401.** The edge re-runs the exchange for the next request rather than replaying the current one, because replay would require buffering request bodies that may be hundreds of megabytes.
+- **Replay reaches 64 frames back and no further.** The ring is in memory and bounded, so a device that was away long enough is told `"gap": true` and starts from the oldest frame still held rather than being handed a false complete history. A durable notification log is deferred.
 - **Tunnel mode publishes a quick tunnel.** Its hostname changes on every start, so a paired device pinned to the previous address must be re-pointed; named tunnels are deferred.
 - **cloudflared is never installed for the user.** Downloading and executing a network binary on someone's machine is their decision; the status reports `tunnel-missing` and stops.
 

@@ -23,6 +23,18 @@ export interface RemoteEventInput {
   sessionId?: string
 }
 
+/** What the ring can still tell a device that asks for everything after a cursor. */
+export interface EventReplay {
+  /** The frames newer than the cursor, oldest first, at most `limit` of them. */
+  events: RemoteEvent[]
+  /** The newest id the ring holds, or the cursor itself when nothing is newer. */
+  newest: string
+  /** Whether more frames than `limit` were available. */
+  truncated: boolean
+  /** Whether frames the cursor asked for had already been evicted. */
+  gap: boolean
+}
+
 /** Serialize one frame in the Server-Sent Events wire format. */
 export function serializeEvent(event: RemoteEvent): string {
   return `id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`
@@ -78,6 +90,29 @@ export class EventBus {
     }
     this.sinks.add(sink)
     return () => { this.sinks.delete(sink) }
+  }
+
+  /**
+   * Answer a cursor out of the ring, for a device that could not hold a stream
+   * open. The same frames `attach` would have replayed, read rather than
+   * pushed, and with the two facts a cursor cannot infer on its own: that the
+   * window was too small, and that the backlog it wanted had already gone.
+   * @param after - the last frame id the device saw; zero asks from the start.
+   * @param limit - the most frames to return.
+   * @returns the window, plus how far ahead the host is.
+   */
+  replay(after: number, limit: number): EventReplay {
+    const pending = this.ring.filter(entry => Number(entry.id) > after)
+    const oldest = Number(this.ring.at(0)?.id ?? 0)
+    const newest = Number(this.ring.at(-1)?.id ?? 0)
+    return {
+      events: pending.slice(0, limit),
+      newest: String(newest > after ? newest : after),
+      truncated: pending.length > limit,
+      // Contiguity, not emptiness: a gap exists only when the frame the device
+      // asked to continue from is older than the oldest one still held.
+      gap: this.ring.length > 0 && oldest > after + 1,
+    }
   }
 
   /** How many device streams are attached. */

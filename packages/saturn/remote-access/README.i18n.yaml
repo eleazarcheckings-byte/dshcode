@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/saturn/remote-access/README.md
-README.md: a5b7af682606e71300071eabfb2b5c001a3f1b6a
-README.zh.md: c54cf7e76db66256f274650cb440ab49625831c2
+README.md: 85e26f5a7e5f3b5e25b4a0a1680556fc5c558c99
+README.zh.md: 13a49f468c4add92cc5cdef3137f8a0867b3816e

@@ -52,6 +52,14 @@ kind: "package-reference"
 
 设备向 `POST <url>/saturn/remote/pair` 提交一次 `{ token, device: { name, platform } }`，得到 `{ deviceToken, sessionCookieName, device }`。此后每个请求携带 `Authorization: Bearer <deviceToken>`；由于 WebView 无法为文档后续发起的子资源请求附加该请求头，通过鉴权的请求还会把同一凭据以 `HttpOnly` Cookie 的形式写回，名称即 `sessionCookieName`。`GET <url>/saturn/remote/events` 是通知流，`GET <url>/saturn/remote/devices` 列出已配对设备，`DELETE <url>/saturn/remote/devices/<id>` 吊销其中之一。其余请求一律代理至回环 Web 服务器。
 
+`GET <url>/saturn/remote/events/replay?after=<id>&limit=<1..200>` 提供的是同样的通知，只是由设备主动读取而非被推送，面向那些操作系统不会为其保持长连接的设备。它回答一个游标：
+
+```json
+{ "events": [], "newest": "12", "truncated": false }
+```
+
+`events` 携带 id 严格大于 `after` 的帧，自旧至新，与通知流会投递的内容逐字节一致；`after` 默认为 `0`，`limit` 默认为 `100`。`newest` 是主机仍持有的最新 id；若没有更新的帧，则原样回传 `after`。`truncated` 表示可用帧多于 `limit`，设备应以读到的最后一个 id 再问一次。若环形缓冲区已经淘汰了该游标索要的帧，则窗口自仍然保留的最旧一帧开始，并在应答中加上 `"gap": true`——这是游标自身无从推断的唯一事实。应答为 `application/json` 且带 `Content-Length`，不含心跳，并且会结束。鉴权与通知流相同：Bearer 设备令牌或设备会话 Cookie，二者皆无则 401。`after` 不是从零起的整数，或 `limit` 落在 1–200 之外，一律返回 400，而不去猜测。
+
 当 `PATH` 中已存在 `cloudflared` 时，隧道模式会启动 `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:<代理端口>`。它从不自行获取该程序：若未安装，状态会报告 `tunnel-missing`，设置页面会说明从何处获取。
 
 <a id="understand-the-implementation"></a>
@@ -97,6 +105,7 @@ None, as this package carries transport and device state only; it registers no t
 - **设备 Cookie 承载的就是设备令牌本身。** 它是设备已经持有的同一份机密，经由同一条传输发送，并标记为 `HttpOnly`；引入独立的服务端会话 id 只会增加一层间接而不减少暴露面，故留待后续。
 - **只有 IPv4 地址会进入证书。** 纯 IPv6 网络无法被公布，此时发布的地址为回环地址，并附带 `issue: 'no-lan-address'`。
 - **上游会话失效时返回 503 而非 401。** 边缘为下一个请求重新执行交换，而不重放当前请求，因为重放需要缓冲可能达数百兆字节的请求体。
+- **回放最多回溯 64 帧，不再更远。** 该环形缓冲区位于内存之中且有界，因此离开足够久的设备会被告知 `"gap": true`，并自仍然保留的最旧一帧开始，而不是拿到一份虚假的完整历史。持久化的通知日志属于后续工作。
 - **隧道模式发布的是快速隧道。** 其主机名每次启动都会变化，因此固定在旧地址上的已配对设备需要重新指向；具名隧道属于后续工作。
 - **绝不代用户安装 cloudflared。** 在他人机器上下载并执行一个联网二进制程序应由他本人决定；状态只报告 `tunnel-missing` 并就此停止。
 

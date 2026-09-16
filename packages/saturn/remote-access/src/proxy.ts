@@ -35,6 +35,8 @@ const STRIPPED_RESPONSE_HEADERS = new Set([
 const REMOTE_PREFIX = '/saturn/remote'
 const MAX_PAIR_BODY_BYTES = 4096
 const HEARTBEAT_MS = 25_000
+const REPLAY_DEFAULT_LIMIT = 100
+const REPLAY_MAX_LIMIT = 200
 const DEVICE_TOKEN_MAX_AGE_SECONDS = 400 * 24 * 60 * 60
 
 /** Everything the edge needs from the host it fronts. */
@@ -108,6 +110,22 @@ async function readBody(req: IncomingMessage, limit: number): Promise<string> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Read one whole-number query parameter. A device's cursor is either a number
+ * the host wrote or it is a mistake, so nothing is coerced and nothing is
+ * clamped: `undefined` means absent, `null` means the caller asked for
+ * something this route will not serve.
+ */
+function wholeParam(query: URLSearchParams, name: string, min: number, max: number): number | null | undefined {
+  const values = query.getAll(name)
+  if (values.length === 0) return undefined
+  if (values.length > 1) return null
+  const raw = values[0] ?? ''
+  if (!/^\d{1,15}$/u.test(raw)) return null
+  const value = Number(raw)
+  return value >= min && value <= max ? value : null
 }
 
 /**
@@ -211,7 +229,8 @@ export class RemoteProxy {
       text(res, 403, 'forbidden\n')
       return
     }
-    const path = new URL(req.url ?? '/', 'http://saturn.invalid').pathname
+    const target = new URL(req.url ?? '/', 'http://saturn.invalid')
+    const path = target.pathname
     if (path === `${REMOTE_PREFIX}/pair`) {
       await this.pair(req, res)
       return
@@ -220,6 +239,10 @@ export class RemoteProxy {
       const device = this.device(req)
       if (device === undefined) {
         text(res, 401, 'pair this device first\n')
+        return
+      }
+      if (path === `${REMOTE_PREFIX}/events/replay`) {
+        this.replay(req, res, target.searchParams)
         return
       }
       if (path === `${REMOTE_PREFIX}/events` && req.method === 'GET') {
@@ -291,6 +314,34 @@ export class RemoteProxy {
       this.options.journal.record('pairing-refused', error.message, this.options.now())
       json(res, 401, { error: error.message })
     }
+  }
+
+  /**
+   * Answer a paired device's cursor out of the notification ring. The stream
+   * is the live channel and this is the same content read on demand: a phone
+   * that was asleep, or that a platform refused to keep a socket open for,
+   * catches up with one finite response that ends.
+   */
+  private replay(req: IncomingMessage, res: ServerResponse, query: URLSearchParams): void {
+    if (req.method !== 'GET') {
+      text(res, 405, 'read the replay with GET\n')
+      return
+    }
+    const after = wholeParam(query, 'after', 0, Number.MAX_SAFE_INTEGER)
+    const limit = wholeParam(query, 'limit', 1, REPLAY_MAX_LIMIT)
+    if (after === null || limit === null) {
+      json(res, 400, { error: 'after is a whole event id from zero up, and limit is between 1 and 200' })
+      return
+    }
+    const caught = this.options.bus.replay(after ?? 0, limit ?? REPLAY_DEFAULT_LIMIT)
+    json(res, 200, {
+      events: caught.events,
+      newest: caught.newest,
+      truncated: caught.truncated,
+      // Only stated when true: a device that never sees the key was never
+      // missing anything, and the absent case needs no vocabulary.
+      ...caught.gap ? { gap: true } : {},
+    })
   }
 
   /** Hold one Server-Sent Events stream open for a paired device. */
