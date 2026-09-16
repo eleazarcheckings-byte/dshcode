@@ -143,7 +143,12 @@ export function displayFailure(failure: unknown): DisplayFailure {
   const code = typeof record.code === 'string' ? record.code : undefined
   // Provider AUTH messages may echo a masked or partially preserved credential.
   // Keep the raw diagnostic in the Session log, but never retain it in UI state.
-  if (code === 'AUTH') return { code, message: '' }
+  // The Hugging Face router tags a 401 `[huggingface:unauthorized]`; that tag
+  // alone (never the text after it) is safe to keep so Chat can localize it.
+  if (code === 'AUTH') {
+    const message = typeof record.message === 'string' ? record.message : ''
+    return { code, message: message.startsWith('[huggingface:unauthorized]') ? '[huggingface:unauthorized]' : '' }
+  }
   return {
     ...(code === undefined ? {} : { code }),
     message: typeof record.message === 'string' ? record.message : JSON.stringify(failure),

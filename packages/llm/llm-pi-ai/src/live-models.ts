@@ -237,7 +237,7 @@ const FAILURES: Readonly<Record<number, { kind: RouterFailureKind; code: string;
   403: {
     kind: 'gated',
     code: ACCESS_DENIED_CODE,
-    text: 'this model is gated; accept its license on huggingface.co with the account that owns the token',
+    text: 'access refused: the model is gated (accept its license on huggingface.co) or the token lacks the "Make calls to Inference Providers" permission',
   },
   404: {
     kind: 'notFound',

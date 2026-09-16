@@ -200,7 +200,7 @@ export const en = {
   'hf.billingLink': 'Add credits',
   'hf.error.unauthorized': 'The Hugging Face token is invalid or lacks the "Make calls to Inference Providers" permission.',
   'hf.error.credits': 'Hugging Face credits are used up.',
-  'hf.error.gated': 'This model is gated — accept its license on huggingface.co first.',
+  'hf.error.gated': 'Hugging Face refused access: the model is gated (accept its license on huggingface.co) or the token lacks the "Make calls to Inference Providers" permission.',
   'hf.error.notFound': 'Model not found, or no provider is serving it right now.',
   'hf.error.rateLimited': 'Hugging Face is rate limiting requests — try again shortly.',
 }
@@ -408,7 +408,7 @@ export const zh: { [Key in keyof typeof en]: string } = {
   'hf.billingLink': '充值额度',
   'hf.error.unauthorized': 'Hugging Face 令牌无效，或缺少“调用 Inference Providers”权限。',
   'hf.error.credits': 'Hugging Face 额度已用完。',
-  'hf.error.gated': '该模型需授权：请先在 huggingface.co 上接受其许可协议。',
+  'hf.error.gated': 'Hugging Face 拒绝访问：该模型需授权（请在 huggingface.co 上接受其许可协议），或令牌缺少“调用 Inference Providers”权限。',
   'hf.error.notFound': '找不到该模型，或当前没有可用的服务商。',
   'hf.error.rateLimited': 'Hugging Face 限流中，请稍后重试。',
 }
