@@ -300,14 +300,17 @@ const DESCRIPTION =
 
 /**
  * Register `design_study_references` on `ctx.tools`. Independent of the `mcp__saturnai__*`
- * connection lifecycle in `./index.ts`: this tool talks straight to the public thumbnail host, so
- * it stays available whether or not the MCP connection is live.
+ * connection lifecycle in `./index.ts` in the sense that it talks straight to the public
+ * thumbnail host rather than through the MCP transport — but its *registration* is gated by
+ * `./index.ts`'s opt-in state (`DesignBrainService.syncStudyTool`), so a disabled design brain
+ * does not pay the tool-schema token cost for a tool with no sanctioned slug source.
  * @param ctx - registrant context; `tools` must already be injected (design-brain declares it).
  * @param options - the deployment's thumbnail host base URL (tests point this at a local fixture).
+ * @returns a disposer that unregisters the tool; the caller owns the tool's lifetime.
  */
-export function registerStudyReferencesTool(ctx: Context, options: { thumbnailBaseUrl: string }): void {
+export function registerStudyReferencesTool(ctx: Context, options: { thumbnailBaseUrl: string }): () => void {
   const baseUrl = options.thumbnailBaseUrl
-  ctx.tools.register(defineTool({
+  return ctx.tools.register(defineTool({
     name: 'design_study_references',
     description: DESCRIPTION,
     parameters: {

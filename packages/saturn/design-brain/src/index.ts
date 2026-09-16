@@ -47,6 +47,15 @@ const PREFIX = 'mcp__saturnai__'
 const REQUIRED_TOOLS = [`${PREFIX}compose`, `${PREFIX}review`]
 const PREFERENCE = 'saturn-design-brain'
 
+/**
+ * The `saturn:design-brain` system-prompt section body, lifted to a named export so its wording
+ * (naming `design_study_references` and `read_image`, and dropping the old "do not automatically
+ * inspect a rendered website" disclaimer) is directly testable without needing the live
+ * `mcp__saturnai__` connection {@link DesignBrainService}'s section guard otherwise requires.
+ */
+export const DESIGN_BRAIN_PROMPT_SECTION_TEXT =
+  'SaturnAI design and brand tools are available through the mcp__saturnai__ namespace. For relevant design work, use the available tools according to their schemas and the user’s brief. Reuse supplied context for focused edits; ask only for decisions that materially affect the result. After compose/search/pick returns reference slugs, call design_study_references to fetch their thumbnails as real images and study them with eyes — named structural moves, never mood adjectives, written to .saturn/reference-study.md — before writing a direction. Review evaluates the evidence you supply; it does not look at pixels itself, so read your own built screenshots with read_image before calling it, and report tool failures honestly. If a tool becomes unavailable, continue with the bundled premium-output guidance and the tools still available.'
+
 /** Own a single opt-in MCP fiber while preserving independently configured profile rows. */
 export default class DesignBrainService extends TypertRemoteService {
   static inject = ['settings', 'tools', 'systemPrompt', 'loader']
@@ -64,6 +73,8 @@ export default class DesignBrainService extends TypertRemoteService {
   private stopped = false
   private connecting = false
   private issue: DesignBrainStatus['issue'] = 'none'
+  /** Disposer for `design_study_references`, registered only while opted in (see {@link syncStudyTool}). */
+  private studyTool: (() => void) | undefined
 
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'designBrain')
@@ -76,20 +87,21 @@ export default class DesignBrainService extends TypertRemoteService {
       name: 'saturn:design-brain', order: ctx.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA') + 110,
       text: ({ scope }) => {
         if (!mcpClient.isServerConnected(ctx, 'saturnai') || !ctx.tools.schemas(scope).some(tool => tool.name.startsWith(PREFIX))) return ''
-        return 'SaturnAI design and brand tools are available through the mcp__saturnai__ namespace. For relevant design work, use the available tools according to their schemas and the user’s brief. Reuse supplied context for focused edits; ask only for decisions that materially affect the result. After compose/search/pick returns reference slugs, call design_study_references to fetch their thumbnails as real images and study them with eyes — named structural moves, never mood adjectives — before writing a direction. Review evaluates the evidence you supply; it does not look at pixels itself, so read your own built screenshots with read_image before calling it, and report tool failures honestly. If a tool becomes unavailable, continue with the bundled premium-output guidance and the tools still available.'
+        return DESIGN_BRAIN_PROMPT_SECTION_TEXT
       },
     })
-    registerStudyReferencesTool(ctx, { thumbnailBaseUrl: config.thumbnailBaseUrl })
     ctx.effect(() => async () => {
       this.stopped = true
       await this.child?.dispose()
       await this.tail
-      this.child = undefined
+      this.studyTool?.()
+      this.studyTool = undefined
     }, 'design-brain: connection lifecycle')
   }
 
   /** Restore an explicit saved opt-in; a fresh profile makes no external request. */
   async [Service.init](): Promise<void> {
+    this.syncStudyTool()
     if (this.preference.get().enabled) await this.enqueue(() => this.ensureConnected(false))
   }
 
@@ -99,6 +111,22 @@ export default class DesignBrainService extends TypertRemoteService {
       const mcp = entry.options.name === '@deepseek-ai/dsh-mcp-client' || entry.fiber?.runtime?.callback === mcpClient.apply
       return scopeOf(entry.ctx) === scopeOf(this.ctx) && mcp && config?.serverName === 'saturnai'
     })
+  }
+
+  /**
+   * Register or dispose `design_study_references` to track opt-in state: registered while the
+   * managed preference is enabled, or while an independent profile row owns the connection.
+   * Idempotent — safe to call from every state transition (init, connect, disconnect) without
+   * double-registering or double-disposing.
+   */
+  private syncStudyTool(): void {
+    const shouldRegister = this.preference.get().enabled || this.profileEntry() !== undefined
+    if (shouldRegister && this.studyTool === undefined) {
+      this.studyTool = registerStudyReferencesTool(this.ctx, { thumbnailBaseUrl: this.config.thumbnailBaseUrl })
+    } else if (!shouldRegister && this.studyTool !== undefined) {
+      this.studyTool()
+      this.studyTool = undefined
+    }
   }
 
   /**
@@ -153,6 +181,7 @@ export default class DesignBrainService extends TypertRemoteService {
       await this.child?.dispose()
       this.child = undefined
       this.issue = 'none'
+      this.syncStudyTool()
       return this.status()
     })
   }
@@ -167,6 +196,7 @@ export default class DesignBrainService extends TypertRemoteService {
   }
 
   private async ensureConnected(retry: boolean): Promise<DesignBrainStatus> {
+    this.syncStudyTool()
     if (this.profileEntry() !== undefined || this.status().state === 'connected') return this.status()
     if (this.child !== undefined && !retry) return this.status()
     await this.child?.dispose()
