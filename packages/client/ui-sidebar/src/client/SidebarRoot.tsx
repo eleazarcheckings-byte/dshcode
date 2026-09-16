@@ -126,6 +126,11 @@ export function SidebarRoot({
   return (
     <div
       ref={column}
+      // Durable anchor for the global mobile sheet: at phone width ui-layout
+      // carries this column as an overlaid drawer, and that sheet has to
+      // reach the column itself (fill the panel, raise its controls to a 44px
+      // tap target). Every class name below is a hashed CSS-module private.
+      data-sidebar-root=""
       className={clsx(
         css.root, !wide && css.collapsed, !wide && everWide.current && css.railIn,
         collapsed && wide && css.fading, !pointerInside && css.quietBars,

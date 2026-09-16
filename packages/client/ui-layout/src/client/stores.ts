@@ -20,7 +20,16 @@ import {
  * `narrowExpanded` is the manual override that re-expands the auto-collapsed
  * sidebar over the squeezed center without rewriting the width preference.
  */
-type LayoutState = { sidebar: number; details: number; narrow: boolean; narrowExpanded: boolean }
+type LayoutState = {
+  sidebar: number
+  details: number
+  narrow: boolean
+  narrowExpanded: boolean
+  /** True while the frame renders the phone layout (AppFrame feeds setMobile). */
+  mobile: boolean
+  /** True while the phone layout's sidebar drawer is open over the conversation. */
+  drawer: boolean
+}
 
 /**
  * Annotation twin of the actions literal below (the export needs a declared
@@ -31,6 +40,8 @@ type LayoutActions = {
   setDetails: (draft: LayoutState, px: number) => void
   toggleSidebar: (draft: LayoutState) => void
   setNarrow: (draft: LayoutState, narrow: boolean) => void
+  setMobile: (draft: LayoutState, mobile: boolean) => void
+  setDrawer: (draft: LayoutState, open: boolean) => void
   openDetails: (draft: LayoutState) => void
   closeDetails: (draft: LayoutState) => void
 }
@@ -47,14 +58,21 @@ type LayoutActions = {
  */
 export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutActions>  {
   const handle = defineStore({
-    init: (): LayoutState => ({ sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false }),
+    init: (): LayoutState => ({
+      sidebar: SIDEBAR_DEFAULT, details: 0, narrow: false, narrowExpanded: false,
+      mobile: false, drawer: false,
+    }),
     actions: {
       setSidebar: (d, px: number) => { d.sidebar = clampWidth(px, SIDEBAR_MIN, SIDEBAR_MAX) },
       setDetails: (d, px: number) => { d.details = clampWidth(px, DETAILS_MIN, DETAILS_MAX) },
-      // Narrow toggles flip only the override: the width preference survives
-      // untouched, so re-widening restores the pre-squeeze layout.
+      // Three semantics behind one gesture, narrowest band first: on a phone
+      // the sidebar is a drawer and the toggle opens or dismisses it; narrow
+      // toggles flip only the override; wide toggles write the preference.
+      // Neither of the first two touches the width, so re-widening restores
+      // the pre-squeeze layout.
       toggleSidebar: (d) => {
-        if (d.narrow) d.narrowExpanded = !d.narrowExpanded
+        if (d.mobile) d.drawer = !d.drawer
+        else if (d.narrow) d.narrowExpanded = !d.narrowExpanded
         else d.sidebar = d.sidebar === 0 ? SIDEBAR_DEFAULT : 0
       },
       // Crossing the breakpoint in either direction drops the override: the
@@ -64,6 +82,15 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         d.narrow = narrow
         d.narrowExpanded = false
       },
+      // Leaving the phone band dismisses the drawer: the column it overlays
+      // is about to be a real column again, and an open overlay on a desktop
+      // frame would be a state with no way back out.
+      setMobile: (d, mobile: boolean) => {
+        if (d.mobile === mobile) return
+        d.mobile = mobile
+        d.drawer = false
+      },
+      setDrawer: (d, open: boolean) => { d.drawer = open },
       openDetails: (d) => { if (d.details === 0) d.details = DETAILS_DEFAULT },
       closeDetails: (d) => { d.details = 0 },
     },

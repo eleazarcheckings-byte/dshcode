@@ -38,6 +38,37 @@ export const DETAILS_MAX = 520
 /** Details width before any user drag. */
 export const DETAILS_DEFAULT = 360
 
+// Phone geometry (SPEC §8 M2). Below this width the three columns stop being
+// a layout at all: the shell becomes one column with a title strip, and the
+// sidebar is carried as an overlaid drawer. AppFrame reads the predicate and
+// decides the shape, so computeColumns above stays breakpoint-free.
+/** Frame width at or below which the shell renders its phone layout. */
+export const MOBILE_MAX = 768
+/** Drawer width ceiling: past this the panel stops reading as an overlay. */
+export const DRAWER_MAX_WIDTH = 360
+/** Share of the viewport the drawer takes before the ceiling applies. */
+const DRAWER_VIEWPORT_SHARE = 0.84
+
+/**
+ * Whether a frame of this width renders the phone layout.
+ * @param viewport - available frame width in px.
+ * @returns true below the breakpoint; a zero width is the pre-layout reading, not a phone.
+ */
+export function isMobileViewport(viewport: number): boolean {
+  return viewport > 0 && viewport <= MOBILE_MAX
+}
+
+/**
+ * Rendered width of the mobile drawer. It deliberately stops short of the
+ * viewport: the conversation staying visible behind the backdrop is what
+ * makes the panel read as a drawer over the app rather than a second screen.
+ * @param viewport - available frame width in px.
+ * @returns the drawer width in px.
+ */
+export function drawerWidth(viewport: number): number {
+  return Math.min(DRAWER_MAX_WIDTH, Math.round(viewport * DRAWER_VIEWPORT_SHARE))
+}
+
 /**
  * Clamp a panel width into its contract range.
  * @param px - requested width.

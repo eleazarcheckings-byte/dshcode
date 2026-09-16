@@ -35,6 +35,10 @@ The `shell.background` single slot fills the frame beneath all three columns. It
 
 An occupied background sets `--dsh-shell-content-background` to transparent and `--dsh-shell-sidebar-background` to a 40% sidebar fill. Structural content surfaces can consume these variables while retaining their ordinary fills as fallbacks. An empty background leaves those fallbacks intact. Content columns, resize handles, and overlays remain above the background.
 
+### Phone shape
+
+At 768px and under the frame stops being three columns: a title strip sits above one full-width column, the details column is withheld, both resize handles are gone, and the sidebar column is carried as a modal drawer over the conversation (`role="dialog"`, `aria-modal`) with a dismissing backdrop. `ctx.layout.toggleSidebar()` and the column's own toggle both work that drawer; Escape, the backdrop, and a route change all close it, and focus returns to the strip's control. The tracks, the drawer geometry, the safe-area insets, and the docked composer are drawn by ui-theme's single `mobile.css` breakpoint through the durable `data-*` anchors this frame publishes (`data-shell-frame`, `data-mobile-drawer`, `data-mobile-backdrop`, `data-mobile-strip`, `data-shell-center`, `data-shell-details`) — renaming one is a product-contract change. Rationale and the full contract: [the mobile shell note](../../../.agents/notes/implemented/feature/2026-09-15-mobile-shell-layout.md).
+
 ### Theme presentation
 
 The presenter consumes resolved theme snapshots and projects them onto the document: `html { color-scheme }` for native UA chrome, `body[data-ds-dark-theme]` from the active color scheme, the theme's alias tokens and `--dsh-content-font-size` as inline variables on body, and one owned `<meta name="theme-color">` whose content follows the computed body background. Disposing the presenter removes its metadata node with its other global writes.

@@ -35,6 +35,10 @@ kind: "package-reference"
 
 背景有内容时，框架将 `--dsh-shell-content-background` 设为透明，将 `--dsh-shell-sidebar-background` 设为 40% 不透明度的侧栏填充。内容结构可使用这些变量，并保留普通填充作为回退。背景为空时继续使用回退填充。内容栏、缩放手柄与浮层始终位于背景之上。
 
+### 手机形状
+
+在 768px 及以下，框架不再是三栏：标题条位于一整栏之上，详情栏被收起，两个拖拽条都不渲染，侧栏则作为覆盖在对话之上的模态抽屉呈现（`role="dialog"`、`aria-modal`），并带有可点击关闭的遮罩。`ctx.layout.toggleSidebar()` 与侧栏自己的开关都操作该抽屉；Escape、遮罩和路由变化都会关闭它，焦点随即回到标题条的控件。轨道、抽屉几何、安全区内边距与停靠的输入框，都由 ui-theme 中单一的 `mobile.css` 断点通过本框架公开的稳定 `data-*` 锚点绘制（`data-shell-frame`、`data-mobile-drawer`、`data-mobile-backdrop`、`data-mobile-strip`、`data-shell-center`、`data-shell-details`）—— 重命名其中任何一个都是产品契约变更。理由与完整契约见[移动外壳记录](../../../.agents/notes/implemented/feature/2026-09-15-mobile-shell-layout.zh.md)。
+
 ### 主题呈现
 
 呈现器消费解析后的主题快照，并投影到 document：`html { color-scheme }` 驱动原生 UA 控件，依据当前配色方案设置 `body[data-ds-dark-theme]`，把主题的别名 token 与 `--dsh-content-font-size` 设为 body 上的内联变量，并持有一个 `<meta name="theme-color">`，其内容随计算后的 body 背景色更新。释放呈现器时，它会连同其他全局写入一起移除自己的元数据节点。

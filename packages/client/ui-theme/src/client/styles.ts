@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import base from '../styles/base.css?inline'
 import cornerShape from '../styles/corner-shape.css?inline'
 import designPlatform from '../styles/design-platform.css?inline'
+import mobile from '../styles/mobile.css?inline'
 import scrollbar from '../styles/scrollbar.css?inline'
 import gradientShadowText from '../styles/gradient-shadow-text.css?inline'
 import shiki from '../styles/shiki.css?inline'
@@ -15,6 +16,8 @@ const STYLES = [
   ['scrollbar.css', scrollbar],
   ['gradient-shadow-text.css', gradientShadowText],
   ['shiki.css', shiki],
+  // Last: the phone shell adapts what every sheet above establishes.
+  ['mobile.css', mobile],
 ] as const
 
 /**

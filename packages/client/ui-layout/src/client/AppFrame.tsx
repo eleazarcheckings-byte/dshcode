@@ -15,8 +15,12 @@ import type { ReactNode } from 'react'
 import type {
   PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { computeColumns, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
+import {
+  computeColumns, drawerWidth, isMobileViewport, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT,
+} from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
+import { installDrawerTrap } from './drawer.ts'
+import { MobileTitleStrip } from './MobileTitleStrip.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
 
@@ -25,16 +29,21 @@ export type AppFrameProps =
   & PropsRuntime<'root'>
   & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay' | 'shell.background'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
-  & PropsLocale<'common'>
+  & PropsLocale<'layout'>
 
-/** Center column grid item (session-body building block). */
+/** DOM id the strip's control points at (aria-controls needs a stable target). */
+const DRAWER_ID = 'saturn-shell-drawer'
+
+/** Center column grid item (session-body building block). The data attribute is
+ * the durable anchor the global mobile sheet places this column by; module
+ * class names are hashed and private to this file. */
 function CenterColumn(props: { children?: ReactNode }) {
-  return <main className={css.centerCol}>{props.children}</main>
+  return <main className={css.centerCol} data-shell-center="">{props.children}</main>
 }
 
 /** Details column grid item; width 0 keeps the subtree mounted (never unmount on close). */
 function DetailsColumn(props: { children?: ReactNode }) {
-  return <div className={css.detailsCol}>{props.children}</div>
+  return <div className={css.detailsCol} data-shell-details="">{props.children}</div>
 }
 
 /**
@@ -145,7 +154,43 @@ export function AppFrame({
   // absorbs the squeeze.
   const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
   useEffect(() => { actions.setNarrow(narrow) }, [actions, narrow])
-  const sidebarCollapsed = narrow ? !panels.narrowExpanded : panels.sidebar === 0
+
+  // Phone shape (SPEC §8 M2). One column plus a title strip; the sidebar
+  // column is the same mounted subtree, carried as a drawer overlaid on the
+  // conversation. The store holds the open state so the shared toggleSidebar
+  // gesture (ctx.layout, the column's own control) opens and dismisses it.
+  const mobile = isMobileViewport(viewport)
+  useEffect(() => { actions.setMobile(mobile) }, [actions, mobile])
+  const drawerOpen = mobile && panels.drawer
+  const closeDrawer = useCallback(() => { actions.setDrawer(false) }, [actions])
+
+  // A route change dismisses the drawer: picking a session IS the drawer's
+  // purpose, and leaving it open over the conversation the user just chose
+  // would hide the thing they asked for.
+  const currentSession = useSessions(s => s.current)
+  useEffect(() => { closeDrawer() }, [closeDrawer, currentSession])
+
+  // Modal keyboard contract while it is open (drawer.ts): Escape dismisses,
+  // Tab stays inside, the strip control gets focus back on close.
+  const drawerRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const panel = drawerRef.current
+    if (!drawerOpen || panel === null) return
+    return installDrawerTrap(panel, {
+      onClose: closeDrawer,
+      // The JS half of the §2 reduced-motion contract: with motion reduced
+      // the panel has no slide, so focus moves without waiting for one.
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      restoreFocusTo: menuRef.current,
+    })
+  }, [drawerOpen, closeDrawer])
+
+  // Collapsed is a desktop state: the drawer always renders the full column,
+  // because a 56px rail floating over the conversation reads as debris.
+  const sidebarCollapsed = mobile
+    ? false
+    : narrow ? !panels.narrowExpanded : panels.sidebar === 0
   const sidebarPreference = sidebarCollapsed
     ? 0
     : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
@@ -177,7 +222,10 @@ export function AppFrame({
       ref={frameRef}
       className={css.frame}
       data-shell-frame
-      style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
+      // The phone shape is the sheet's: an inline template would outrank it.
+      style={mobile ? undefined : { gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
+      data-mobile={mobile || undefined}
+      data-drawer-open={drawerOpen || undefined}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
       data-dragging={dragging || undefined}
@@ -189,7 +237,32 @@ export function AppFrame({
       <div className={css.backgroundLayer} data-shell-background aria-hidden="true">
         {renderSlot('shell.background', {})}
       </div>
-      <div className={css.sidebarCol}>
+      {mobile && (
+        <MobileTitleStrip
+          title={documentTitle ?? productTitle}
+          menuLabel={drawerOpen ? t('mobile.menu.close') : t('mobile.menu.open')}
+          drawerId={DRAWER_ID}
+          open={drawerOpen}
+          onToggle={() => { actions.setDrawer(!drawerOpen) }}
+          buttonRef={menuRef}
+        />
+      )}
+      {/* Dismissal surface for the drawer; inert and invisible until it opens
+          (mobile.css), so the desktop frame never gains a click sink. */}
+      {mobile && <div className={css.backdrop} data-mobile-backdrop="" onClick={closeDrawer} />}
+      <div
+        ref={drawerRef}
+        className={css.sidebarCol}
+        {...mobile
+          ? {
+            id: DRAWER_ID,
+            'data-mobile-drawer': '',
+            role: 'dialog',
+            'aria-modal': true,
+            'aria-label': t('mobile.drawer'),
+          }
+          : {}}
+      >
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the
             component sees its rendered state as owner params decided here
@@ -197,7 +270,7 @@ export function AppFrame({
             renders the rail UI too). */}
         {renderSlot('sidebar', {
           collapsed: sidebarCollapsed,
-          width: cols.sidebar,
+          width: mobile ? drawerWidth(viewport) : cols.sidebar,
         })}
       </div>
       <>
@@ -214,9 +287,11 @@ export function AppFrame({
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>
-      {/* The collapsed rail is fixed-width: no resize handle while closed. */}
-      {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
-      {cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
+      {/* The collapsed rail is fixed-width: no resize handle while closed. The
+          phone shape has no resizable columns at all — and a col-resize strip
+          over a touch surface would only eat swipes. */}
+      {!mobile && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
+      {!mobile && cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
     </div>
   )
 }

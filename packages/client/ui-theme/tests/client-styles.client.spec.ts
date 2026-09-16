@@ -26,6 +26,8 @@ describe('ui-theme client styles', () => {
       `${PLUGIN_ID}/scrollbar.css`,
       `${PLUGIN_ID}/gradient-shadow-text.css`,
       `${PLUGIN_ID}/shiki.css`,
+      // Last: the phone shell adapts what every sheet above establishes.
+      `${PLUGIN_ID}/mobile.css`,
     ])
     await fiber.dispose()
     expect(document.head.querySelectorAll(`style[data-plugin="${PLUGIN_ID}"]`)).toHaveLength(0)

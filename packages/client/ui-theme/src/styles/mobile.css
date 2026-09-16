@@ -1,0 +1,206 @@
+/* The phone shell (SPEC §8 M2). One breakpoint, one file: at <= 768px the
+ * desktop three-column frame becomes a title strip over a single column with
+ * the sidebar carried as a drawer, and the composer docks above the home
+ * indicator and any open keyboard.
+ *
+ * Two rules keep this sheet honest. It adapts components it does not own, so
+ * it anchors ONLY on durable attributes the owning packages publish
+ * deliberately (`data-shell-frame`, `data-mobile-drawer`, `data-composer-seat`,
+ * `data-disclosure-row`, `data-tool`) — never a CSS-module class, which is
+ * hashed and free to change. And its motion is the named system of §2
+ * (the --saturn-dur and --saturn-ease scales in ui-theme base.css), with the whole
+ * reduced-motion arm nested inside this same breakpoint rather than opening a
+ * second top-level query.
+ *
+ * NOTE (integration): `env(safe-area-inset-*)` resolves to 0 unless the page's
+ * viewport meta carries `viewport-fit=cover`. apps/web/index.html belongs to
+ * another cell this round; the insets below are written so a 0 resolution is
+ * simply the desktop-equivalent spacing.
+ */
+
+@media (max-width: 768px) {
+  :root {
+    /* Safe areas, named once so the rules below read as intent. */
+    --saturn-safe-top: env(safe-area-inset-top, 0px);
+    --saturn-safe-right: env(safe-area-inset-right, 0px);
+    --saturn-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --saturn-safe-left: env(safe-area-inset-left, 0px);
+    /* Band an open on-screen keyboard covers. The shell republishes this from
+       the visual viewport (ui-conversation skeleton/keyboard-inset.ts); the
+       fallback here is what a browser with no visualViewport gets. */
+    --saturn-keyboard-inset: 0px;
+  }
+
+  /* The shell owns the dynamic viewport: 100% of a collapsing URL bar leaves
+     a gap under the composer every time the bar re-expands. */
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+
+  /* No sideways travel, anywhere: the frame already clips, but the document
+     itself must refuse it too, or a single over-wide payload scrolls the page
+     behind the fixed drawer. */
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+    /* A swipe that reaches the end of a transcript must not pull the page. */
+    overscroll-behavior: none;
+  }
+
+  /* ---- The frame: title strip over one column ---------------------------- */
+
+  [data-shell-frame][data-mobile] {
+    grid-template-columns: 100%;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  [data-shell-frame][data-mobile] [data-mobile-strip] {
+    grid-column: 1;
+    grid-row: 1;
+    /* The strip is what stands under the notch/status bar. */
+    padding-top: var(--saturn-safe-top);
+    padding-right: calc(10px + var(--saturn-safe-right));
+    padding-bottom: 6px;
+    padding-left: calc(6px + var(--saturn-safe-left));
+  }
+
+  [data-shell-frame][data-mobile] [data-shell-center] {
+    grid-column: 1;
+    grid-row: 2;
+    padding-right: var(--saturn-safe-right);
+    padding-left: var(--saturn-safe-left);
+  }
+
+  /* The details column has no room on a phone; it stays mounted (the shell
+     never unmounts it) but takes no space and no tab stops. */
+  [data-shell-frame][data-mobile] [data-shell-details] {
+    display: none;
+  }
+
+  /* ---- The sidebar as a drawer ------------------------------------------ */
+
+  [data-mobile-drawer] {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 30;
+    /* Short of the viewport on purpose: the conversation staying visible
+       behind the backdrop is what makes this an overlay and not a screen. */
+    width: min(84vw, 360px);
+    max-width: 100%;
+    padding-top: var(--saturn-safe-top);
+    padding-bottom: var(--saturn-safe-bottom);
+    padding-left: var(--saturn-safe-left);
+    box-sizing: border-box;
+    /* Opaque in its own right: the shared column fill goes transparent
+       whenever an ambient background is registered, which would let the
+       transcript read straight through the panel. */
+    background: var(--dsw-specific-sidebar-fill);
+    border-right: 0.5px solid var(--dsw-alias-border-l3);
+    transform: translateX(-100%);
+    visibility: hidden;
+    /* One of the surface's two intentional motions. Visibility flips at the
+       END of the exit so the panel is not focusable mid-slide, and at the
+       START of the entrance so it is visible while it travels. */
+    transition:
+      transform var(--saturn-dur-2) var(--saturn-ease-out),
+      visibility 0s linear var(--saturn-dur-2);
+  }
+
+  [data-shell-frame][data-drawer-open] [data-mobile-drawer] {
+    transform: translateX(0);
+    visibility: visible;
+    transition:
+      transform var(--saturn-dur-2) var(--saturn-ease-out),
+      visibility 0s linear 0s;
+  }
+
+  /* The column sizes itself from the owner width prop; inside the drawer the
+     panel is the authority, so it simply fills. */
+  [data-mobile-drawer] [data-sidebar-root] {
+    width: 100%;
+  }
+
+  [data-mobile-backdrop] {
+    z-index: 29;
+    background: color-mix(in srgb, var(--dsw-alias-bg-base) 68%, transparent);
+    transition: opacity var(--saturn-dur-2) var(--saturn-ease-out);
+  }
+
+  [data-shell-frame][data-drawer-open] [data-mobile-backdrop] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ---- Touch targets ----------------------------------------------------- */
+
+  [data-mobile-strip] button,
+  [data-mobile-drawer] button,
+  [data-mobile-drawer] [role='treeitem'],
+  [data-composer-seat] button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* A row is a target in its height only — stretching it to a 44px square
+     would break the transcript's rhythm. */
+  [data-tool] [data-disclosure-row] {
+    min-height: 44px;
+  }
+
+  /* ---- Tool rows: one line, disclosure intact ---------------------------- */
+
+  [data-tool] [data-disclosure-row] {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  /* Everything after the leading glyph shares the line and clips; the glyph
+     and the chevron keep their size so the affordance survives. */
+  [data-tool] [data-disclosure-row] > * {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  [data-tool] [data-disclosure-row] > :first-child {
+    flex: none;
+    overflow: visible;
+  }
+
+  /* ---- Nothing escapes the viewport -------------------------------------- */
+
+  [data-shell-frame][data-mobile] :is(img, canvas, svg, video, table) {
+    max-width: 100%;
+  }
+
+  [data-shell-frame][data-mobile] :is(pre, [data-terminal], [data-diff], [data-read], [data-search]) {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* ---- The composer, docked ---------------------------------------------- */
+
+  [data-shell-frame][data-mobile] [data-composer-seat] {
+    /* The seat is sticky at the scrollport floor; padding lifts its content
+       clear of the home indicator and of the band the keyboard covers,
+       without ever clipping the card. */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--saturn-keyboard-inset, 0px));
+  }
+
+  /* ---- Reduced motion ---------------------------------------------------- */
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-mobile-drawer],
+    [data-shell-frame][data-drawer-open] [data-mobile-drawer],
+    [data-mobile-backdrop] {
+      transition: none;
+    }
+  }
+}

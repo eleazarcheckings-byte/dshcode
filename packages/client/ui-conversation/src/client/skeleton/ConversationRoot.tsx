@@ -8,6 +8,7 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
 import { conversationPhase } from '../contract/snapshot.ts'
 import { HeroShell, HeroStarters, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
+import { installKeyboardInset } from './keyboard-inset.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the slot contract. */
@@ -148,6 +149,12 @@ export function ConversationRoot({
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
+
+  // Phone keyboards draw OVER the layout viewport instead of shrinking it, so
+  // the band they cover is published once here — this component is the
+  // resident owner of the composer seat, and there is exactly one of it — and
+  // spent as the seat's bottom padding by ui-theme's mobile sheet.
+  useEffect(() => installKeyboardInset(document.documentElement), [])
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()

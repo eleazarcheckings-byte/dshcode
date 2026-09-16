@@ -17,6 +17,7 @@ import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
 import { ThemePresenter } from './theme-presenter.ts'
+import { en, zh, type LayoutKey } from './locales.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
 // keep a symbol exported; test-only/package-internal symbols live off /src).
@@ -25,6 +26,22 @@ import { ThemePresenter } from './theme-presenter.ts'
 // against; the frame components and the store factory are package-internal.
 export { LayoutController } from './service.ts'
 export type { ILayout } from './service.ts'
+export type { LayoutKey } from './locales.ts'
+
+/**
+ * Dictionary namespace owned by this plugin: the phone shell's own copy (the
+ * title strip's drawer control and the drawer's accessible name). The root
+ * entry declares it rather than `common` — a `t` bound to a namespace also
+ * reads the shared common vocabulary, so `brand.localBuild` still resolves.
+ */
+const NS = 'layout'
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    /** Shell chrome the frame itself renders (phone title strip, drawer). */
+    layout: LayoutKey
+  }
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -127,11 +144,12 @@ export const inject = ['slots', 'theme', 'locale']
  */
 export function apply(ctx: ClientContext): void {
   const layout = new LayoutController()
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-layout: dictionaries')
   ctx.effect(() => {
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeRegistration = ctx.slots.register({
       name: 'root',
-      locale: 'common',
+      locale: NS,
       children: {
         'sidebar': { kind: 'single', scope: 'root' },
         'conversation': { kind: 'single', scope: 'session-maybe' },

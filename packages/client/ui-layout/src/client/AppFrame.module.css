@@ -126,6 +126,18 @@
   border-color: var(--dsw-alias-border-l3);
 }
 
+/* Phone-shell dismissal surface for the sidebar drawer. Mounted only in the
+   mobile shape; its appearance, stacking, and motion are the global mobile
+   sheet's (ui-theme/src/styles/mobile.css), which owns the one breakpoint —
+   this rule only keeps it out of the grid flow and inert until that sheet
+   opens it. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .overlayLayer {
   position: absolute;
   inset: 0;

@@ -1,0 +1,78 @@
+/* Phone title strip. Intrinsic chrome only — the safe-area inset, the tap
+   target floor, and the grid placement are the global mobile sheet's
+   (ui-theme/src/styles/mobile.css), which owns the one breakpoint. */
+
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  background: var(--dsh-shell-content-background, var(--dsw-alias-bg-base));
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-primary);
+}
+
+.menu {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  corner-shape: round;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  /* Touch: no 300ms tap highlight, no double-tap zoom on the one control the
+     whole shell depends on. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.menu:active {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* The signature ring (SPEC §2): the favicon's ellipse — rx 27, ry 9.5,
+   rotate(-18deg) in a 64 box — painted through a mask so it takes the button's
+   own ink rather than a baked colour, exactly as the sidebar's active-row seal
+   does. Closed it rides the -18° tilt; opening rotates it flat, which reads as
+   the panel it just pulled out. */
+.ring {
+  width: 22px;
+  height: 22px;
+  background-color: currentColor;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='32' cy='32' rx='27' ry='9.5' fill='none' stroke='black' stroke-width='7'/%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='32' cy='32' rx='27' ry='9.5' fill='none' stroke='black' stroke-width='7'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  transform: rotate(-18deg);
+  transition: transform var(--saturn-dur-2) var(--saturn-ease-out);
+}
+
+.menu[aria-expanded='true'] .ring {
+  transform: rotate(0deg);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring {
+    transition: none;
+  }
+}
