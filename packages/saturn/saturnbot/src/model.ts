@@ -107,7 +107,7 @@ export class LoggedBotModel implements BotModel {
     try {
       const tier = task === undefined ? 'coordinator' : 'specialist'
       const candidate = router.resolve(tier)
-      if (typeof candidate?.provider !== 'string' || typeof candidate.model !== 'string' || candidate.provider === '' || candidate.model === '') return fallback
+      if (typeof candidate.provider !== 'string' || typeof candidate.model !== 'string' || candidate.provider === '' || candidate.model === '') return fallback
       resolved = candidate
     } catch { return fallback }
     if (resolved.reasoningEffort === undefined) return resolved
