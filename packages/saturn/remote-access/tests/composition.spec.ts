@@ -193,6 +193,59 @@ it('pairs a device over the LAN listener, proxies the app to it, streams approva
   expect(event.body).toContain('writes outside the workspace')
   expect(Date.parse(event.at)).not.toBeNaN()
 
+  // A second question gives the replay window a backlog it can be too small for.
+  await h.ctx.waterfall(
+    'approval/request',
+    { agent: { id: 'agent-2' }, toolName: 'write', reason: 'edits a file the plan did not name' } as never,
+    () => Promise.resolve('unavailable' as never),
+  )
+  const second = frameData(await stream.next()) as { id: string; title: string }
+  expect(second.id).toBe('2')
+
+  // Replay carries exactly what the stream carried, for a phone that was asleep.
+  const replayed = await pinnedRequest({ url: `${origin}/saturn/remote/events/replay?after=0`, fingerprint, headers: bearer })
+  expect(replayed.status).toBe(200)
+  expect(String(replayed.headers['content-type'])).toContain('application/json')
+  expect(replayed.headers['content-length']).toBe(String(Buffer.byteLength(replayed.body)))
+  expect(String(replayed.headers['content-type'])).not.toContain('event-stream')
+  const caught = JSON.parse(replayed.body) as {
+    events: { id: string; type: string; title: string; body: string; at: string }[]
+    newest: string
+    truncated: boolean
+    gap?: boolean
+  }
+  expect(caught.events.map(entry => entry.id)).toEqual(['1', '2'])
+  expect(caught.events[0]).toEqual(event)
+  expect(caught.events[1]?.title).toBe(second.title)
+  expect(caught).toMatchObject({ newest: '2', truncated: false })
+  expect(caught.gap).toBeUndefined()
+
+  // Caught up: the cursor comes straight back and nothing is re-delivered.
+  const emptied = await pinnedRequest({ url: `${origin}/saturn/remote/events/replay?after=2`, fingerprint, headers: bearer })
+  expect(emptied.status).toBe(200)
+  expect(JSON.parse(emptied.body)).toMatchObject({ events: [], newest: '2', truncated: false })
+
+  // A window smaller than the backlog says so instead of dropping the rest silently.
+  const windowed = await pinnedRequest({ url: `${origin}/saturn/remote/events/replay?after=0&limit=1`, fingerprint, headers: bearer })
+  expect(windowed.status).toBe(200)
+  const page = JSON.parse(windowed.body) as { events: { id: string }[]; newest: string; truncated: boolean }
+  expect(page.events.map(entry => entry.id)).toEqual(['1'])
+  expect(page).toMatchObject({ newest: '2', truncated: true })
+
+  // A window the device cannot have meant is refused rather than guessed at.
+  for (const query of ['after=soon', 'after=-1', 'after=', 'limit=0', 'limit=201', 'limit=1.5', 'limit=all']) {
+    const refused = await pinnedRequest({ url: `${origin}/saturn/remote/events/replay?${query}`, fingerprint, headers: bearer })
+    expect({ query, status: refused.status }).toEqual({ query, status: 400 })
+  }
+
+  // Replay stands behind the same door as the stream it replays.
+  expect((await pinnedRequest({ url: `${origin}/saturn/remote/events/replay?after=0`, fingerprint })).status).toBe(401)
+  expect((await pinnedRequest({
+    url: `${origin}/saturn/remote/events/replay`,
+    fingerprint,
+    headers: { authorization: 'Bearer not-a-device-token' },
+  })).status).toBe(401)
+
   const listed = await pinnedRequest({ url: `${origin}/saturn/remote/devices`, fingerprint, headers: bearer })
   expect(listed.status).toBe(200)
   const devices = JSON.parse(listed.body) as { devices: { id: string; name: string }[] }
