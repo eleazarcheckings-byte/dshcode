@@ -21,6 +21,41 @@ const CLAUDE_EVENTS = [
 ] as const
 const SUPPORTED_EVENTS: ReadonlySet<string> = new Set(CLAUDE_EVENTS)
 
+/**
+ * Every Claude Code hook-event name this bridge knows about, implemented or not: the seven
+ * {@link CLAUDE_EVENTS} it runs, plus the 23 events the README's Known Limitations section
+ * enumerates as unimplemented (`Setup` … `ElicitationResult`, `ConfigChange` and `PreCompact`
+ * included). A settings file's own top-level keys (`model`, `permissions`, `env`, …) are NOT
+ * Claude Code hook events and must never be recorded as `skipped` — only a key in this set can be
+ * an "unsupported event" (see {@link parseClaudeCodeConfig}'s settings-file fallback).
+ */
+const KNOWN_UNIMPLEMENTED_CLAUDE_EVENTS = [
+  'Setup',
+  'InstructionsLoaded',
+  'UserPromptExpansion',
+  'MessageDisplay',
+  'PermissionRequest',
+  'PostToolUseFailure',
+  'PostToolBatch',
+  'PermissionDenied',
+  'Notification',
+  'TaskCreated',
+  'TaskCompleted',
+  'StopFailure',
+  'TeammateIdle',
+  'ConfigChange',
+  'CwdChanged',
+  'FileChanged',
+  'WorktreeCreate',
+  'WorktreeRemove',
+  'PreCompact',
+  'PostCompact',
+  'SessionEnd',
+  'Elicitation',
+  'ElicitationResult',
+] as const
+const KNOWN_CLAUDE_EVENTS: ReadonlySet<string> = new Set([...CLAUDE_EVENTS, ...KNOWN_UNIMPLEMENTED_CLAUDE_EVENTS])
+
 /** A parsed CC config: event name → its matcher groups (command hooks only). */
 export type ClaudeCodeHookConfig = Record<string, MatcherGroup[]>
 
@@ -183,7 +218,12 @@ export function parseClaudeCodeConfig(raw: unknown, vars: SubstitutionVars = {})
 
   for (const event of Object.keys(hooksMap)) {
     if (!SUPPORTED_EVENTS.has(event)) {
-      skipped.push({ event, type: 'event', reason: 'unsupported event' })
+      // Only a key this bridge recognizes as an actual Claude Code hook-event name is worth a
+      // warning; an ordinary settings-file key (`model`, `permissions`, `env`, …) reaching this
+      // loop through the bare-root fallback above is not an event at all and must stay silent.
+      if (KNOWN_CLAUDE_EVENTS.has(event)) {
+        skipped.push({ event, type: 'event', reason: 'unsupported event' })
+      }
       continue
     }
     const rawGroups = hooksMap[event]
