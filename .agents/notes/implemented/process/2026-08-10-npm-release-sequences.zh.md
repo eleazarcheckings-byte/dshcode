@@ -26,7 +26,7 @@ Status: implemented
 | vendored framework | `vendor/*` 九个包 | 每包各自一条版本线 | `vendor-<包名>-v<版本>`（每包一个） | `release-vendor.yml`（pack）/ `release-vendor-publish.yml`（发布） |
 | native | `native/landlock-run/packages/*` | 自己的 `0.0.x` | `landlock-run-v<版本>` | `landlock-run-release.yml` |
 
-三组一律发到 npmjs.com 的 `@deepseek-ai` scope，且 access 按序列而非按 scope 区分：vendored 框架与 native 包是 `public`，dsh 族是 `restricted`（[理由](2026-08-13-public-vendor-and-native-sequences.zh.md)）。没有任何发布路径传 `--access`——一个选项无法服务级别互不相同的序列，且会覆盖真正拥有该级别的 manifest。
+vendored 框架与 native 包发到 npmjs.com 的 `@deepseek-ai` scope；dsh 族发到 `@deepseek-ai` 和 `@saturnai` 两个 scope——从 `packages/experimental/` 提升上来的 Saturn 层自带一个 scope，而两个 harness 成员 `@deepseek-ai/dsh-base` 与 `@deepseek-ai/dsh-web-app` 依赖其中的包，只认 harness 那一个 scope 的发布会产出无法解析的依赖树。每个 family 在 [`scripts/release/families.ts`](../../../../scripts/release/families.ts) 里各自声明自己的 scope 集合，并拒绝集合之外的成员，这正是让 glob 与发布集不会各走各路的机制。access 按序列而非按 scope 区分：vendored 框架与 native 包是 `public`，dsh 族是 `restricted`（[理由](2026-08-13-public-vendor-and-native-sequences.zh.md)）。没有任何发布路径传 `--access`——一个选项无法服务级别互不相同的序列，且会覆盖真正拥有该级别的 manifest。
 
 ### 版本由本地命令写进仓库，CI 只核对与上传
 
