@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-tool-browser",
-  "description": "Model-facing browser verify tools (browser_navigate, browser_snapshot) over in-tree Playwright Chromium: open an http(s) page and capture its accessibility tree or a PNG screenshot",
+  "description": "Model-facing browser control tools over in-tree Playwright Chromium: navigate, an accessibility snapshot with stable refs, click/type/fill/press/hover/scroll, page text, console and network reads, tabs, and screenshots",
   "version": "0.1.2-alpha.4",
   "publishConfig": {
     "access": "public"

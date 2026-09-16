@@ -159,7 +159,7 @@ describe('the documented asymmetry when the escalation is real', () => {
     await h.call({ ...FORCE_PUSH, sandbox_permissions: 'danger-full-access', justification: 'the remote lives outside the workspace' })
 
     expect(h.asked).toHaveLength(2)
-    expect(h.asked.some(request => request.reason.includes('publish-git-force-push'))).toBe(true)
-    expect(h.asked.some(request => request.reason.includes('escalate sandbox to danger-full-access'))).toBe(true)
+    expect(h.asked.some(request => request.reason?.includes('publish-git-force-push') ?? false)).toBe(true)
+    expect(h.asked.some(request => request.reason?.includes('escalate sandbox to danger-full-access') ?? false)).toBe(true)
   })
 })

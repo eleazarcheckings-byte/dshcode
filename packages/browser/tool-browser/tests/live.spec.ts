@@ -30,7 +30,13 @@ afterEach(async () => {
 
 async function chromiumAvailable(): Promise<boolean> {
   try {
-    const process = await launchPlaywright({ headless: true })
+    const process = await launchPlaywright({
+      headless: true,
+      consoleLimit: 100,
+      networkLimit: 100,
+      autoDownload: true,
+      onDownloadProgress: () => {},
+    })
     await process.close()
     return true
   } catch {

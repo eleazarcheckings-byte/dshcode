@@ -8,10 +8,11 @@
  * @module @deepseek-ai/dsh-tool-browser/playwright
  */
 
-import { chromium, type LaunchOptions, type Page, type Request as PwRequest } from 'playwright-core'
+import { chromium, type LaunchOptions, type Page, type Request as PwRequest, type Route } from 'playwright-core'
 import { downloadChromium as defaultDownloadChromium, MANUAL_INSTALL_COMMAND } from './downloader.ts'
 import type { ChromiumDownloader, DownloadProgressListener } from './downloader.ts'
 import type { BrowserProcess, BrowserTab, ConsoleMessageRecord, NetworkRequestRecord, TabLocator } from './session.ts'
+import { isLinkLocalHost } from './urls.ts'
 
 /** Validated Chromium launch facts forwarded to playwright-core. */
 export interface PlaywrightLaunchSpec {
@@ -73,6 +74,46 @@ function directionDelta(direction: 'up' | 'down' | 'left' | 'right', amount: num
 }
 
 /**
+ * Decide whether one outgoing request must be blocked at the network layer:
+ * every request the page issues, not only the two model-supplied navigation
+ * arguments {@link import('./urls.ts').parseBrowserUrl} validates — a
+ * same-origin redirect, an in-page link the model clicks, or a page-issued
+ * fetch can all reach a link-local/cloud-metadata host that argument-only
+ * validation never re-checks. An unparsable URL is let through rather than
+ * blocked, matching Playwright's own tolerance for odd request URLs (e.g.
+ * `about:blank`, `data:` subresources it still fires `request` events for).
+ * @param url - the request's URL, as `Route.request().url()` reports it.
+ * @returns whether the request must be aborted.
+ */
+export function shouldBlockRequestUrl(url: string): boolean {
+  try {
+    return isLinkLocalHost(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Route handler installed on every tab: aborts requests to a link-local or
+ * cloud-metadata host and lets everything else through. Registered with
+ * Playwright's catch-all pattern (`**\/*`) so it sees the main document
+ * request, every redirect hop, every subresource, and every request an
+ * in-page script issues — not just the URL the model passed to
+ * `browser_navigate`/`browser_tabs`. It does not re-resolve a hostname that
+ * is not itself a link-local literal, so a DNS name that resolves into the
+ * range (e.g. `metadata.google.internal`) is not caught here; see the
+ * README's URL policy section for that residual gap.
+ * @param route - the intercepted request.
+ */
+async function linkLocalRouteGuard(route: Route): Promise<void> {
+  if (shouldBlockRequestUrl(route.request().url())) {
+    await route.abort('blockedbyclient')
+    return
+  }
+  await route.continue()
+}
+
+/**
  * Wrap one Playwright locator resolution as the session's `TabLocator`
  * surface. Resolution is lazy — `page.locator(selector)` never itself
  * rejects; failures surface from the first action.
@@ -102,10 +143,15 @@ function wrapLocator(page: Page, selector: string): TabLocator {
  * @param networkLimit - ring-buffer cap on captured network requests.
  * @returns the wrapped tab.
  */
-function wrapPage(page: Page, consoleLimit: number, networkLimit: number): BrowserTab {
+async function wrapPage(page: Page, consoleLimit: number, networkLimit: number): Promise<BrowserTab> {
   const consoleBuffer: ConsoleMessageRecord[] = []
   const networkBuffer: NetworkRequestRecord[] = []
   const recordsByRequest = new WeakMap<PwRequest, NetworkRequestRecord>()
+
+  // Registered before any navigation can run on this tab (this function is
+  // always awaited before the tab is handed back), so the guard is in place
+  // for the very first request the tab ever issues.
+  await page.route('**/*', linkLocalRouteGuard)
 
   page.on('console', (message) => {
     consoleBuffer.push({ type: message.type(), text: message.text(), time: Date.now() })
@@ -184,7 +230,7 @@ export async function launchPlaywright(spec: PlaywrightLaunchSpec): Promise<Brow
   return {
     async newTab(): Promise<BrowserTab> {
       const page = await openBrowser.newPage()
-      return wrapPage(page, spec.consoleLimit, spec.networkLimit)
+      return await wrapPage(page, spec.consoleLimit, spec.networkLimit)
     },
     close: () => openBrowser.close(),
   }

@@ -51,6 +51,7 @@ function installBrowser(): void {
       keyboard: { press: async () => {} },
       evaluate: async () => {},
       on: () => {},
+      route: async () => {},
       close: async () => {},
     }),
     close,
@@ -193,6 +194,21 @@ describe('presenters and renderers', () => {
       truncated: false,
       screenshotPath: '/tmp/a.png',
     })).toEqual([{ type: 'text', text: 'https://example.com/\n- heading "Example"\nScreenshot: /tmp/a.png' }])
+    // Mars round-1 minor: session.ts's boundPageText already appends the
+    // truncation footer into `text`; renderPageText must not append a second
+    // copy on top of it.
+    expect(tool.renderPageText({}, {
+      url: 'https://example.com/',
+      title: 'Example',
+      text: 'body copy\n(Text truncated.)',
+      truncated: true,
+    })).toEqual([{ type: 'text', text: 'https://example.com/\nExample\nbody copy\n(Text truncated.)' }])
+    expect((tool.renderPageText({}, {
+      url: 'https://example.com/',
+      title: 'Example',
+      text: 'body copy\n(Text truncated.)',
+      truncated: true,
+    })[0]?.text.match(/\(Text truncated\.\)/gu) ?? []).length).toBe(1)
   })
 })
 
@@ -264,5 +280,28 @@ describe('browser verify tools', () => {
     await expect(ctx.plugin(tool, { snapshotMaxChars: -1 })).rejects.toThrow(
       'browser: snapshotMaxChars must be a positive safe integer',
     )
+  })
+
+  it('rejects a non-positive or non-integer browser_scroll amount', async () => {
+    // Mars round-1 low: every other model-supplied numeric argument
+    // (maxChars, limit, the resolveConfig caps) is guarded against a
+    // negative/fractional/non-finite value with a clear `browser:` error;
+    // browser_scroll's amount must be too rather than silently reversing or
+    // no-oping the scroll.
+    const { ctx } = await setup({ timeoutMs: 1_500 })
+    await execute(ctx, 'browser_navigate', { url: 'https://example.com/' })
+
+    const negative = await execute(ctx, 'browser_scroll', { direction: 'down', amount: -1 })
+    expect(negative.isError).toBe(true)
+    if (!negative.isError) throw new Error('expected negative amount to fail')
+    const negativeBlock = negative.content[0]
+    expect(negativeBlock?.type).toBe('text')
+    if (negativeBlock?.type === 'text') {
+      expect(negativeBlock.text).toContain('browser: amount must be a positive safe integer')
+    }
+
+    const fractional = await execute(ctx, 'browser_scroll', { direction: 'up', amount: 1.5 })
+    expect(fractional.isError).toBe(true)
+    if (!fractional.isError) throw new Error('expected fractional amount to fail')
   })
 })

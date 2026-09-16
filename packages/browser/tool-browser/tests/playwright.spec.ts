@@ -31,6 +31,7 @@ describe('launchPlaywright', () => {
       keyboard: { press: vi.fn(async () => {}) },
       evaluate: vi.fn(async () => {}),
       on: vi.fn(),
+      route: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
     }
     launch.mockResolvedValueOnce({
@@ -62,6 +63,7 @@ describe('launchPlaywright', () => {
     expect(page.on).toHaveBeenCalledWith('console', expect.any(Function))
     expect(page.on).toHaveBeenCalledWith('request', expect.any(Function))
     expect(page.on).toHaveBeenCalledWith('response', expect.any(Function))
+    expect(page.route).toHaveBeenCalledWith('**/*', expect.any(Function))
     await process.close()
     expect(close).toHaveBeenCalledOnce()
   })
@@ -95,6 +97,7 @@ describe('launchPlaywright', () => {
       keyboard: { press: vi.fn(async () => {}) },
       evaluate: vi.fn(async () => {}),
       on: vi.fn(),
+      route: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
     }
     const closeAfterDownload = vi.fn(async () => {})

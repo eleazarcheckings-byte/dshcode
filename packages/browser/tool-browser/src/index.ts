@@ -432,8 +432,9 @@ export function renderSnapshot(_args: SnapshotArgs, value: SnapshotValue): { typ
 export function renderPageText(_args: PageTextArgs, value: PageTextValue): { type: 'text'; text: string }[] {
   const title = value.title.trim()
   const header = title.length === 0 ? value.url : `${value.url}\n${title}`
-  const footer = value.truncated ? '\n(Text truncated.)' : ''
-  return [{ type: 'text', text: `${header}\n${value.text}${footer}` }]
+  // `value.text` already carries the truncation footer when truncated is
+  // true (session.ts's boundPageText appends it) — do not append it again.
+  return [{ type: 'text', text: `${header}\n${value.text}` }]
 }
 
 /**
@@ -697,8 +698,12 @@ export function apply(ctx: Context, config: Config): void {
       render: (_args: ScrollArgs, value) => renderTabState('Scrolled', value),
     },
     async execute(args, exec) {
+      const amount = args.amount ?? DEFAULT_SCROLL_AMOUNT
+      if (!Number.isSafeInteger(amount) || amount <= 0) {
+        throw new Error('browser: amount must be a positive safe integer')
+      }
       await session.scroll(
-        { ref: args.ref, selector: args.selector, direction: args.direction, amount: args.amount ?? DEFAULT_SCROLL_AMOUNT },
+        { ref: args.ref, selector: args.selector, direction: args.direction, amount },
         resolved.timeoutMs,
         exec.signal,
       )

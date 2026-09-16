@@ -74,7 +74,9 @@ kind: "package-reference"
 
 ### URL 策略
 
-只接受 `http:` 与 `https:`；`file:`、`data:`、其他 scheme、相对 URL，以及带 userinfo 的 URL 会在 Playwright 看到之前被拒绝。回环地址（`127.0.0.1`、`::1`）与 RFC1918 私有网段（`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`）保持可达——开发者核验本地开发服务器是本工具服务的常见场景。链路本地地址（`169.254.0.0/16`、IPv6 的 `fe80::/10`）会被拒绝，包括同一网段写成十六进制/八进制/十进制整数形式的 IPv4，或嵌入在 IPv4 映射 IPv6 字面量中的情形——这正是各大云厂商用来承载实例元数据（`169.254.169.254`）的网段，因此本工具访问的页面永远无法借道读取宿主机的云凭据。回环可达性本身就是一个真实的攻击面：任何没有自身鉴权的本地服务，都能被本工具导航到的页面（或该页面自身发起的重定向、同源 fetch）访问到——请据此对待部署的本地端口。
+只接受 `http:` 与 `https:`；`file:`、`data:`、其他 scheme、相对 URL，以及带 userinfo 的 URL 会在 Playwright 看到之前被拒绝。回环地址（`127.0.0.1`、`::1`）与 RFC1918 私有网段（`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`）保持可达——开发者核验本地开发服务器是本工具服务的常见场景。链路本地地址（`169.254.0.0/16`、IPv6 的 `fe80::/10`）会被拒绝，包括同一网段写成十六进制/八进制/十进制整数形式的 IPv4，或嵌入在 IPv4 映射 IPv6 字面量中的情形——这正是各大云厂商用来承载实例元数据（`169.254.169.254`）的网段。
+
+该拒绝被执行两次。`browser_navigate` 与 `browser_tabs new` 的 `url` 参数，在两个工具触碰 Playwright 之前就会先被检查。此外，每个标签页都会安装一个全量拦截的 `page.route('**/*', …)` 守卫（见 `src/playwright.ts` 中的 `shouldBlockRequestUrl`），在标签页存续期间对它发出的每一个请求重新检查——主文档、每一跳重定向、每个子资源，以及页内脚本发起的任何请求——因此一次指向链路本地主机的同源重定向，或模型通过 `browser_click` 点击的链接，即使从未经过参数级检查，也会被拦下。两层检查都拦不住的情形：一个*解析*到该网段的 DNS 名称（例如 `metadata.google.internal`）——两层检查比对的都是请求命名的字面主机名/IP，而非其解析结果，因此指向元数据端点的主机名别名不会被拒绝。回环可达性本身就是一个路由守卫无法收窄的真实攻击面：任何没有自身鉴权的本地服务，都能被本工具导航到的页面（或该页面自身发起的导航）访问到——请据此对待部署的本地端口。
 
 ### Chromium 自动拉取
 
@@ -88,7 +90,7 @@ kind: "package-reference"
 <details>
 <summary>实现内部——点击展开</summary>
 
-preset 的常驻挂载在该 preset 上的 agent 之间共享标签页：`browser_navigate` 替换活动标签页的页面；`browser_tabs new` 打开另一个。Chromium 在第一个标签页创建时启动，并在插件 fiber 释放时关闭，同时关闭所有打开的标签页。`browser_snapshot` 以 Playwright 的 `mode: 'ai'` 选项捕获 ARIA 树，其中嵌入了可通过 Playwright `aria-ref=` 选择器引擎解析的 `[ref=eN]` 句柄；交互工具把 `ref` 解析为 `aria-ref=<ref>`，把 `selector` 原样传递，再通过 Playwright 的 `Locator` API（`click`、`fill`、`pressSequentially`、`press`、`hover`、`scrollIntoViewIfNeeded`）执行动作。控制台与网络捕获在标签页创建时挂上 `page.on('console'|'request'|'response', …)` 监听器，每个标签页保留一个有界环形缓冲（先逐出最旧的），使长期存活的标签页也不会让缓冲无限增长；网络记录的 `status` 会在匹配的响应到达后异步补上，因此请求刚触发就读取可能还看不到状态码。截图文件以独占的 `wx` 方式创建；在 POSIX 上目录以 `0700`、文件以 `0600` 创建——Windows 没有 POSIX 的仅属主位，因此在 Windows 上该文件只受其父目录继承的 ACL 保护（通常是当前用户自己的临时目录），而非该权限模式。调用方 `AbortSignal` 与大多数标签页操作竞速；已经在 Playwright 内进行的工作不会被内部取消，下一次调用仍使用同一标签页。`browser_screenshot` 目前只返回文件路径，不返回随内容一起的图像内容块——见[已知限制](#known-limitations-and-deferred-work)。
+preset 的常驻挂载在该 preset 上的 agent 之间共享标签页：`browser_navigate` 替换活动标签页的页面；`browser_tabs new` 打开另一个。Chromium 在第一个标签页创建时启动，并在插件 fiber 释放时关闭，同时关闭所有打开的标签页。`browser_snapshot` 以 Playwright 的 `mode: 'ai'` 选项捕获 ARIA 树，其中嵌入了可通过 Playwright `aria-ref=` 选择器引擎解析的 `[ref=eN]` 句柄；交互工具把 `ref` 解析为 `aria-ref=<ref>`，把 `selector` 原样传递，再通过 Playwright 的 `Locator` API（`click`、`fill`、`pressSequentially`、`press`、`hover`、`scrollIntoViewIfNeeded`）执行动作。在这两组监听器挂载之前，每个标签页还会注册一个全量拦截的 `page.route('**/*', …)` 守卫（`src/playwright.ts` 中的 `linkLocalRouteGuard`），它会中止任何主机名属于链路本地／云元数据的请求，其余一律放行——这正是能拦下 `urls.ts` 里两处参数级检查都看不到的重定向或页内 fetch 的机制（见[URL 策略](#use-this-package)一节）。控制台与网络捕获在标签页创建时挂上 `page.on('console'|'request'|'response', …)` 监听器，每个标签页保留一个有界环形缓冲（先逐出最旧的），使长期存活的标签页也不会让缓冲无限增长；网络记录的 `status` 会在匹配的响应到达后异步补上，因此请求刚触发就读取可能还看不到状态码。截图文件以独占的 `wx` 方式创建；在 POSIX 上目录以 `0700`、文件以 `0600` 创建——Windows 没有 POSIX 的仅属主位，因此在 Windows 上该文件只受其父目录继承的 ACL 保护（通常是当前用户自己的临时目录），而非该权限模式。调用方 `AbortSignal` 与大多数标签页操作竞速；已经在 Playwright 内进行的工作不会被内部取消，下一次调用仍使用同一标签页。`browser_screenshot` 目前只返回文件路径，不返回随内容一起的图像内容块——见[已知限制](#known-limitations-and-deferred-work)。
 
 </details>
 
@@ -114,7 +116,7 @@ preset 的常驻挂载在该 preset 上的 agent 之间共享标签页：`browse
 
 #### Token 影响
 
-工具已注册时，每次请求有固定的 schema 成本；是十二个工具 schema，而不是两个。
+工具已注册时，每次请求有固定的 schema 成本；是十三个工具 schema，而不是两个。
 
 #### KV Cache 影响
 

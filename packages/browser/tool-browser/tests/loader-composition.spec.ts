@@ -56,6 +56,7 @@ async function boot(configLines: readonly string[]): Promise<Context> {
       keyboard: { press: async () => {} },
       evaluate: async () => {},
       on: () => {},
+      route: async () => {},
       close: async () => {},
     }),
     close: async () => {},
