@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-16-huggingface-provider.md
-2026-09-16-huggingface-provider.md: 5fd7ca7c723ccbc3fb7643c26bfa3a45f7f94324
-2026-09-16-huggingface-provider.zh.md: 6aafd7fa3d211a027877810c6b84f17c89b1e145
+2026-09-16-huggingface-provider.md: 094234b684003fb51e9a4d0d36bd4859c33fbda8
+2026-09-16-huggingface-provider.zh.md: 5bf39a7925bf7a20bcc623de68c0a690c78c10df

@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-`dsh-llm-pi-ai` 为声明路由新增通用的 `modelsEndpoint: true` 标志（`src/live-models.ts`）：路由的模型来自 `GET {baseURL}/models`，成功列出后服务十分钟（失败的列出 30 秒后重试，已存密钥变化时立即重新获取），并合并在路由自身的 `models` 之后，后者作为种子与失败回退。带 `providers[]` 数组的条目只有在某个提供方为 `live` 时才保留；上下文取最大的在线 `context_length`，工具支持取任一在线 `supports_tools`，只有 `architecture.input_modalities` 声明时才支持图片输入。路由接受 `org/name:<策略|提供方>` 以及任意键入的 `org/name` id。路由器的 401/402/403/404/429 回答会变为 `[huggingface:<kind>]` 失败；403（受限模型）的代码是 `ACCESS_DENIED` 而非 `AUTH`，因此任何客户端都不会将其报告为密钥无效。其他 `modelsEndpoint` 路由的列表失败使用与提供方无关的措辞。基础 bundle 声明 `huggingface`（`HF_TOKEN`、三个种子、`supportsDeveloperRole: false`）。
+`dsh-llm-pi-ai` 为声明路由新增通用的 `modelsEndpoint: true` 标志（`src/live-models.ts`）：路由的模型来自 `GET {baseURL}/models`，成功列出后服务十分钟（失败的列出 30 秒后重试，已存密钥变化时立即重新获取），并合并在路由自身的 `models` 之后，后者作为种子与失败回退。带 `providers[]` 数组的条目只有在某个提供方为 `live` 时才保留；上下文取最大的在线 `context_length`，工具支持取任一在线 `supports_tools`，只有 `architecture.input_modalities` 声明时才支持图片输入。路由接受 `org/name:<策略|提供方>` 以及任意键入的 `org/name` id。路由器的 401/402/403/404/429 回答会变为 `[huggingface:<kind>]` 失败；403（受限模型，或令牌缺少“调用 Inference Providers”权限）的代码是 `ACCESS_DENIED` 而非 `AUTH`，因此任何客户端都不会将其报告为密钥无效。其他 `modelsEndpoint` 路由的列表失败使用与提供方无关的措辞。基础 bundle 声明 `huggingface`（`HF_TOKEN`、三个种子、`supportsDeveloperRole: false`）。
 
 输入框模型选择器显示 Hugging Face 分组，带搜索框、上下文与工具徽标、键入模型 id 的入口，以及路由面板（最快、最便宜、偏好、每个在线提供方）。设置 → 模型渲染 Hugging Face 卡片：带细粒度令牌链接的令牌引导、带上下文与工具徽标的可搜索在线列表、路由策略、固定到路由的 `models`，以及本地化的路由器失败。
 
