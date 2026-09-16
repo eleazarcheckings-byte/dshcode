@@ -2263,6 +2263,9 @@ importers:
       '@saturnai/dsh-client-ui-orchestrate':
         specifier: workspace:^
         version: link:../../client/ui-orchestrate
+      '@saturnai/dsh-client-ui-remote-access':
+        specifier: workspace:^
+        version: link:../../client/ui-remote-access
       '@saturnai/dsh-client-ui-saturnbot':
         specifier: workspace:^
         version: link:../../client/ui-saturnbot
@@ -2278,6 +2281,9 @@ importers:
       '@saturnai/dsh-orchestrate':
         specifier: workspace:^
         version: link:../../saturn/orchestrate
+      '@saturnai/dsh-remote-access':
+        specifier: workspace:^
+        version: link:../../saturn/remote-access
       '@saturnai/dsh-review':
         specifier: workspace:^
         version: link:../../saturn/review

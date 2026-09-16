@@ -249,6 +249,10 @@
     - id: ui-settings-general
       name: '@deepseek-ai/dsh-client-ui-settings-general'
 
+    # Settings → Remote: enable remote access, show the pairing QR, manage devices.
+    - id: ui-remote-access
+      name: '@saturnai/dsh-client-ui-remote-access'
+
     - id: ui-settings-models
       name: '@deepseek-ai/dsh-client-ui-settings-models'
 
@@ -382,6 +386,13 @@
     # SaturnBot owns its own durable scheduler. It stays paused until configured.
     - id: saturnbot
       name: '@saturnai/dsh-saturnbot'
+
+    # Saturn AI remote access (SPEC §8 M1): a pinned-certificate LAN listener or a
+    # bring-your-own cloudflared tunnel, device-token pairing, and the approval
+    # event stream the companion apps subscribe to. Off by default; the user turns
+    # it on in Settings → Remote. Injects webServer, connection, settings.
+    - id: saturn-remote-access
+      name: '@saturnai/dsh-remote-access'
 
     - id: saturn-design-brain
       name: '@saturnai/dsh-design-brain'

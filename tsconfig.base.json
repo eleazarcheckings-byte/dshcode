@@ -462,6 +462,11 @@
       ],
       "@saturnai/dsh-design-brain": ["./packages/saturn/design-brain/src"],
       "@saturnai/dsh-design-brain/client": ["./packages/saturn/design-brain/src/client.ts"],
+      "@saturnai/dsh-remote-access": ["./packages/saturn/remote-access/src"],
+      "@saturnai/dsh-remote-access/client": ["./packages/saturn/remote-access/src/client.ts"],
+      "@saturnai/dsh-remote-access/types": ["./packages/saturn/remote-access/src/types.ts"],
+      "@saturnai/dsh-client-ui-remote-access": ["./packages/client/ui-remote-access/src"],
+      "@saturnai/dsh-client-ui-remote-access/client": ["./packages/client/ui-remote-access/src/client/index.ts"],
       "@saturnai/dsh-claims": [
         "./packages/saturn/claims/src"
       ],

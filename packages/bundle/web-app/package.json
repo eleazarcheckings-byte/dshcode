@@ -63,6 +63,7 @@
     "@saturnai/dsh-orchestrate": "workspace:^",
     "@saturnai/dsh-agent-team": "workspace:^",
     "@saturnai/dsh-tool-agent-team": "workspace:^",
+    "@saturnai/dsh-remote-access": "workspace:^",
     "@saturnai/dsh-review": "workspace:^",
     "@saturnai/dsh-tool-media": "workspace:^",
     "@deepseek-ai/dsh-client-ui-commands": "workspace:^",
@@ -141,6 +142,7 @@
     "@omdsh-dev/dsh-genui": "github:omdsh-dev/dsh-genui#57b4338222632f8ea81c2665d44e5f9e80b52686",
     "@saturnai/dsh-saturnbot": "workspace:^",
     "@saturnai/dsh-client-ui-saturnbot": "workspace:^",
+    "@saturnai/dsh-client-ui-remote-access": "workspace:^",
     "@saturnai/dsh-design-brain": "workspace:^"
   },
   "optionalDependencies": {

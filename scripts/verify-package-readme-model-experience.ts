@@ -49,6 +49,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/web-react': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/schema-form': { kind: 'none', reason: 'Browser-side form-rendering library; registers nothing model-facing.' },
   'packages/client/ui-skin-saturn': { kind: 'none', reason: 'Browser-side skin package; only changes browser presentation, no model-facing behavior.' },
+  'packages/saturn/remote-access': { kind: 'none', reason: 'Transport and device state only; registers no tool, prompt section, or model-visible text.' },
+  'packages/client/ui-remote-access': { kind: 'none', reason: 'Browser-side settings page; registers nothing model-facing.' },
 
   'packages/attachment/attachment': { kind: 'indirect', reason: 'The storage seam delegates model request rendering to provider adapters.' },
   'packages/attachment/attachment-local': { kind: 'indirect', reason: 'The local backend delegates model request rendering to provider adapters.' },
