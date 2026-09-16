@@ -15,6 +15,7 @@ import type { PiAiProviderProfile } from '../src/config.ts'
 import {
   describeLiveModel,
   isRoutableModelId,
+  LIVE_MODEL_RETRY_MS,
   LIVE_MODEL_TTL_MS,
   LiveModelCache,
   mapModelListing,
@@ -354,5 +355,97 @@ describe('llm-pi-ai plugin with a live route', () => {
     const failure = (result.finish as { failure: { message: string } }).failure
     expect(failure.message.startsWith('[huggingface:credits]')).toBe(true)
     expect((server.requests[1] as { model?: string }).model).toBe('openai/gpt-oss-120b:cheapest')
+  })
+})
+
+describe('gated access, retry backoff, credential changes, and neutral wording', () => {
+  const ROTATED = 'hf_rotatedTokenNeverReal1111'
+
+  it('gives a gated 403 its own non-AUTH code, so no client reports it as an invalid key', () => {
+    const gated = routerFailure(403)
+    expect(gated.message.startsWith('[huggingface:gated]')).toBe(true)
+    expect(gated.failure.code).toBe('ACCESS_DENIED')
+    expect(routerFailure(401).failure.code).toBe('AUTH')
+  })
+
+  it('retries a failed listing after the short backoff instead of the ten-minute TTL', async () => {
+    const responses = [jsonResponse(401, { error: 'Invalid credentials' }), jsonResponse(200, listing)]
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(responses.shift() ?? jsonResponse(200, listing)))
+    const now = { value: 0 }
+    const live = new LiveModelCache({ fetch: fetchSpy, now: () => now.value, onFailure: vi.fn() })
+    const source = { baseURL: ROUTER, apiKey: () => Promise.resolve<string | undefined>(TOKEN) }
+    await live.refresh('huggingface', source)
+    now.value += 30_000 - 1
+    await live.refresh('huggingface', source)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    now.value += 2
+    await live.refresh('huggingface', source)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(live.models('huggingface')).toEqual(expectedLive)
+    // A success earns the full TTL again.
+    now.value += 30_000 + 1
+    await live.refresh('huggingface', source)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(LIVE_MODEL_RETRY_MS).toBe(30_000)
+  })
+
+  it('refetches at once when the stored key changes, and drops the list when the key is removed', async () => {
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(jsonResponse(200, listing)))
+    const now = { value: 0 }
+    const onFailure = vi.fn()
+    const live = new LiveModelCache({ fetch: fetchSpy, now: () => now.value, onFailure })
+    const key: { value: string | undefined } = { value: TOKEN }
+    const source = { baseURL: ROUTER, apiKey: () => Promise.resolve(key.value) }
+    await live.refresh('huggingface', source)
+    now.value += 1_000
+    await live.refresh('huggingface', source)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+
+    key.value = ROTATED
+    await live.refresh('huggingface', source)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(new Headers(fetchSpy.mock.calls[1]![1]?.headers).get('authorization')).toBe(`Bearer ${ROTATED}`)
+    expect(live.models('huggingface')).toEqual(expectedLive)
+
+    const generation = live.generation
+    key.value = undefined
+    await live.refresh('huggingface', source)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(live.models('huggingface')).toBeUndefined()
+    expect(live.generation).toBeGreaterThan(generation)
+    expect(onFailure).not.toHaveBeenCalled()
+  })
+
+  it('words a failure on a non-Hugging Face modelsEndpoint route neutrally', async () => {
+    const responses = [jsonResponse(401, { error: 'bad key' }), jsonResponse(403, { error: 'forbidden' })]
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(responses.shift()!))
+    const now = { value: 0 }
+    const onFailure = vi.fn()
+    const live = new LiveModelCache({ fetch: fetchSpy, now: () => now.value, onFailure })
+    const source = { baseURL: 'http://tgi.internal:8080/v1', apiKey: () => Promise.resolve<string | undefined>(TOKEN) }
+    await live.refresh('tgi', source)
+    now.value += LIVE_MODEL_TTL_MS + 1
+    await live.refresh('tgi', source)
+    expect(onFailure).toHaveBeenCalledTimes(2)
+    const [unauthorized, forbidden] = onFailure.mock.calls.map(call => call[1] as LlmError)
+    expect(unauthorized!.message).toMatch(/rejected the API key/u)
+    expect(unauthorized!.failure.code).toBe('AUTH')
+    expect(forbidden!.message).toMatch(/refused access/u)
+    expect(forbidden!.failure.code).toBe('ACCESS_DENIED')
+    for (const failure of [unauthorized!, forbidden!]) {
+      expect(failure.message).not.toContain('Hugging Face')
+      expect(failure.message.startsWith('[huggingface:')).toBe(false)
+      expect(failure.message).not.toContain(TOKEN)
+    }
+  })
+
+  it('keeps the Hugging Face wording for the huggingface route even behind a proxy host', async () => {
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(jsonResponse(403, { error: 'gated' })))
+    const onFailure = vi.fn()
+    const live = new LiveModelCache({ fetch: fetchSpy, now: () => 0, onFailure })
+    await live.refresh('huggingface', { baseURL: 'http://proxy.internal/v1', apiKey: () => Promise.resolve<string | undefined>(TOKEN) })
+    const failure = onFailure.mock.calls[0]![1] as LlmError
+    expect(failure.message.startsWith('[huggingface:gated]')).toBe(true)
+    expect(failure.failure.code).toBe('ACCESS_DENIED')
   })
 })
