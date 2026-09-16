@@ -50,8 +50,9 @@ DeepSeek API 在低峰时段半价计费，harness 用一枚小小的「高峰 /
 - 会话头部的右内边距现在依赖两个框架属性。新的栏占位者应同样发布自己的
   占位，而不是修改头部。
 - 输入框尾部控制行少了一个控件；其余未动。
-- 在手机上，栏与启动按钮共享顶部条带；指示灯高 22px 且不可交互，无需 44px
-  触控目标，但若条带需要隐藏它，移动端样式表可通过 `data-peak-rail` 触及。
+- 在手机上，右上角是标题条带，因此移动端样式表隐藏该栏（`ui-theme/src/styles/mobile.css`
+  中的 `[data-peak-rail]`）；席位随之测得 0 宽、不预留任何头部内缩。在条带为它
+  长出席位之前，指示灯是桌面端的功能。
 - 客户端 slot 目录在 `shell.overlay` 上新增 `deepseek-peak` 占位者（用
   `pnpm run gen-client-catalog` 重新生成）。
 
@@ -79,8 +80,10 @@ DeepSeek API 在低峰时段半价计费，harness 用一枚小小的「高峰 /
   指示灯。
 - `tests/apply-wiring.client.spec.tsx`：`shell.overlay` 依次携带 `ambient-motion`
   与 `deepseek-peak`。
-- 测试先以 RED 状态提交。声明一处 RED 之后的测试修改：分钟计时用例在 `act()` 之外
-  推进了假时钟，状态更新从未刷新；修改仅把推进包进 `act()`，断言未变。
+- 测试先以 RED 状态提交。声明两处 RED 之后的测试修改，均为机械性改动：分钟计时
+  用例在 `act()` 之外推进了假时钟，状态更新从未刷新，修改把推进包进 `act()`；
+  布局桩改为 `vi.spyOn` 以满足 linter。断言未变。第二轮 RED（Mars r1）补上了
+  零宽度守卫与 SaturnBot 窗口用例。
 - 运行时证明：已安装的桌面构建以远程调试端口重新启动后，在首页和会话中都能
   看到指示灯位于右上角、紧邻 SaturnBot 启动按钮，definition-of-done 芯片与之
   无重叠。

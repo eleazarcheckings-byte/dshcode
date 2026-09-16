@@ -206,6 +206,14 @@
 
   /* ---- The composer, docked ---------------------------------------------- */
 
+  /* The DeepSeek pricing lamp is desktop rail chrome (top-right, beside the
+     SaturnBot launcher). On a phone that corner is the title strip, so the
+     lamp stands down; its seat then measures 0 wide and reserves no header
+     inset (ui-conversation PeakRail). */
+  [data-shell-frame][data-mobile] [data-peak-rail] {
+    display: none;
+  }
+
   [data-shell-frame][data-mobile] [data-composer-seat] {
     /* The seat is sticky at the scrollport floor; padding lifts its content
        clear of the home indicator and of the band the keyboard covers,

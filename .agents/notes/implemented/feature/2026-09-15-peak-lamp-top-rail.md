@@ -62,10 +62,10 @@ for the mobile sheet, which cannot reach a hashed CSS-module class.
   editing the header.
 - The composer's trailing row is one control shorter; nothing else there
   moved.
-- On a phone the rail shares the top strip with the launcher; the lamp is
-  22px tall and non-interactive, so it needs no 44px target, but the mobile
-  sheet can reach it through `data-peak-rail` if the strip ever needs it
-  hidden.
+- On a phone the top-right corner is the title strip, so the mobile sheet
+  hides the rail (`ui-theme/src/styles/mobile.css`, `[data-peak-rail]`); the
+  seat then measures 0 wide and reserves no header inset. The lamp is a
+  desktop affordance until the strip grows a seat for it.
 - The client slot catalog gains the `deepseek-peak` occupant on
   `shell.overlay` (regenerated with `pnpm run gen-client-catalog`).
 
@@ -95,9 +95,12 @@ for the mobile sheet, which cannot reach a hashed CSS-module class.
   composer renders the lamp any more.
 - `tests/apply-wiring.client.spec.tsx`: `shell.overlay` carries
   `ambient-motion` then `deepseek-peak`.
-- Tests were committed RED first. One post-RED test edit is declared: the
-  minute-tick case advanced the fake clock outside `act()`, so the state update
-  never flushed; the edit wraps the advance in `act()`. No assertion changed.
+- Tests were committed RED first. Two post-RED test edits are declared, both
+  mechanical: the minute-tick case advanced the fake clock outside `act()`, so
+  the state update never flushed, and the edit wraps the advance in `act()`;
+  the layout stub became a `vi.spyOn` to satisfy the linter. No assertion
+  changed. A second RED round (Mars r1) added the zero-width guard and the
+  SaturnBot-window case.
 - Runtime proof: the installed desktop build, relaunched with a remote
   debugging port, shows the lamp at the top-right beside the SaturnBot launcher
   on the hero and in a session, with the definition-of-done chip clear of it.

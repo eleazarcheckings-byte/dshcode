@@ -139,19 +139,26 @@ export function PeakRail({ t }: PeakRailProps) {
     const frame = node.closest('[data-shell-overlay]')?.parentElement
     if (frame === null || frame === undefined) return
     const previous = frame.style.getPropertyValue(TRAILING_EXTRA)
+    const release = () => {
+      if (previous) frame.style.setProperty(TRAILING_EXTRA, previous)
+      else frame.style.removeProperty(TRAILING_EXTRA)
+    }
     const reserve = () => {
       const width = Math.round(node.getBoundingClientRect().width)
-      frame.style.setProperty(TRAILING_EXTRA, `${width + PEAK_RAIL_GAP}px`)
+      // No box means the sheet hid the rail (the phone shell does): reserve
+      // nothing rather than a bare gap for an invisible lamp.
+      if (width === 0) release()
+      else frame.style.setProperty(TRAILING_EXTRA, `${width + PEAK_RAIL_GAP}px`)
     }
     reserve()
-    // The label changes width at the tier switch and on a locale change; the
-    // reservation follows the seat's box, not a guess about it.
+    // The label changes width at the tier switch and on a locale change, and
+    // the sheet can hide the rail at a breakpoint; the reservation follows the
+    // seat's box, not a guess about it.
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(reserve)
     observer?.observe(node)
     return () => {
       observer?.disconnect()
-      if (previous) frame.style.setProperty(TRAILING_EXTRA, previous)
-      else frame.style.removeProperty(TRAILING_EXTRA)
+      release()
     }
   }, [standalone])
 

@@ -103,7 +103,8 @@ describe('PeakRail', () => {
   })
 
   it('stays out of the SaturnBot window and reserves nothing there', () => {
-    vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, search: '?saturnbot=1' } as Location)
+    // The guard reads only `location.search`; a URL carries that shape.
+    vi.spyOn(window, 'location', 'get').mockReturnValue(new URL('http://localhost/?saturnbot=1') as unknown as Location)
     const view = mountRail(MONDAY_PEAK)
     expect(view.container.querySelector('[data-peak-rail]')).toBeNull()
     expect(view.queryByRole('img')).toBeNull()
