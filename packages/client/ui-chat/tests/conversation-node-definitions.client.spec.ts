@@ -2008,6 +2008,44 @@ describe('built-in conversation node Definitions', () => {
     })
   })
 
+  it('carries the huggingface unauthorized tag onto the turn-error node, unlike any other AUTH failure', () => {
+    // Drives a durable AUTH failure through turn-error.ts (displayFailure at
+    // event-projection.ts), not just the view: a `[huggingface:unauthorized]`
+    // tagged 401 must survive the AUTH redaction so Chat can localize it,
+    // while every other AUTH message still comes out empty.
+    const tagged = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'turn/end', {
+        turn: 1,
+        reason: {
+          kind: 'error',
+          error: {
+            code: 'AUTH',
+            message: '[huggingface:unauthorized] the Hugging Face token is invalid or lacks the "Make calls to Inference Providers" permission',
+          },
+        },
+      }),
+    ])
+    expect(node(snapshot(tagged), 'turn-error')?.data).toMatchObject({
+      kind: 'turn-error',
+      seq: 2,
+      turn: 1,
+      message: '[huggingface:unauthorized]',
+      code: 'AUTH',
+    })
+
+    const untagged = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'turn/end', {
+        turn: 1,
+        reason: { kind: 'error', error: { code: 'AUTH', message: '401 Unauthorized' } },
+      }),
+    ])
+    expect(node(snapshot(untagged), 'turn-error')?.data).toMatchObject({
+      kind: 'turn-error', seq: 2, turn: 1, message: '', code: 'AUTH',
+    })
+  })
+
   it('materializes a max-tokens notice and keeps completed and error turns clean', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

@@ -49,6 +49,15 @@ describe('toAssistantBlock', () => {
     expect(displayFailure(null)).toEqual({ message: 'null' })
   })
 
+  it('keeps the huggingface unauthorized tag through the AUTH redaction, and only that tag', () => {
+    // routerFailure(401) codes AUTH with a `[huggingface:unauthorized]` tag the
+    // client localizes; the tag must survive so Chat can show that copy instead
+    // of the generic invalid-key text. Every other AUTH message stays emptied.
+    expect(displayFailure({ code: 'AUTH', message: '[huggingface:unauthorized] the Hugging Face token is invalid or lacks the "Make calls to Inference Providers" permission' }))
+      .toEqual({ code: 'AUTH', message: '[huggingface:unauthorized]' })
+    expect(displayFailure({ code: 'AUTH', message: '401 Unauthorized' })).toEqual({ code: 'AUTH', message: '' })
+  })
+
   it('recognizes only non-empty token deltas', () => {
     expect(isTokenDelta({ type: 'text-delta', index: 0, text: 'x' } as never)).toBe(true)
     expect(isTokenDelta({ type: 'reasoning-delta', index: 0, text: '' } as never)).toBe(false)
