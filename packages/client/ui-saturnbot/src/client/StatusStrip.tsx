@@ -23,7 +23,7 @@ export function computeSetupGaps(snapshot: SaturnBotSnapshot, t: BotTranslate): 
   if (snapshot.config.workspace.trim() === '') gaps.push({ key: 'workspace', label: t('wizard.gap.workspace'), step: 'workspace' })
   if (snapshot.config.goal.trim() === '') gaps.push({ key: 'goal', label: t('wizard.gap.goal'), step: 'goal' })
   if (snapshot.config.provider.trim() === '' || snapshot.config.model.trim() === '') gaps.push({ key: 'model', label: t('wizard.gap.model'), step: 'model' })
-  for (const credential of snapshot.firstRun?.credentials ?? []) {
+  for (const credential of snapshot.firstRun.credentials) {
     if (!credential.present) gaps.push({ key: `credential:${credential.env}`, label: t('wizard.gap.credential', { name: credential.name, env: credential.env }), step: 'connections' })
   }
   return gaps

@@ -73,10 +73,10 @@ export function Configuration({ snapshot, workspaces, save, busy, t }: {
     <section className={css.panel}><PanelHeading title={t('nav.connections')} /><p className={css.muted}>{t('wizard.step.connections.detail')}</p>
       {!integrationsResult.ok && <p className={css.error} role="alert">{t('connect.fixJsonFirst')}</p>}
       <IntegrationConnectForms
-        catalog={snapshot.integrationCatalog ?? []}
+        catalog={snapshot.integrationCatalog}
         values={integrationsResult.ok ? integrationsResult.value : {}}
         onChange={(next) => { setIntegrations(JSON.stringify(next, null, 2)); setSaved(false) }}
-        envPath={snapshot.firstRun?.envPath}
+        envPath={snapshot.firstRun.envPath}
         disabled={!integrationsResult.ok}
         t={t}
       />

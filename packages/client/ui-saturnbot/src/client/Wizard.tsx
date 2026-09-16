@@ -21,9 +21,9 @@ const PROVIDER_PRESETS = ['deepseek', 'anthropic', 'openai', 'google', 'xai', 'm
 
 /** Resume at the first incomplete step, matching how `firstRun` (when present) already reports things. */
 export function resumeWizardStep(snapshot: SaturnBotSnapshot): SaturnBotWizardStep {
-  const goal = snapshot.firstRun?.goal ?? snapshot.config.goal
-  const workspace = snapshot.firstRun?.workspace ?? snapshot.config.workspace
-  const provider = snapshot.firstRun?.provider ?? snapshot.config.provider
+  const goal = snapshot.firstRun.goal
+  const workspace = snapshot.firstRun.workspace
+  const provider = snapshot.firstRun.provider
   if (goal.trim() === '') return 'goal'
   if (workspace.trim() === '') return 'workspace'
   if (provider.trim() === '' || snapshot.config.model.trim() === '') return 'model'
@@ -60,7 +60,7 @@ export function FirstRunWizard({ snapshot, workspaces, save, busy, pickDirectory
   const index = STEPS.indexOf(step)
   const integrationsResult = parseIntegrationsResult(integrations)
   const parsedIntegrations = integrationsResult.ok ? integrationsResult.value : {}
-  const catalog = snapshot.integrationCatalog ?? []
+  const catalog = snapshot.integrationCatalog
   const browse = (): void => {
     setBrowsing(true)
     void pickDirectory().then((picked) => { if (picked !== null) setWorkspace(picked) }).catch(() => {
@@ -127,7 +127,7 @@ export function FirstRunWizard({ snapshot, workspaces, save, busy, pickDirectory
         catalog={catalog}
         values={parsedIntegrations}
         onChange={(next) => { setIntegrations(JSON.stringify(next, null, 2)) }}
-        envPath={snapshot.firstRun?.envPath}
+        envPath={snapshot.firstRun.envPath}
         disabled={!integrationsResult.ok}
         t={t}
       />
