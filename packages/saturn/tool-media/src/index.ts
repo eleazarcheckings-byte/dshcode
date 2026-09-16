@@ -80,26 +80,35 @@ const DEFAULT_HIGGSFIELD_API_KEY_ENV = 'HIGGSFIELD_API_KEY'
 
 /** Loader-facing config for the Gemini sub-block, plus its credential fields. */
 export interface GeminiPluginConfig extends GeminiConfig {
+  /** Literal Gemini API key; mutually exclusive with `apiKeyEnv` and never logged. */
   readonly apiKey?: string
+  /** Name of the environment variable holding the Gemini API key; defaults to `GEMINI_API_KEY`. */
   readonly apiKeyEnv?: string
 }
 
 /** Loader-facing config for the OpenAI sub-block, plus its credential fields. */
 export interface OpenAiPluginConfig extends OpenAiConfig {
+  /** Literal OpenAI API key; mutually exclusive with `apiKeyEnv` and never logged. */
   readonly apiKey?: string
+  /** Name of the environment variable holding the OpenAI API key; defaults to `OPENAI_API_KEY`. */
   readonly apiKeyEnv?: string
 }
 
 /** Loader-facing config for the Higgsfield sub-block, plus its (combined `id:secret`) credential fields. */
 export interface HiggsfieldPluginConfig extends HiggsfieldConfig {
+  /** Literal, already-combined `"{id}:{secret}"` Higgsfield credential; mutually exclusive with `apiKeyEnv` and never logged. */
   readonly apiKey?: string
+  /** Name of the environment variable holding the combined `"{id}:{secret}"` Higgsfield credential; defaults to `HIGGSFIELD_API_KEY`. */
   readonly apiKeyEnv?: string
 }
 
 /** Deployment configuration for the media tool package. */
 export interface Config {
+  /** Gemini provider sub-block: credentials plus `GeminiConfig`; omit to leave the provider unconfigured. */
   readonly gemini?: GeminiPluginConfig
+  /** OpenAI provider sub-block: credentials plus `OpenAiConfig`; omit to leave the provider unconfigured. */
   readonly openai?: OpenAiPluginConfig
+  /** Higgsfield provider sub-block: credentials plus `HiggsfieldConfig`; omit to leave the provider unconfigured. */
   readonly higgsfield?: HiggsfieldPluginConfig
   /** Provider used when a call omits `provider` for an `image` request; defaults to `gemini`. */
   readonly defaultImageProvider?: MediaProviderId
@@ -145,7 +154,7 @@ export const Config: z<Config> = z.object({
   higgsfield: higgsfieldConfigSchema,
   defaultImageProvider: providerSchema.default('gemini'),
   defaultVideoProvider: providerSchema.default('gemini'),
-})
+}).default({})
 
 /** Resolve one API key: an explicit inline value wins; otherwise the credential seam, falling back to the launch environment. */
 async function resolveApiKey(ctx: Context, label: string, inline: string | undefined, envName: string): Promise<string> {
@@ -338,7 +347,7 @@ export class MediaService extends Service {
   static Config = Config
   private readonly pending = new Map<string, TrackedJob>()
 
-  constructor(ctx: Context, public config: Config) {
+  constructor(ctx: Context, public config: Config = {}) {
     super(ctx, 'media')
   }
 
@@ -381,6 +390,8 @@ export class MediaService extends Service {
    * @param agent - the identity `ctx.approval` routes this binding's prompts through.
    * @param defaults - additional `exec` fields (`callId`, `signal`, `toolName`) applied to every call
    *   made through the binding; `toolName` defaults to `'media'` when omitted, matching direct `ctx.media` use.
+   * @returns a `{ generate, status }` pair with `agent` and `defaults` already closed over, so callers
+   *   invoke `generate(request)` / `status(id)` without threading `exec` themselves.
    */
   withAgent(agent: Agent, defaults: Omit<MediaExecContext, 'agent'> = {}): BoundMediaService {
     const exec: MediaExecContext = { agent, ...defaults }
@@ -393,6 +404,15 @@ export class MediaService extends Service {
   /**
    * Resolve one generation request to a terminal (`'done'`/`'failed'`) job, gating the billable
    * network call behind approval first. See the class doc for the `exec` extension rationale.
+   * @param request - the kind, prompt, target provider (or the configured default for `request.kind`
+   *   when omitted), workspace, and provider-specific params for the generation; `request.workspace`
+   *   must be an absolute path and `request.prompt` must be non-empty.
+   * @param exec - the calling `Agent` (routes the spend-approval prompt through `ctx.approval` when
+   *   present, else `ctx.userQuestions`) plus optional `callId`, `signal`, and `toolName`; defaults
+   *   to `{}`, which fails the call closed if no approval route is composed.
+   * @returns the terminal job, its produced assets, and the metered cost once approval and the
+   *   provider call both succeed; throws on an empty prompt, an unknown provider, a rejected or
+   *   unavailable approval, or a provider-side failure.
    */
   async generate(request: MediaGenerateRequest, exec: MediaExecContext = {}): Promise<MediaJob> {
     assertAbsoluteWorkspace(request.workspace)
@@ -524,6 +544,9 @@ export class MediaService extends Service {
   /**
    * Re-read a job's last known result. Every job this package produces is already terminal by the
    * time `generate()` returns (see the README Known Limitations), so this is a cache read, not a fresh poll.
+   * @param id - the `MediaJob.id` returned by an earlier `generate()` call.
+   * @returns the cached terminal job for `id`; throws when `id` is unknown to this service instance
+   *   (jobs do not persist across process restarts).
    */
   async status(id: string): Promise<MediaJob> {
     const tracked = this.pending.get(id)
@@ -605,7 +628,7 @@ function jobRenderText(value: JobRenderValue): string {
  * @param ctx - registrant context carrying the tool registry.
  * @param config - deployment configuration, validated at load by the sub-resolvers.
  */
-export function apply(ctx: Context, config: Config): void {
+export function apply(ctx: Context, config: Config = {}): void {
   // Fail loud at load if any configured sub-block is malformed, mirroring tool-describe-image.
   if (config.gemini !== undefined) resolveGeminiConfig(config.gemini)
   if (config.openai !== undefined) resolveOpenAiConfig(config.openai)
@@ -767,4 +790,6 @@ export function apply(ctx: Context, config: Config): void {
   }))
 }
 
-export default apply
+// Named exports only. cordis-plugin-loader's unwrapExports takes `module.default ?? module`;
+// a default `apply` function would replace the namespace and drop `inject` / `Config` / `name`,
+// and the row would fail at boot with "cannot get property \"tools\" without inject".
