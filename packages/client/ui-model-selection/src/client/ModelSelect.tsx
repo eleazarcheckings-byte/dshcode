@@ -24,6 +24,9 @@ import {
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelCatalogModel } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { ModelSelectInjected } from './slots.ts'
+import {
+  HF_ROUTE, huggingFaceErrorKey, isRoutableModelId, parseLiveDescription, ROUTING_POLICIES, splitRoutedModelId,
+} from './huggingface.ts'
 import css from './ModelSelect.module.css'
 
 /**
@@ -40,7 +43,7 @@ type ModelEntry = ModelCatalogModel & {
 }
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
-type Pane = 'root' | 'model' | 'effort'
+type Pane = 'root' | 'model' | 'effort' | 'route'
 
 /** One dynamic effort row; undefined means preserve the provider default. */
 interface EffortChoice {
@@ -72,6 +75,9 @@ export function ModelSelect(
   // action was a load.
   const lastActionRef = useRef<'load' | 'select'>('load')
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
+  const [query, setQuery] = useState('')
+  const [typedId, setTypedId] = useState('')
+  const [typedInvalid, setTypedInvalid] = useState(false)
   const toastSeq = useRef(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
@@ -90,10 +96,46 @@ export function ModelSelect(
           : { reasoningEffort: model.reasoning.defaultEffort },
       } satisfies ModelSelection,
     }))), [state.groups])
-  const selectedIndex = state.current === null
-    ? -1
-    : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
+  // A Hugging Face selection may carry a routing suffix (`org/name:cheapest`);
+  // it still belongs to the listed `org/name` row unless that exact id is listed.
+  const selectedIndex = useMemo(() => {
+    const current = state.current
+    if (current === null) return -1
+    const exact = choices.findIndex(c => c.selection.provider === current.provider && c.selection.model === current.model)
+    if (exact >= 0 || current.provider !== HF_ROUTE) return exact
+    const base = splitRoutedModelId(current.model).base
+    return choices.findIndex(c => c.selection.provider === current.provider && c.selection.model === base)
+  }, [choices, state.current])
+  const hfPresent = state.groups.some(group => group.id === HF_ROUTE)
+  const needle = query.trim().toLowerCase()
+  const visibleGroups = needle.length === 0
+    ? state.groups
+    : state.groups
+      .map(group => ({
+        ...group,
+        models: group.models.filter(model =>
+          model.id.toLowerCase().includes(needle) || model.name.toLowerCase().includes(needle)),
+      }))
+      .filter(group => group.models.length > 0)
   const currentChoice = choices[selectedIndex]
+  const routed = state.current?.provider === HF_ROUTE && currentChoice !== undefined
+  const routeSuffix = state.current === null ? undefined : splitRoutedModelId(state.current.model).suffix
+  const routeChoices: readonly { key: string; suffix: string | undefined; label: string }[] = routed
+    ? [
+      ...ROUTING_POLICIES.map(policy => ({
+        key: `policy:${policy}`,
+        suffix: policy === 'fastest' ? undefined : policy,
+        label: t(`route.${policy}`),
+      })),
+      ...(parseLiveDescription(currentChoice.model.description)?.providers ?? []).map(provider => ({
+        key: `provider:${provider}`,
+        suffix: provider,
+        label: provider,
+      })),
+    ]
+    : []
+  const effectiveSuffix = routeSuffix === 'fastest' ? undefined : routeSuffix
+  const routeLabel = routeChoices.find(choice => choice.suffix === effectiveSuffix)?.label ?? routeSuffix
   const reasoning = currentChoice?.model.reasoning
   const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
   const effortLabel = reasoning === undefined
@@ -179,6 +221,12 @@ export function ModelSelect(
     close()
   }
 
+  /** A Host failure message, localized when it is a tagged Hugging Face router failure. */
+  const failureText = (message: string): string => {
+    const key = huggingFaceErrorKey(message)
+    return key === undefined ? message : t(key)
+  }
+
   const settleSelection = (accepted: boolean): void => {
     if (accepted) {
       if (rootRef.current !== null) close(true)
@@ -187,7 +235,7 @@ export function ModelSelect(
     const message = directory.getSnapshot().error
     if (message !== null) {
       toastSeq.current += 1
-      setToast({ seq: toastSeq.current, text: t('error.action', { message }) })
+      setToast({ seq: toastSeq.current, text: t('error.action', { message: failureText(message) }) })
     }
   }
 
@@ -198,6 +246,32 @@ export function ModelSelect(
     }
     lastActionRef.current = 'select'
     void select(selection).then(settleSelection)
+  }
+
+  const chooseRoute = (suffix: string | undefined): void => {
+    const current = state.current
+    if (current === null || currentChoice === undefined) return
+    const model = suffix === undefined ? currentChoice.model.id : `${currentChoice.model.id}:${suffix}`
+    if (model === current.model) {
+      close(true)
+      return
+    }
+    lastActionRef.current = 'select'
+    void select({
+      provider: current.provider,
+      model,
+      ...current.reasoningEffort === undefined ? {} : { reasoningEffort: current.reasoningEffort },
+    }).then(settleSelection)
+  }
+
+  const submitTypedId = (): void => {
+    const typed = typedId.trim()
+    if (!isRoutableModelId(typed)) {
+      setTypedInvalid(true)
+      return
+    }
+    setTypedInvalid(false)
+    choose({ provider: HF_ROUTE, model: typed })
   }
 
   const chooseEffort = (effort: string | undefined): void => {
@@ -275,6 +349,13 @@ export function ModelSelect(
                 <span className={css.cellValue}>{modelLabel}</span>
                 <IconChevronRightOutline14 className={css.cellChevron} />
               </button>
+              {routed && (
+                <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('route') }}>
+                  <span className={css.cellLabel}>{t('menu.route')}</span>
+                  <span className={css.cellValue}>{routeLabel}</span>
+                  <IconChevronRightOutline14 className={css.cellChevron} />
+                </button>
+              )}
               {reasoning !== undefined && (
                 <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('effort') }}>
                   <span className={css.cellLabel}>{t('menu.effort')}</span>
@@ -292,25 +373,36 @@ export function ModelSelect(
               )}
               {state.error !== null && lastActionRef.current === 'load' && (
                 <div className={css.error}>
-                  <span>{t('error.action', { message: state.error })}</span>
+                  <span>{t('error.action', { message: failureText(state.error) })}</span>
                   <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
                 </div>
               )}
               {state.failures.map(failure => (
                 <div className={css.warning} key={failure.id}>
-                  <span>{t('warning.groupLoad', { name: failure.name, message: failure.message })}</span>
+                  <span>{t('warning.groupLoad', { name: failure.name, message: failureText(failure.message) })}</span>
                   <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
                 </div>
               ))}
+              {hfPresent && (
+                <input
+                  type="search"
+                  className={css.search}
+                  aria-label={t('hf.search')}
+                  placeholder={t('hf.search')}
+                  value={query}
+                  onChange={(event) => { setQuery(event.target.value) }}
+                />
+              )}
               <div className={clsx(css.groups, 'scrollable')}>
-                {state.groups.map((group) => {
+                {visibleGroups.map((group) => {
                   const headingId = `${id}-${group.id}`
                   return (
                     <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
                       <div className={css.groupTitle} id={headingId}>{group.name}</div>
                       {group.models.map((model) => {
                         const entry = model as ModelEntry
-                        const selected = state.current?.provider === group.id && state.current.model === model.id
+                        const live = group.id === HF_ROUTE ? parseLiveDescription(model.description) : undefined
+                        const selected = currentChoice?.group.id === group.id && currentChoice.model.id === model.id
                         return (
                           <button
                             ref={itemRef()}
@@ -328,6 +420,13 @@ export function ModelSelect(
                               {/* Declared capability badges; the absence of a
                                   field is not a badge, so only declared claims
                                   render. */}
+                              {live !== undefined && (live.context !== undefined || live.tools) && (
+                                <span className={css.badges}>
+                                  {live.context !== undefined
+                                    && <span className={css.badge}>{t('badge.context', { size: live.context })}</span>}
+                                  {live.tools && <span className={css.badge}>{t('badge.tools')}</span>}
+                                </span>
+                              )}
                               {(entry.inputModalities?.includes('image') === true
                                 || entry.outputModalities?.includes('image') === true
                                 || entry.capabilities?.includes('image-understanding') === true)
@@ -356,8 +455,52 @@ export function ModelSelect(
               {state.status === 'ready' && choices.length === 0 && (
                 <div className={css.empty}>{t('empty.models')}</div>
               )}
+              {hfPresent && (
+                <div className={css.typedId}>
+                  <input
+                    type="text"
+                    className={css.search}
+                    aria-label={t('hf.idLabel')}
+                    placeholder={t('hf.idLabel')}
+                    aria-invalid={typedInvalid}
+                    value={typedId}
+                    onChange={(event) => {
+                      setTypedId(event.target.value)
+                      setTypedInvalid(false)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        submitTypedId()
+                      }
+                    }}
+                  />
+                  <button type="button" className={css.retry} disabled={busy} onClick={submitTypedId}>{t('hf.idUse')}</button>
+                  {typedInvalid && <div className={css.error}>{t('hf.idInvalid')}</div>}
+                </div>
+              )}
             </>
           )}
+
+          {pane === 'route' && routeChoices.map(choice => (
+            <button
+              ref={itemRef()}
+              type="button"
+              role="menuitemradio"
+              aria-checked={effectiveSuffix === choice.suffix}
+              className={clsx(css.option, effectiveSuffix === choice.suffix && css.selected)}
+              key={choice.key}
+              disabled={busy}
+              onClick={() => { chooseRoute(choice.suffix) }}
+            >
+              <span className={css.optionCopy}>
+                <span className={css.modelName}>{choice.label}</span>
+              </span>
+              <span className={css.check}>
+                {effectiveSuffix === choice.suffix ? <IconCheckOutline16 /> : null}
+              </span>
+            </button>
+          ))}
 
           {pane === 'effort' && (
             <>

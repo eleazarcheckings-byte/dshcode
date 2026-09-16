@@ -19,6 +19,8 @@ import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-sl
 // Type-only: pulls this package's SlotMap merge (the two Models child slots).
 import type {} from './slot-contract.ts'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
+import { HuggingFaceCard } from './HuggingFaceCard.tsx'
+import { HF_ROUTE } from './huggingface.ts'
 import { deriveKeyRef, protocolChoices, providerUsable } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
@@ -421,6 +423,18 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                 { provider: row.entry, configured: row.configured, keyConfigured: keyConfiguredOf(row) },
                 { entryKey: row.entry.settingsNs },
               )}
+              {row.entry.provider === HF_ROUTE && row.entry.settingsNs === 'llm-pi-ai'
+                ? (
+                  <HuggingFaceCard
+                    operations={operations}
+                    namespace={namespace}
+                    keyConfigured={credentialConfigured}
+                    readOnly={!state.writable}
+                    t={t}
+                    onChanged={() => { void controller.load() }}
+                  />
+                )
+                : null}
               {open
                 ? renderProviderEditor({
                   target,
