@@ -49,6 +49,11 @@ pre-merge-commit:
       glob: '.agents/notes/archived/**'
       run: node_modules/.bin/tsx scripts/verify-archived-agent-notes.ts
 
+commit-msg:
+  jobs:
+    - name: commit type matches its scope
+      run: node_modules/.bin/tsx scripts/verify-commit-scope.ts {1}
+
 pre-push:
   jobs:
     - name: typecheck

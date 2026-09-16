@@ -110,6 +110,7 @@ lefthook is configured in `lefthook.yml` as a fast local checkpoint:
 
 - `pre-commit` verifies staged pairing records against the staged owner blobs, validates staged files with the project-free `.oxlintrc.staged.json` profile and applies Oxlint fixes with one bounded retry, regenerates `THIRD_PARTY_NOTICES.md` when a staged file is one of its inputs, checks the staged diff for whitespace errors, and runs the vendor manifest guard.
 - `pre-merge-commit` performs the same index-backed pairing check before Git creates an automatic merge commit.
+- `commit-msg` refuses a `docs()` commit that changes code outside comment lines and a `chore()` commit that stages `src/` or `tests/` code (`scripts/verify-commit-scope.ts`); a `Scope-Exception: <reason>` trailer in the message waives it with the reason kept in history.
 - `pre-push` runs `pnpm run typecheck`, which completes the Host lib phase, including generated Typert contracts, before the Client TypeScript check.
 
 The vendor manifest guard checks that changes under `vendor/*/src` are staged with the matching `vendor/README.md` manifest update. See `vendor/README.md` before editing vendored code.
