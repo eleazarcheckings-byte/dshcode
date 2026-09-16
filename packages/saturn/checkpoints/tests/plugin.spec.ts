@@ -80,7 +80,7 @@ async function dispatch(ctx: Context, agent: CommandAgent, name: string, args: u
     name,
     arguments: args,
     signal: new AbortController().signal,
-    agent: agent as never,
+    agent,
   })
   expect(result.isError, `${name} should have run`).toBe(false)
 }
