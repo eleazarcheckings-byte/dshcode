@@ -55,7 +55,7 @@ Artifacts land as:
 - `dshcode-macos-arm64`, `dshcode-macos-x64`, `dshcode-windows-x64` — workflow
   artifacts on the run itself (14-day retention), each holding the raw
   `.dmg`/`.zip`/`.exe`.
-- A GitHub Release named `DSHCode <version>` (prerelease flag set
+- A GitHub Release named `Saturn AI Desktop <version>` (prerelease flag set
   automatically when the tag has a `-` suffix, e.g. `desktop-v1.2.0-beta`),
   with every packaged file plus `SHA256SUMS.txt` attached.
 

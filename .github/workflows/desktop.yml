@@ -181,7 +181,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_NOTES: |
-            Installable DSHCode desktop preview for macOS and Windows.
+            Installable Saturn AI Desktop preview for macOS and Windows.
 
             Code signing and notarization are opt-in per repo secret (see apps/desktop/RELEASE.md). If those secrets were not configured for this run, these packages are unsigned: macOS Gatekeeper and Windows SmartScreen may warn before first launch.
         run: |
@@ -192,7 +192,7 @@ jobs:
           fi
           gh release create "$GITHUB_REF_NAME" release/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "DSHCode $version" \
+            --title "Saturn AI Desktop $version" \
             --notes "$RELEASE_NOTES" \
             --verify-tag \
             "${release_args[@]}"
