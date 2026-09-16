@@ -27,7 +27,7 @@
  * @module @saturnai/dsh-checkpoints
  */
 
-import { join } from 'node:path'
+import { win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
@@ -175,7 +175,11 @@ export const checkpointsProjectionDefinition = {
 export function defaultInstallRoot(env: Record<string, string | undefined> = process.env): string | null {
   const local = env.LOCALAPPDATA
   return typeof local === 'string' && local.trim().length > 0
-    ? join(local, 'Programs', '@dshcodedesktop')
+    // LOCALAPPDATA only exists on Windows and names a Windows tree, so the
+    // separator belongs to the value, not to the host: joining through the
+    // ambient `path` produced a mixed-separator root whenever a non-Windows
+    // process asked, and this root is compared against native absolute paths.
+    ? win32.join(local, 'Programs', '@dshcodedesktop')
     : null
 }
 
