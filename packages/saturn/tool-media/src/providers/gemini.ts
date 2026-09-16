@@ -125,7 +125,7 @@ export function parseOutputImage(payload: unknown): DecodedMedia {
   if (typeof root !== 'object' || root === null) {
     throw new Error('gemini: interactions endpoint returned a non-object response')
   }
-  const block = (root.output_image ?? root.outputImage) as Record<string, unknown> | undefined
+  const block = (root.output_image ?? root.outputImage) as Record<string, unknown> | null | undefined
   if (typeof block !== 'object' || block === null) {
     throw new Error(`gemini: interactions response carried no output_image (keys seen: ${Object.keys(root).join(', ') || 'none'})`)
   }
