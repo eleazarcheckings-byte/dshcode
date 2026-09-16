@@ -54,8 +54,8 @@ export interface SaturnBotIntegrationField {
   readonly label: string
   /** Secret fields never carry an editable value; only the required env var name is shown. */
   readonly secret: boolean
-  /** Environment variable name to set (meaningful, non-empty, only when `secret`). */
-  readonly env: string
+  /** Environment variable name to set; present (and non-empty) only when `secret`, matching the host catalog. */
+  readonly env?: string
 }
 
 /** One integration's generated connect form (matches a `BotConfig.integrations` key). */

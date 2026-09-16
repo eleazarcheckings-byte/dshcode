@@ -68,7 +68,7 @@ export function IntegrationConnectForms({ catalog, values, onChange, envPath, di
     onChange({ ...values, [name]: { ...values[name], [key]: value } })
   }
   const copy = (env: string): void => {
-    void navigator.clipboard?.writeText(env).then(() => {
+    void navigator.clipboard.writeText(env).then(() => {
       setCopied(env)
       setTimeout(() => { setCopied(current => current === env ? null : current) }, 1500)
     }).catch(() => { /* Clipboard access can be denied; the env name remains visible to copy by hand. */ })
@@ -81,8 +81,8 @@ export function IntegrationConnectForms({ catalog, values, onChange, envPath, di
       {entry.fields.map((field) => {
         if (field.secret) return <div key={field.key} className={css.field}>
           <span>{field.label}</span>
-          <div className={css.envRow}><code>{field.env}</code><button type="button" className={css.linkButton} onClick={() => { copy(field.env) }}>{copied === field.env ? t('action.copied') : t('connect.copyEnv')}</button></div>
-          <small>{t('connect.envHint', { env: field.env, path: envPath ?? t('connect.envPathFallback') })}</small>
+          <div className={css.envRow}><code>{field.env ?? ''}</code><button type="button" className={css.linkButton} onClick={() => { copy(field.env ?? '') }}>{copied === (field.env ?? '') ? t('action.copied') : t('connect.copyEnv')}</button></div>
+          <small>{t('connect.envHint', { env: field.env ?? '', path: envPath ?? t('connect.envPathFallback') })}</small>
         </div>
         if (!isSupportedFieldKey(field.key)) return <div key={field.key} className={css.field}><span>{field.label}</span><small>{t('connect.fieldUnsupported')}</small></div>
         const key = field.key
