@@ -38,9 +38,10 @@ untouched since its build commands already match `desktop.yml`'s
 `pnpm --filter @dshcode/desktop run dist:mac:$arch`), only its header
 comment updated to stop naming the now-deleted workflow.
 
-Repo visibility was reconfirmed before restating the free-CI-minutes claim:
-`gh repo view eleazarcheckings-byte/dshcode` (the `fork` remote) reports
-`visibility: PUBLIC`.
+The free-CI-minutes claim rests on the 2026-09-15 Mars r3 review round's own
+check, which ran `gh repo view eleazarcheckings-byte/dshcode` (the `fork`
+remote) and got back `visibility: PUBLIC` — that check is cited here rather
+than repeated, since this note's own session did not re-run it.
 
 ## Alternatives considered
 
@@ -70,3 +71,29 @@ publishes the GitHub release at zero infrastructure cost. `RELEASE.md`
 documents that path exactly as written in the workflow file, plus the local
 Mac build handoff and what turning on code signing will cost and require.
 There is no second lane left to reconcile.
+
+## Addendum (2026-09-15, cell M5): opt-in signing wired in
+
+This round wires the signing/notarization path `RELEASE.md` previously only
+described as a future step: `desktop.yml`'s macOS legs now carry a
+"Configure Apple signing (opt-in)" step that, when
+`MAC_CERT_P12`/`MAC_CERT_PASSWORD`/`APPLE_TEAM_ID`/`ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_KEY_P8`
+are all present as repo secrets, imports the certificate into a temporary
+keychain and exports the exact env vars electron-builder 26.15.3 reads for
+signing (`CSC_LINK`/`CSC_KEY_PASSWORD`) and for its built-in
+`@electron/notarize` integration
+(`APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER`, mapped from the ASC
+secrets) — variable names confirmed against the pinned package's own source
+(`node_modules/app-builder-lib/out/mac/MacTargetHelper.js`), not just its
+docs site (which 404'd on this session's fetch attempts). Absent any of the
+six, the step sets `CSC_IDENTITY_AUTO_DISCOVERY=false` so the build stays
+unsigned exactly as before. The Windows leg gets the same opt-in shape on a
+`WIN_CERT_PFX`/`WIN_CERT_PASSWORD` pair. `scripts/build-mac.sh` (the local
+Mac handoff, one level above `dshcode/`) reads the same six mac-signing env
+var names for parity. Decision: keep this entirely env-var-driven with no
+`electron-builder.yml` change, since `getNotarizeOptions()` already runs
+unconditionally and no-ops to a warning log when the vars are absent —
+there was nothing to toggle in config. izzy's Apple Developer Program
+membership is already paid as of this session (relayed 2026-09-15 17:19),
+so entering the six secrets is the only remaining step; Windows
+code-signing remains an unpurchased Gate.

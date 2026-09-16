@@ -32,9 +32,10 @@ secret（`CSC_LINK`、`CSC_KEY_PASSWORD`、notarytool 凭证）接入 `desktop.y
 --frozen-lockfile`、`pnpm run build`、`pnpm --filter @dshcode/desktop run
 dist:mac:$arch`），只更新了脚本头部注释，使其不再指向已删除的 workflow。
 
-在重申"CI 分钟数免费"这一结论之前，重新核实了仓库可见性：
-`gh repo view eleazarcheckings-byte/dshcode`（`fork` 远程）返回
-`visibility: PUBLIC`。
+"CI 分钟数免费"这一结论依据的是 2026-09-15 Mars r3 复核轮自己做的检查：
+它运行了 `gh repo view eleazarcheckings-byte/dshcode`（`fork` 远程），
+返回 `visibility: PUBLIC`——这里是引用那次检查的结果，而非重新核实一遍，
+因为本记录所在的这次会话并未重新运行该检查。
 
 ## 考虑过的替代方案
 
@@ -60,3 +61,26 @@ dist:mac:$arch`），只更新了脚本头部注释，使其不再指向已删�
 `RELEASE.md` 完全按照 workflow 文件中实际写的内容记录了这条路径，外加本地
 Mac 构建的交接方式，以及启用代码签名将来需要的花费和配置。已经没有第二条
 通道需要协调了。
+
+## 补充（2026-09-15，单元 M5）：接入可选签名
+
+本轮把 `RELEASE.md` 此前只当作"未来步骤"描述的签名/公证路径真正接了进去：
+`desktop.yml` 的 macOS 分支现在多了一步"Configure Apple signing
+(opt-in)"——当仓库 secret 中
+`MAC_CERT_P12`/`MAC_CERT_PASSWORD`/`APPLE_TEAM_ID`/`ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_KEY_P8`
+六项全部存在时，会把证书导入一个临时钥匙串，并导出
+electron-builder 26.15.3 用于签名读取的环境变量
+（`CSC_LINK`/`CSC_KEY_PASSWORD`）以及其内置 `@electron/notarize` 集成用于
+公证读取的环境变量（`APPLE_API_KEY`/`APPLE_API_KEY_ID`/`APPLE_API_ISSUER`，
+由 ASC 相关 secret 映射而来）——这些变量名是对照该固定版本包自身的源码
+（`node_modules/app-builder-lib/out/mac/MacTargetHelper.js`）核实的，而不
+只是它的文档站点（本次会话尝试抓取时返回了 404）。六项中只要缺一项，这一步
+就会设置 `CSC_IDENTITY_AUTO_DISCOVERY=false`，构建保持和之前一样不签名。
+Windows 分支采用同样的可选形态，读取 `WIN_CERT_PFX`/`WIN_CERT_PASSWORD` 这
+一对。`scripts/build-mac.sh`（本地 Mac 交接脚本，位于比 `dshcode/` 高一级的
+目录）读取同样六个 mac 签名环境变量名，以保持一致。决定：完全依靠环境变量
+驱动，不改动 `electron-builder.yml`——因为 `getNotarizeOptions()` 本来就会
+无条件执行，在变量缺失时只会打一条警告日志然后跳过，配置里没有什么开关可
+切换。截至本次会话（2026-09-15 17:19 转达），izzy 的 Apple 开发者计划会员
+资格已经付费，所以剩下唯一要做的就是把这六个 secret 填进去；Windows 代码签
+名仍然是一个尚未购买的 Gate。

@@ -1,0 +1,138 @@
+name: Mobile Android
+
+# Companion app for Android (SPEC.md §8 M3, apps/mobile). assembleDebug
+# always runs and needs no secrets -- Gradle's own auto-generated debug
+# keystore signs it, matching apps/mobile/README.md's sideload instructions.
+# bundleRelease (the Play-ready .aab) only runs when the four ANDROID_* + a
+# keystore secret below are present. Never echoes a secret value.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'mobile-android-v*'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: apps/mobile
+
+jobs:
+  build:
+    name: Android build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          build-scan-publish: false
+
+      - name: Install (npm, not pnpm -- see apps/mobile/README.md "Why npm, not pnpm")
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync Android project
+        run: npx cap sync android
+
+      - name: Debug APK (assembleDebug, always -- unsigned/debug-keystore)
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: saturn-mobile-android-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # Opt-in Play signing. apksigner (from the Android SDK build-tools this
+      # session installs above) signs the release APK it is built for;
+      # bundleRelease's .aab output is signed with the Android Gradle
+      # Plugin's own injected signing properties instead (apksigner cannot
+      # sign an .aab -- it only understands the APK format). Both read the
+      # same four secrets.
+      - name: Configure Play signing (opt-in)
+        id: signing
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ANDROID_KEYSTORE" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "No Android keystore secrets configured -- skipping the release build."
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Android keystore secrets present -- building the signed release artifacts."
+          keystore_path="$RUNNER_TEMP/saturn-release.keystore"
+          printf '%s' "$ANDROID_KEYSTORE" | base64 --decode > "$keystore_path"
+          echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+          echo "keystore_path=$keystore_path" >> "$GITHUB_OUTPUT"
+
+      - name: Release bundle (bundleRelease, signed via injected Gradle properties)
+        if: steps.signing.outputs.has_secrets == 'true'
+        working-directory: apps/mobile/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file="${{ steps.signing.outputs.keystore_path }}" \
+            -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+
+      - name: Release APK (assembleRelease, unsigned) + apksigner
+        if: steps.signing.outputs.has_secrets == 'true'
+        working-directory: apps/mobile/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./gradlew assembleRelease
+          unsigned_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+          signed_apk="app/build/outputs/apk/release/app-release-signed.apk"
+          build_tools_dir="$(ls -d "$ANDROID_SDK_ROOT"/build-tools/*/ | sort -V | tail -n1)"
+          "${build_tools_dir}apksigner" sign \
+            --ks "${{ steps.signing.outputs.keystore_path }}" \
+            --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --key-pass "pass:$ANDROID_KEY_PASSWORD" \
+            --out "$signed_apk" \
+            "$unsigned_apk"
+
+      - name: Upload signed release artifacts
+        if: steps.signing.outputs.has_secrets == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: saturn-mobile-android-release
+          path: |
+            apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+            apps/mobile/android/app/build/outputs/apk/release/app-release-signed.apk
+          if-no-files-found: error
+          retention-days: 14

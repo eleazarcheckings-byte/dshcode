@@ -1,0 +1,175 @@
+name: Mobile iOS
+
+# Companion app for iPhone (SPEC.md §8 M3, apps/mobile). Builds the Capacitor
+# iOS project on a Mac runner. With no App Store Connect API key configured
+# this produces an UNSIGNED .xcarchive artifact and nothing is uploaded
+# anywhere -- zero secrets needed for that path. With the three ASC_* secrets
+# below present it archives with automatic signing, exports a .ipa, and
+# uploads it to TestFlight. Never echoes a secret value; the API key is
+# written once to a per-run temp/HOME path that dies with the runner.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'mobile-ios-v*'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: apps/mobile
+
+jobs:
+  build:
+    name: iOS archive
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install (npm, not pnpm -- see apps/mobile/README.md "Why npm, not pnpm")
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync iOS project
+        run: npx cap sync ios
+
+      # Opt-in App Store Connect signing. xcodebuild's -authenticationKeyPath/
+      # -authenticationKeyID/-authenticationKeyIssuerID (used below with
+      # -allowProvisioningUpdates for automatic signing) and altool's
+      # --apiKey/--apiIssuer both read the same App Store Connect API key.
+      # altool locates the key file itself by fixed search path + name
+      # (AuthKey_<keyID>.p8 under ~/.appstoreconnect/private_keys); writing
+      # it there once lets both tools use it without a second copy.
+      - name: Configure Apple signing (opt-in)
+        id: signing
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_KEY_P8" ]; then
+            echo "No App Store Connect API key configured -- archiving unsigned."
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "App Store Connect API key present -- will archive with automatic signing."
+          key_dir="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$key_dir"
+          key_path="$key_dir/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$key_path"
+          chmod 600 "$key_path"
+          echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+          echo "auth_key_path=$key_path" >> "$GITHUB_OUTPUT"
+
+      - name: Archive (signed)
+        if: steps.signing.outputs.has_secrets == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/SaturnAI.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${{ steps.signing.outputs.auth_key_path }}" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID"
+
+      - name: Export .ipa (signed)
+        if: steps.signing.outputs.has_secrets == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/SaturnAI.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${{ steps.signing.outputs.auth_key_path }}" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload to TestFlight
+        if: steps.signing.outputs.has_secrets == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          ipa_path="$(find "$RUNNER_TEMP/export" -maxdepth 1 -name '*.ipa' | head -n1)"
+          if [ -z "$ipa_path" ]; then
+            echo "exportArchive produced no .ipa" >&2
+            exit 1
+          fi
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$ipa_path" \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Upload signed .ipa artifact
+        if: steps.signing.outputs.has_secrets == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: saturn-mobile-ios-ipa
+          path: ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      # Unsigned path: zero secrets needed. CODE_SIGNING_ALLOWED=NO produces
+      # an archive with an unsigned .app inside it -- there is no .ipa to
+      # export (exportArchive requires a signature), so the raw .xcarchive
+      # is what gets uploaded.
+      - name: Archive (unsigned)
+        if: steps.signing.outputs.has_secrets != 'true'
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/SaturnAI.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Upload unsigned .xcarchive artifact
+        if: steps.signing.outputs.has_secrets != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: saturn-mobile-ios-xcarchive
+          path: ${{ runner.temp }}/SaturnAI.xcarchive
+          if-no-files-found: error
+          retention-days: 14
