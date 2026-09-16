@@ -40,6 +40,8 @@ function contrast(a: string, b: string): number {
 function declaredScales(): Map<string, { index: number; value: string }[]> {
   const tag = document.querySelector(`style[data-plugin="${PLUGIN}"]`)
   expect(tag, 'the skin must inject its stylesheet on import').not.toBeNull()
+  if (!tag) throw new Error('the skin must inject its stylesheet on import')
+  if (tag.textContent === null) throw new Error('the injected stylesheet must have text content')
   const scales = new Map<string, { index: number; value: string }[]>()
   for (const match of tag.textContent.matchAll(/--dsw-static-([a-z0-9-]+):(#[0-9a-f]{6})/g)) {
     const parsed = INDEXED.exec(match[1]!)

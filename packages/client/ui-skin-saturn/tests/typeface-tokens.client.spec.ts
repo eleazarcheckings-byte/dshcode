@@ -19,6 +19,8 @@ const PLUGIN = '@saturnai/dsh-client-ui-skin-saturn'
 function skinCss(): string {
   const tag = document.querySelector(`style[data-plugin="${PLUGIN}"]`)
   expect(tag, 'the skin must inject its stylesheet on import').not.toBeNull()
+  if (!tag) throw new Error('the skin must inject its stylesheet on import')
+  if (tag.textContent === null) throw new Error('the injected stylesheet must have text content')
   return tag.textContent
 }
 
