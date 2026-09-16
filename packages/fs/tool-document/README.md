@@ -48,13 +48,14 @@ Mount the plugin after a `ctx.fs` backend and a `ctx.tools` runtime. No attachme
 
 | Key | Default | Meaning |
 |---|---|---|
-| `workspaceRoot` | `process.cwd()` | Root both tools confine reads to; a resolved path outside it refuses with `DOCUMENT_PATH_OUTSIDE_WORKSPACE` |
-| `maxFileBytes` | `33554432` (32 MiB) | Inclusive byte cap on the whole file read into memory for either tool |
+| `workspaceRoot` | `process.cwd()` | Root both tools confine reads to; a resolved path outside it — including through a symlinked/junctioned directory inside the root — refuses with `DOCUMENT_PATH_OUTSIDE_WORKSPACE` |
+| `maxFileBytes` | `33554432` (32 MiB) | Inclusive byte cap on the whole file read into memory for either tool; also bounds a PDF content stream's INFLATED size, so a highly compressible `FlateDecode` stream cannot drive an unbounded allocation |
 | `maxOutputChars` | `4000` | Inclusive character cap on one rendered notebook-cell output before truncation |
+| `maxTextChars` | `200000` | Inclusive character cap on `read_pdf`'s assembled text across the selected pages, in ascending page order, before truncation |
 
 ### PDF support
 
-`read_pdf` implements a minimal in-tree extractor — no maintained PDF library (`pdfjs`/`pdf-parse`/`unpdf`) is vendored in this workspace. It supports single-revision, text-only PDFs whose page text lives in `Tj`/`TJ` content-stream operators, either uncompressed or `FlateDecode`-compressed. It does not parse the cross-reference table (objects are found by scanning `N 0 obj … endobj`, which tolerates a stale or absent xref), and does not resolve encryption, object streams, cross-reference streams, or `ToUnicode` CMaps — see [Known Limitations](#known-limitations-and-deferred-work).
+`read_pdf` implements a minimal in-tree extractor — no maintained PDF library (`pdfjs`/`pdf-parse`/`unpdf`) is vendored in this workspace. It supports single-revision, text-only PDFs whose page text lives in `Tj`/`TJ`/`'`/`"` content-stream text-showing operators (both literal-string `(...)` and hex-string `<...>` operands), either uncompressed or `FlateDecode`-compressed. It does not parse the cross-reference table (objects are found by scanning `N 0 obj … endobj`, which tolerates a stale or absent xref), and does not resolve encryption, object streams, cross-reference streams, or `ToUnicode` CMaps — see [Known Limitations](#known-limitations-and-deferred-work).
 
 ### Failures and recovery
 
@@ -72,7 +73,7 @@ This section explains the design decisions behind the two tools and points at th
 
 ### Design concept
 
-Both tools are read-only, confined to a `workspaceRoot`, and independent of every other capability seam — no attachment store (unlike `read_image`), no sandbox controller, no session cwd requirement. `ctx.fs` backends resolve paths but do not all confine them (the bare local backend is a resolution default, not a containment boundary), so `src/workspace.ts` enforces containment against the configured root explicitly, before any byte is read.
+Both tools are read-only, confined to a `workspaceRoot`, and independent of every other capability seam — no attachment store (unlike `read_image`), no sandbox controller, no session cwd requirement. `ctx.fs` backends resolve paths but do not all confine them (the bare local backend is a resolution default, not a containment boundary), so `src/workspace.ts` enforces containment against the configured root explicitly, before any byte is read. The check compares CANONICAL identities (`ctx.fs.processPath`, the realpath), not the as-spelled `displayPath` — a directory symlink or junction inside the root that points outside it is still refused, the same class of check `@deepseek-ai/dsh-fs-sandbox`'s `checkedTarget` applies to its own fence.
 
 ### Source map
 
@@ -87,7 +88,7 @@ Both tools are read-only, confined to a `workspaceRoot`, and independent of ever
 
 ### The PDF extractor's supported subset
 
-Objects are found by scanning the whole file for `N 0 obj … endobj` rather than parsing the cross-reference table, so a stale or absent xref (common after a naive edit) does not block extraction. The page tree is walked depth-first from the `/Catalog`'s `/Pages` root through `/Kids`, collecting leaf `/Page` objects; each page's `/Contents` stream(s) are decoded (`FlateDecode` via `node:zlib`, or passed through unfiltered) and scanned for `Tj`/`TJ` text-showing operators, with `Td`/`TD`/`T*` treated as line breaks and `BT`/`ET` bracketing one text object. Every other operator — font, color, graphics state, positioning — is inert.
+Objects are found by scanning the whole file for `N 0 obj … endobj` rather than parsing the cross-reference table, so a stale or absent xref (common after a naive edit) does not block extraction. The page tree is walked depth-first from the `/Catalog`'s `/Pages` root through `/Kids`, collecting leaf `/Page` objects; each page's `/Contents` stream(s) are decoded (`FlateDecode` via `node:zlib`, or passed through unfiltered) and scanned for `Tj`/`TJ`/`'`/`"` text-showing operators — literal-string `(...)` and hex-string `<...>` operands both decode to text — with `Td`/`TD`/`T*` treated as line breaks and `BT`/`ET` bracketing one text object. Every other operator — font, color, graphics state, positioning — is inert. A `FlateDecode` stream's inflated size is bounded by `maxFileBytes` (`inflateSync`'s `maxOutputLength`, which aborts the expansion early rather than allocating the full output first), so a highly compressible stream cannot drive an unbounded allocation; the assembled text across selected pages is separately bounded by `maxTextChars`.
 
 ### Notebook output rendering
 
@@ -118,11 +119,11 @@ Prefix-stable while tool visibility and definitions are unchanged. Registration 
 
 #### What the model sees
 
-`read_pdf` returns `<path>`/`<type>pdf</type>`/`<content>` with `totalPages` and each selected page under a `--- page N ---` heading. `read_notebook` returns the same envelope shape with `<type>notebook</type>`, `cellCount`, and each cell under a `--- cell N (type) ---` heading, its outputs bracketed by `[output_type]`. A truncated output ends with `... [truncated N more characters]`. Failures are normalized as `Error: <message>` with a stable `DocumentError` code (`DOCUMENT_*`, `PDF_*`, or `NOTEBOOK_PARSE_FAILED`) for callers that branch on failure kind.
+`read_pdf` returns `<path>`/`<type>pdf</type>`/`<content>` with `totalPages` and each selected page under a `--- page N ---` heading. `read_notebook` returns the same envelope shape with `<type>notebook</type>`, `cellCount`, and each cell under a `--- cell N (type) ---` heading, its outputs bracketed by `[output_type]`. A truncated output or page ends with `... [truncated N more characters]`; `read_pdf`'s structured result also carries a top-level `truncated: true` when the assembled text was cut, and drops any page past the cut. Failures are normalized as `Error: <message>` with a stable `DocumentError` code (`DOCUMENT_*`, `PDF_*`, or `NOTEBOOK_PARSE_FAILED`) for callers that branch on failure kind.
 
 #### Token effect
 
-Bounded by `maxFileBytes` (the whole file, before extraction) and `maxOutputChars` (each notebook output); the call and retained result stay in history until compaction.
+Bounded by `maxFileBytes` (the whole file, before extraction, and a PDF content stream's inflated size), `maxTextChars` (`read_pdf`'s assembled text across selected pages), and `maxOutputChars` (each notebook output); the call and retained result stay in history until compaction.
 
 #### KV Cache effect
 

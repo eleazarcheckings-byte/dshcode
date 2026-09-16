@@ -21,7 +21,7 @@ export {
   parsePdfDocument,
   applyReadPdfTool,
 } from './pdf.ts'
-export type { PdfDocument } from './pdf.ts'
+export type { PdfDocument, PdfToolCaps } from './pdf.ts'
 export {
   formatNotebookReadOutput,
   parseNotebook,
@@ -50,10 +50,12 @@ export const inject = ['tools', 'fs']
 export interface Config {
   /** Absolute (or cwd-relative) root both tools confine reads to. Defaults to `process.cwd()`. */
   workspaceRoot?: string
-  /** Inclusive byte cap on the whole file read into memory for either tool. */
+  /** Inclusive byte cap on the whole file read into memory for either tool; also bounds a PDF content stream's inflated size. */
   maxFileBytes?: number
   /** Inclusive character cap on one rendered notebook-cell output before truncation. */
   maxOutputChars?: number
+  /** Inclusive character cap on `read_pdf`'s assembled text across selected pages before truncation. */
+  maxTextChars?: number
 }
 
 /** Default whole-file byte cap: generous for a document a model would plausibly read in one call. */
@@ -61,6 +63,9 @@ export const DEFAULT_MAX_FILE_BYTES = 32 * 1024 * 1024
 
 /** Default per-output truncation cap for `read_notebook`. */
 export const DEFAULT_MAX_OUTPUT_CHARS = 4000
+
+/** Default assembled-text truncation cap for `read_pdf`. */
+export const DEFAULT_MAX_TEXT_CHARS = 200_000
 
 function assertPositiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value < 1) {
@@ -77,8 +82,10 @@ export function apply(ctx: Context, config: Config = {}): void {
   const workspaceRoot = resolve(config.workspaceRoot ?? process.cwd())
   const maxFileBytes = config.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES
   const maxOutputChars = config.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS
+  const maxTextChars = config.maxTextChars ?? DEFAULT_MAX_TEXT_CHARS
   assertPositiveInteger('maxFileBytes', maxFileBytes)
   assertPositiveInteger('maxOutputChars', maxOutputChars)
-  applyReadPdfTool(ctx, { workspaceRoot, maxFileBytes })
+  assertPositiveInteger('maxTextChars', maxTextChars)
+  applyReadPdfTool(ctx, { workspaceRoot, maxFileBytes, maxTextChars })
   applyReadNotebookTool(ctx, { workspaceRoot, maxFileBytes, maxOutputChars })
 }

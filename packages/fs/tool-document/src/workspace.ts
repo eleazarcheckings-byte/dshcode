@@ -5,14 +5,45 @@
  * containment boundary), so this module enforces containment against the
  * plugin's configured `workspaceRoot` explicitly, the way a stricter backend
  * or a `tools/execute` permission plugin would.
+ *
+ * The containment check compares CANONICAL identities, not display spellings:
+ * `LocalFileSystem.resolve` sets `displayPath` to the as-spelled resolved path
+ * with no symlink resolution, while the bytes are read from `targetKey`
+ * (`ctx.fs.processPath`), the realpath. A directory symlink/junction inside
+ * the workspace root pointing outside it would pass a `displayPath`-based
+ * check and still read the file outside — see `@deepseek-ai/dsh-fs-sandbox`'s
+ * `checkedTarget`, which re-canonicalizes for exactly this reason. Resolution
+ * uses the backend's own default `cwd` (no session dependency): the package
+ * has no attachment-store, sandbox, or session-service seam, and no test in
+ * this suite exercises a relative-path-plus-agent-session combination that
+ * would need one.
  * @module @deepseek-ai/dsh-tool-document/workspace
  */
 
 import { isAbsolute, relative } from 'node:path'
+import { realpath } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type { FsInfo, FsTarget } from '@deepseek-ai/dsh-fs'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import { DocumentError } from './error.ts'
+
+/**
+ * Canonicalize `path` (symlinks resolved), matching the identity
+ * `ctx.fs.processPath` returns for a resolved target, so containment is
+ * compared between two comparably-canonical paths. Falls back to `path`
+ * unchanged when it cannot be resolved (a missing root matches nothing until
+ * it exists — the conservative outcome; inventing a fallback would grant a
+ * path nobody configured).
+ * @param path - the path to canonicalize.
+ * @returns the canonical (realpath'd) form, or `path` itself when resolution fails.
+ */
+async function canonicalizePath(path: string): Promise<string> {
+  try {
+    return await realpath(path)
+  } catch {
+    return path
+  }
+}
 
 /** Caps shared by every document tool. */
 export interface DocumentToolCaps {
@@ -55,9 +86,9 @@ export async function resolveWorkspaceDocument(
   if (requestedPath.trim().length === 0) {
     throw new DocumentError('file_path must be a non-empty string', 'DOCUMENT_EMPTY_PATH')
   }
-  const cwd = exec.agent?.session.header.cwd
-  const target = await ctx.fs.resolve(requestedPath, { ...cwd === undefined ? {} : { cwd }, signal: exec.signal })
-  if (!isWithinRoot(workspaceRoot, target.displayPath)) {
+  const target = await ctx.fs.resolve(requestedPath, { signal: exec.signal })
+  const canonicalRoot = await canonicalizePath(workspaceRoot)
+  if (!isWithinRoot(canonicalRoot, ctx.fs.processPath(target))) {
     throw new DocumentError(
       `cannot read "${target.displayPath}": path is outside the workspace root "${workspaceRoot}"`,
       'DOCUMENT_PATH_OUTSIDE_WORKSPACE',

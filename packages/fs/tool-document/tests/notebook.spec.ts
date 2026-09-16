@@ -157,7 +157,7 @@ describe('read_notebook tool', () => {
     const ctx = await setup()
     const result = await call(ctx, 'read_notebook', { file_path: 'nb.ipynb' })
     expect(result.isError).toBe(false)
-    const value = result.value as NotebookReadValue
+    const value = result.value as unknown as NotebookReadValue
     expect(value.cellCount).toBe(6)
     expect(value.cells.map(c => c.cellType)).toEqual(['markdown', 'code', 'code', 'code', 'raw', 'code'])
     expect(value.cells[5]!.outputs[0]!.truncated).toBe(true)
@@ -197,7 +197,7 @@ describe('read_notebook tool', () => {
     const ctx = await setup({ maxOutputChars: 5 })
     const result = await call(ctx, 'read_notebook', { file_path: 'nb.ipynb' })
     expect(result.isError).toBe(false)
-    const value = result.value as NotebookReadValue
+    const value = result.value as unknown as NotebookReadValue
     expect(value.cells[0]!.outputs[0]!.truncated).toBe(true)
     expect(value.cells[0]!.outputs[0]!.text.startsWith('01234\n... [truncated')).toBe(true)
   })

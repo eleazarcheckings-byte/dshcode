@@ -48,13 +48,14 @@ kind: "package-reference"
 
 | Key | Default | Meaning |
 |---|---|---|
-| `workspaceRoot` | `process.cwd()` | 两个工具都将读取限制在此根目录内；解析后的路径超出范围将以 `DOCUMENT_PATH_OUTSIDE_WORKSPACE` 拒绝 |
-| `maxFileBytes` | `33554432`（32 MiB） | 任一工具读入内存的整个文件的字节上限（含端点） |
+| `workspaceRoot` | `process.cwd()` | 两个工具都将读取限制在此根目录内；解析后的路径超出范围——包括通过根目录内指向外部的符号链接/联接点（junction）——将以 `DOCUMENT_PATH_OUTSIDE_WORKSPACE` 拒绝 |
+| `maxFileBytes` | `33554432`（32 MiB） | 任一工具读入内存的整个文件的字节上限（含端点）；同时也限制 PDF 内容流解压后的大小,因此高压缩比的 `FlateDecode` 流无法触发无上限的内存分配 |
 | `maxOutputChars` | `4000` | 单个渲染后笔记本单元格输出在截断前的字符上限（含端点） |
+| `maxTextChars` | `200000` | `read_pdf` 按页码升序拼接所选页面文本后,在截断前的字符上限（含端点） |
 
 ### PDF 支持
 
-`read_pdf` 实现了一个最小化的内置提取器 —— 本工作区未引入任何成熟的 PDF 库（`pdfjs`/`pdf-parse`/`unpdf`）。它支持单版本、纯文本 PDF,其页面文本位于 `Tj`/`TJ` 内容流操作符中,内容流可以是未压缩的,也可以是 `FlateDecode` 压缩的。它不解析交叉引用表（对象通过扫描全文中的 `N 0 obj … endobj` 找到,因此能容忍陈旧或缺失的 xref）,也不处理加密、对象流、交叉引用流或 `ToUnicode` CMap —— 参见[已知限制](#known-limitations-and-deferred-work)。
+`read_pdf` 实现了一个最小化的内置提取器 —— 本工作区未引入任何成熟的 PDF 库（`pdfjs`/`pdf-parse`/`unpdf`）。它支持单版本、纯文本 PDF,其页面文本位于 `Tj`/`TJ`/`'`/`"` 内容流文本显示操作符中（字面量字符串 `(...)` 与十六进制字符串 `<...>` 操作数均可解码）,内容流可以是未压缩的,也可以是 `FlateDecode` 压缩的。它不解析交叉引用表（对象通过扫描全文中的 `N 0 obj … endobj` 找到,因此能容忍陈旧或缺失的 xref）,也不处理加密、对象流、交叉引用流或 `ToUnicode` CMap —— 参见[已知限制](#known-limitations-and-deferred-work)。
 
 ### 失败与恢复
 
@@ -72,7 +73,7 @@ kind: "package-reference"
 
 ### 设计理念
 
-两个工具都是只读的,限制在 `workspaceRoot` 内,并且不依赖任何其他能力接缝 —— 没有附件存储（与 `read_image` 不同）、没有沙箱控制器、也不要求会话 cwd。`ctx.fs` 后端会解析路径,但并非都会限制路径（裸本地后端只是一个解析默认值,而非隔离边界）,因此 `src/workspace.ts` 在读取任何字节之前,显式地针对配置的根目录强制执行隔离。
+两个工具都是只读的,限制在 `workspaceRoot` 内,并且不依赖任何其他能力接缝 —— 没有附件存储（与 `read_image` 不同）、没有沙箱控制器、也不要求会话 cwd。`ctx.fs` 后端会解析路径,但并非都会限制路径（裸本地后端只是一个解析默认值,而非隔离边界）,因此 `src/workspace.ts` 在读取任何字节之前,显式地针对配置的根目录强制执行隔离。该检查比较的是**规范化**身份（`ctx.fs.processPath`,即 realpath）,而不是按原样拼写的 `displayPath`——根目录内部指向外部的符号链接或联接点目录同样会被拒绝,这与 `@deepseek-ai/dsh-fs-sandbox` 的 `checkedTarget` 为自身防护施加的检查属于同一类。
 
 ### 源码地图
 
@@ -87,7 +88,7 @@ kind: "package-reference"
 
 ### PDF 提取器支持的子集
 
-对象通过扫描全文中的 `N 0 obj … endobj` 找到,而不是解析交叉引用表,因此陈旧或缺失的 xref（在简单粗暴的编辑之后很常见）不会阻塞提取。页面树从 `/Catalog` 的 `/Pages` 根节点开始,沿 `/Kids` 深度优先遍历,收集叶子 `/Page` 对象；每个页面的 `/Contents` 流（可以有多个）会被解码（通过 `node:zlib` 处理 `FlateDecode`,或原样透传未过滤的内容）,并扫描其中的 `Tj`/`TJ` 文本显示操作符,`Td`/`TD`/`T*` 被视为换行,`BT`/`ET` 括起一个文本对象。其余所有操作符 —— 字体、颜色、图形状态、定位 —— 都不产生效果。
+对象通过扫描全文中的 `N 0 obj … endobj` 找到,而不是解析交叉引用表,因此陈旧或缺失的 xref（在简单粗暴的编辑之后很常见）不会阻塞提取。页面树从 `/Catalog` 的 `/Pages` 根节点开始,沿 `/Kids` 深度优先遍历,收集叶子 `/Page` 对象；每个页面的 `/Contents` 流（可以有多个）会被解码（通过 `node:zlib` 处理 `FlateDecode`,或原样透传未过滤的内容）,并扫描其中的 `Tj`/`TJ`/`'`/`"` 文本显示操作符 —— 字面量字符串 `(...)` 与十六进制字符串 `<...>` 操作数均可解码为文本 ——,`Td`/`TD`/`T*` 被视为换行,`BT`/`ET` 括起一个文本对象。其余所有操作符 —— 字体、颜色、图形状态、定位 —— 都不产生效果。`FlateDecode` 流解压后的大小受 `maxFileBytes` 限制（`inflateSync` 的 `maxOutputLength`,会提前中止展开而不是先分配完整输出）,因此高压缩比的流无法触发无上限的内存分配；所选页面拼接后的文本则另受 `maxTextChars` 限制。
 
 ### 笔记本输出渲染
 
@@ -118,11 +119,11 @@ kind: "package-reference"
 
 #### 模型看到的内容
 
-`read_pdf` 返回 `<path>`/`<type>pdf</type>`/`<content>`,其中包含 `totalPages` 以及每个所选页面在 `--- page N ---` 标题下的内容。`read_notebook` 返回相同的信封结构,`<type>notebook</type>`、`cellCount`,每个单元格在 `--- cell N (type) ---` 标题下,其输出以 `[output_type]` 标注。被截断的输出以 `... [truncated N more characters]` 结尾。失败会被规范化为 `Error: <message>`,并携带一个稳定的 `DocumentError` 代码（`DOCUMENT_*`、`PDF_*`,或 `NOTEBOOK_PARSE_FAILED`）,供按失败类型分支处理的调用方使用。
+`read_pdf` 返回 `<path>`/`<type>pdf</type>`/`<content>`,其中包含 `totalPages` 以及每个所选页面在 `--- page N ---` 标题下的内容。`read_notebook` 返回相同的信封结构,`<type>notebook</type>`、`cellCount`,每个单元格在 `--- cell N (type) ---` 标题下,其输出以 `[output_type]` 标注。被截断的输出或页面以 `... [truncated N more characters]` 结尾；当拼接文本被截断时,`read_pdf` 的结构化结果还会携带一个顶层的 `truncated: true`,并丢弃截断点之后的所有页面。失败会被规范化为 `Error: <message>`,并携带一个稳定的 `DocumentError` 代码（`DOCUMENT_*`、`PDF_*`,或 `NOTEBOOK_PARSE_FAILED`）,供按失败类型分支处理的调用方使用。
 
 #### Token 影响
 
-受 `maxFileBytes`（提取前的整个文件）与 `maxOutputChars`（每个笔记本输出）限制；调用及保留的结果会一直留在历史记录中,直到被压缩。
+受 `maxFileBytes`（提取前的整个文件,以及 PDF 内容流解压后的大小）、`maxTextChars`（`read_pdf` 所选页面拼接后的文本）与 `maxOutputChars`（每个笔记本输出）限制；调用及保留的结果会一直留在历史记录中,直到被压缩。
 
 #### KV Cache 影响
 

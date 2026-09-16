@@ -53,6 +53,7 @@ import * as ToolCordis from '@deepseek-ai/dsh-tool-cordis'
 import * as ToolDescribeImage from '@deepseek-ai/dsh-tool-describe-image'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
 import * as ToolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
+import * as ToolDocument from '@deepseek-ai/dsh-tool-document'
 import * as ToolStrReplaceEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
 import TerminalSessionService from '@deepseek-ai/dsh-terminal'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
@@ -381,6 +382,19 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'glob and grep are unconditional discovery tools that spawn the packaged ripgrep binary (`@vscode/ripgrep`) through ctx.subprocess as ordinary foreground calls (never background jobs) — no host `rg` install and no shell layer. The catalog uses `sampleOverCapGlobResults: true`; deployments must choose that behavior explicitly. Capped results save the complete formatted list through the optional ctx.spillStore backend; returned locators are follow-up-readable/searchable when the backend exposes local paths in co-located deployments.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-document',
+    dir: 'tool-document',
+    source: 'packages/fs/tool-document/src/index.ts',
+    requires: ['ctx.tools', 'ctx.fs'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(LocalFileSystem)
+      await ctx.plugin(ToolDocument)
+    },
+    note:
+      'read_pdf and read_notebook confine reads to the configured workspaceRoot and never mutate; both resolve paths through ctx.fs rather than the host filesystem directly. read_notebook truncates any huge cell output with a marker naming exactly how many characters were cut.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-terminal',

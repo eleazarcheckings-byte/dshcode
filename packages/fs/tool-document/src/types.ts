@@ -18,6 +18,12 @@ export interface PdfReadValue {
   totalPages: number
   /** Extracted text for the selected pages, in ascending page order. */
   pages: PdfPageText[]
+  /**
+   * Present (and `true`) only when the assembled text across selected pages
+   * was cut short at `maxTextChars`, dropping any page after the cut; matches
+   * the `boolean` output-schema field (the schema DSL has no literal-`true` type).
+   */
+  truncated?: boolean
 }
 
 /** nbformat cell types this package understands. */
