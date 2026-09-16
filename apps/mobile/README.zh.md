@@ -52,7 +52,7 @@ apps/mobile/
 
 ## 通知
 
-`src/lib/eventsMapper.ts` 把 `GET <url>/saturn/remote/events` 的事件载荷（`{ type, title, body, sessionId?, id, at }`）映射为本地通知描述，沿用主机自身裁定卡片的措辞：“需要批准”（approval 且主机未给标题时）、“裁定 PASS/REVISE/REJECT”（从 verdict 事件的正文或标题解析得出）、“SaturnBot 需要你”（saturnbot 且主机未给标题时）。`src/lib/remoteApi.ts` 的 `RemoteEventsClient` 在前台时用 `EventSource` 打开该事件流（走 Cookie 鉴权，因为 `EventSource` 无法设置 `Authorization` 头），并额外提供一个用 Bearer 令牌鉴权的 `pollOnce()` 供后台轮询调用。`src/notificationLog.ts` 在本地保留最近 100 条，供应用内“动态”列表展示，其样式正是 SPEC.md §2 在产品各处反复出现的那张裁定卡片。
+`src/lib/eventsMapper.ts` 把 `GET <url>/saturn/remote/events` 的事件载荷（`{ type, title, body, sessionId?, id, at }`）映射为本地通知描述，沿用主机自身裁定卡片的措辞：“需要批准”（approval 且主机未给标题时）、“裁定 PASS/REVISE/REJECT”（从 verdict 事件的正文或标题解析得出）、“SaturnBot 需要你”（saturnbot 且主机未给标题时）。`src/lib/remoteApi.ts` 的 `RemoteEventsClient` 在前台时用 `EventSource` 打开该事件流（走 Cookie 鉴权，因为 `EventSource` 无法设置 `Authorization` 头）——也仅限前台：后台路径是下文“后台事件投递”一节里那个独立的 runner，而不是这个客户端上的某个方法。它原先的 `pollOnce()` 对这条永不关闭的 SSE 路由做一次性 `fetch` + `text()` 读取（正是 Mars r2 在 runner 里发现的那种永不返回的读取），由于没有任何调用方，已直接移除而非修复。`src/notificationLog.ts` 在本地保留最近 100 条，供应用内“动态”列表展示，其样式正是 SPEC.md §2 在产品各处反复出现的那张裁定卡片。
 
 ## 安装与构建
 
@@ -125,12 +125,19 @@ API key，所以只需要填一次就能同时解锁这里和桌面端的公证�
 导出 `.ipa`，再用 `xcrun altool --upload-app --apiKey --apiIssuer`
 上传到 TestFlight。
 
-无论是签名路径还是未签名路径，构建时都使用 `-scheme App`；仓库里并未提交
-共享的 `ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme`
-（上文第 2 步依赖的是 Xcode 自身 GUI 管理的 scheme 列表，本就不需要这个文件），
-所以该 workflow 在 `cap sync` 之后的第一步会运行 `xcodebuild -list`，
-如果在一次全新 checkout 上解析不到 `App` 就会立刻失败并打印真实的
-scheme 列表 —— 这一点目前尚未在真实的 macOS runner 上跑通验证过。
+无论是签名路径还是未签名路径，构建时都使用 `-scheme App`，解析自已提交的
+`ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme`——Xcode 只有在一个
+scheme 被显式标记为共享时才会把它写进 `xcshareddata/`（而不是逐用户、已被
+gitignore 的 `xcuserdata/`），所以在一台从未用 Xcode 图形界面打开过该工程的
+CI runner 上执行“全新 `git clone` + `xcodebuild -scheme App archive`”就需要
+提交这个文件；没有它，`-scheme App` 会立即失败，报 “scheme App is not
+currently configured”——这正是本节上一版所预告的那个失败（“这一点目前尚未在
+真实的 macOS runner 上跑通验证过”）。它的 `BuildableReference` 指向
+`504EC3031FED79650016851F`（`project.pbxproj` 中 `App` target 自身的标识符），
+并启用了 build、test、launch、profile、archive 五种 action —— archive action
+正是两条 workflow 分支里 `xcodebuild archive` 实际调用的那个。`ios/.gitignore`
+忽略的是 `xcuserdata`（逐开发者的本地状态），而不是 `xcshareddata`（工程共享、
+需要入库的配置），所以这个文件不会被忽略。
 
 ## 为什么用 npm 而不是 pnpm
 
@@ -144,17 +151,26 @@ scheme 列表 —— 这一点目前尚未在真实的 macOS runner 上跑通验
 
 ## 后台事件投递
 
-iOS 与 Android 都不会在应用进入后台后继续保持 `EventSource` 连接，因此由 `@capacitor/background-runner`（官方 `@capacitor` 作用域）安排一个独立于 WebView、自行运行的周期性轮询：
+iOS 与 Android 都不会在应用进入后台后继续保持 `EventSource` 连接，因此由 `@capacitor/background-runner`（官方 `@capacitor` 作用域）安排一个独立于 WebView、自行运行的周期性轮询。**这个定时任务做的是有边界的轮询，而不是流式读取**——原因见下文“为什么不用 SSE 流”，这不是风格选择，而是正确性要求。
 
-- **`assets/background-runner.js`** 是一个**生成文件**（`scripts/backgroundRunnerBuild.mjs`，通过 `npm run build:background-runner` 运行，并作为本包的 `prebuild` 挂接）—— 它把 `src/lib/backgroundEventsCore.js` 里的纯逻辑辅助函数（SSE 帧解析、事件 id 的数值排序、事件到通知的映射）内联到 `scripts/background-runner.entry.js` 的 OS 定时任务接线代码之下，因为该插件的隔离 JS 引擎完全没有模块加载器，根本无法执行 `import`/`export` 语句。如果提交的文件与一次全新渲染结果出现漂移，`tests/backgroundRunnerGenerated.test.ts` 会让 `npm test` 失败 —— 这样两份源文件就不会像手工镜像那样悄悄产生分歧。
-- **每一次触发时**，运行器会在 `GET /saturn/remote/events` 请求上带上 `Last-Event-ID` 请求头（而不是 `?since=` 查询参数 —— 主机的路由会剥离查询字符串、始终路由到它的 SSE 流，所以基于查询参数的轮询永远不会结束：见下文“本轮已修复”），并以 8 秒的读取截止时间增量读取响应体，超时后主动取消 reader，让连接真正关闭，而不是一直挂到操作系统把整个任务杀掉。事件 id（`String(sequence)`，一个普通递增计数器）按**数值**比较；每条触发的通知都携带 `extra: { deepLink, eventId, type }`——与前台路径 `src/lib/eventsMapper.ts` 附加的结构完全一致——因此点击能正确跳转；`src/main.ts` 的 `onNotificationTapped` 处理函数会对完全没有 `extra` 的通知（例如旧版本触发的，或系统自身的通知）做出防护。
+- **`assets/background-runner.js`** 是一个**生成文件**（`scripts/backgroundRunnerBuild.mjs`，通过 `npm run build:background-runner` 运行，并作为本包的 `prebuild` 挂接）—— 它把 `src/lib/backgroundEventsCore.js` 里的纯逻辑辅助函数（回放响应的 JSON 结构、事件 id 的数值排序、事件到通知的映射）内联到 `scripts/background-runner.entry.js` 的 OS 定时任务接线代码之下，因为该插件的隔离 JS 引擎完全没有模块加载器，根本无法执行 `import`/`export` 语句。如果提交的文件与一次全新渲染结果出现漂移，`tests/backgroundRunnerGenerated.test.ts` 会让 `npm test` 失败 —— 这样两份源文件就不会像手工镜像那样悄悄产生分歧。
+- **每一次触发时**，运行器都会调用主机的有边界回放端点 `GET /saturn/remote/events/replay?after=<lastSeen>&limit=100`（SPEC.md §8 的回放契约——与 SSE 流携带的是同一批事件对象，但打包成一个 `{ events, newest, truncated, gap? }` 的 JSON 对象，用一次 `response.json()` 就能读完，不需要保持连接打开，也完全不读取 `response.body`），并像其他 API 调用一样带上设备的 bearer token。首次运行时 `after` 从 `0` 开始，此后取自上一次触发持久化的 id。当响应报告 `truncated: true`（可用事件多于 `limit`）时，本次触发会在同一轮里最多再取 4 页，每次都推进 `after`，这样一次较大的积压事件也不用等好几个 15 分钟周期才能消化完。当响应报告 `gap: true`（请求的 `after` 比主机环形缓冲区所保留的最旧 id 还要旧）时，这一页会从主机实际保留的最旧事件开始，按普通页面一样处理——上一次成功触发和这一次之间的部分事件已经不可恢复地丢失了，但游标仍会正确地推进到主机接下来所报告的位置。事件 id（`String(sequence)`，一个普通递增计数器）全程按**数值**比较（`compareEventIds`/`resolveReplayCursor`）；每条触发的通知都携带 `extra: { deepLink, eventId, type }`——与前台路径 `src/lib/eventsMapper.ts` 附加的结构完全一致——因此点击能正确跳转；`src/main.ts` 的 `onNotificationTapped` 处理函数会对完全没有 `extra` 的通知（例如旧版本触发的，或系统自身的通知）做出防护。
 - **`src/lib/backgroundSync.ts`** 是应用侧的另一半：在配对成功后、撤销/忘记主机时、以及每次启动时，通过 `dispatchEvent('storeSession', …)` 把已配对的会话推送进这个隔离的 KV 存储 —— 该运行环境看不到 `@capacitor/preferences`。
-- **`capacitor.config.ts`** 的 `plugins.BackgroundRunner` 配置块（`buildBackgroundRunnerConfig()`）注册了一个每 15 分钟重复一次的轮询（这是 Android 对重复后台任务的下限；iOS 的 BGTaskScheduler 只把这个数字当作提示，实际节奏由系统自行决定）。
-- **Android**：已完整接入，且是下面 debug 构建的一部分 —— `android/app/build.gradle` 的 `flatDir` 条目与 Gradle 插件模块均已就位；APK 一侧不需要额外代码。
+- **`capacitor.config.ts`** 的 `plugins.BackgroundRunner` 配置块（`buildBackgroundRunnerConfig()`）注册了一个每 15 分钟重复一次的轮询（这是 Android 对重复后台任务的下限；iOS 的 BGTaskScheduler 只把这个数字当作提示，实际节奏由系统自行决定——最终是操作系统而不是本应用来控制某次触发何时真正运行）。
+- **Android**：已完整接入，且是下面 debug 构建的一部分 —— `android/app/build.gradle` 的 `flatDir` 条目与 Gradle 插件模块均已就位；APK 一侧不需要额外代码。该插件的 Android 引擎是以预编译的原生 `.aar` 形式提供的，本仓库里没有其源码，因此这条回放轮询在 Android 上的真实行为是根据插件文档化的 JS API 表面（`fetch`、`console`、定时器、`CapacitorKV`/`CapacitorNotifications`）推断出来的，不像下文 iOS 的那条发现那样是直接读源码得到的。
 - **iOS**：`Info.plist` 的 `BGTaskSchedulerPermittedIdentifiers`/`UIBackgroundModes` 与 `AppDelegate.swift` 中的两处 `BackgroundRunnerPlugin` 调用均已提交，但 **Background Modes 能力**（Background fetch + Background processing）仍需在 Xcode 的 Signing & Capabilities 标签页中手动打开 —— 这一步是仅限 Mac、修改 Xcode 工程文件的操作，没有可用纯文本编辑替代的办法。见下文“Mac 上的步骤”。
 - **无论哪个平台**：真正“锁屏也能立即收到推送”（完全没有轮询延迟）都需要主机通过 APNs/FCM 推送，这仍然超出本分支范围，与此前一致。
 
-**本轮已修复（Mars r2，`M3-apps-mobile-r2.md`）：** 此前版本的运行器调用的是 `fetch('…/events?since=poll').then(r => r.text())`——主机的这条路由只支持 SSE、从不自行关闭（`packages/saturn/remote-access/src/proxy.ts` 的 `stream()`，只有 25 秒一次的心跳、没有结束），所以这次调用永远不会 resolve，后台通知也就永远不可能触发。它还把事件 id 当字符串比较（`"10" <= "9"` 为真，一旦超过个位数就会悄悄丢弃 10 到 89 之间的所有事件），并且触发的通知不带 `extra`，导致在 `main.ts` 里点击时崩溃。以上三点均已在上文修复；鉴于隔离引擎文档化的 Web API 范围（`fetch`、`TextDecoder`、定时器 —— 没有 `AbortController`），这里的读取截止时间方案是尽力而为的折中，尚未在真机或模拟器上以真实的 OS 定时任务跑过一遍 —— `npm test` 验证的是纯逻辑（帧解析、id 排序、`extra` 的结构），而不是端到端的真实网络/系统行为。
+### 为什么不用 SSE 流
+
+本节上一版直接读取主机保持打开的 `GET /saturn/remote/events` 流：带一个 `Last-Event-ID` 请求头，并设置 8 秒的读取截止时间，超时就取消 reader。**这在当前锁定的插件版本下，在 iOS 上是不可用的**，而不仅仅是“未经验证”——插件自己提交的 Swift 源码就证明了这一点：
+
+- `node_modules/@capacitor/background-runner/ios/Sources/RunnerEngine/JSResponse.swift`——隔离环境里的 `Response` 对象（`JSResponseExports`）只暴露了 `ok`、`status`、`url`、`text()`、`json()`。完全没有 `body` 属性，也没有 `ReadableStream`。
+- `node_modules/@capacitor/background-runner/ios/Sources/RunnerEngine/JSFetch.swift`——`fetch()` 是基于 `URLSession.dataTask` 实现的，它返回的 JS Promise **在 completion handler 内部**才会 resolve，也就是说，只有等 `URLSession` 把整个响应体都缓冲完，Promise 才会 resolve。
+
+两者合在一起：对一条主机保持打开、从不自行关闭的流（25 秒一次心跳、永不结束——`packages/saturn/remote-access/src/proxy.ts` 的 `stream()`）执行 `await fetch(hostUrl + '/saturn/remote/events')`，在 iOS 上根本不会 resolve。原本用来限定读取时长的读取截止时间逻辑甚至都没机会启动，因为它是在 `await fetch(...)` 这一行**之后**才创建的——这与 Mars r2（`M3-apps-mobile-r2.md`）针对早期 `?since=poll` + `response.text()` 版本指出的是同一类挂起，只是把出问题的那一层往里挪了一层。这一发现完全来自阅读插件已提交的源码，没有涉及任何真机或模拟器。上文的有边界回放端点（用 `response.json()` 读取一个必定会完成的请求，而不是主机保持打开的流）在两个平台上都不存在同样的失败模式，因为整条路径都完全不依赖 `response.body`。
+
+**跨轮次的修复历史（Mars r2 `M3-apps-mobile-r2.md`，Mars r3 `M3-apps-mobile-r3.md`）：** r1 调用的是 `fetch('…/events?since=poll').then(r => r.text())`，针对的是只支持 SSE 的路由，永远不会 resolve。r2 把它换成了上文描述的 `Last-Event-ID` + 流式读取方案，修好了“主机路由选错”这个问题，但依赖的流式读取被 r3 证明在 iOS 上根本走不到。这两套都已不复存在：现在这个定时任务只用 `response.json()` 读取有边界的 `/events/replay` 端点，别无其他。字符串而非数值比较 id（`"10" <= "9"` 悄悄丢弃 10–89 之间的事件）以及通知缺少 `extra` 这两个问题在 r2 就已修复，且依然保持修复状态。`npm test` 端到端验证的是纯逻辑——回放响应的 JSON 结构、数值 id 排序、gap 与分页截断（truncated paging）的处理，以及通知 `extra` 的结构——但真实的网络/系统行为（一次真正由操作系统调度触发、并真正弹出通知的过程）仍未在真机或模拟器上跑过；在任何主机契约下，只要没有真正跑过一次，这条限制对任何后台定时任务都成立。
 
 ## 已知限制与遗留工作
 
