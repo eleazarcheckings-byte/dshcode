@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/saturn/agent-team/README.md
-README.md: 4b447c2162fd2f035b4e2fcd07e4231c300a745b
-README.zh.md: 1a1900fe9e052f414e6808caaba76e1f84c86a7c
+README.md: 07be2c68cad1b38161b90720475f178ae9428a79
+README.zh.md: 8225a5607cfa49a374a3f223514e08b97f4fff4f

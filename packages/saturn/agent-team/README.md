@@ -29,7 +29,7 @@ Add this package to a composition when one agent should run a small team of name
 
 ### When to choose it
 
-Choose it when several agents must cooperate on one shared workspace and their roster, messages, and task state must survive crashes and restarts. Avoid it when teammates need separate working directories, when several processes must coordinate over one team, or when a task owner should be released automatically — none of those are supported. The team features need durable session storage to activate.
+Choose it when several agents must cooperate on one repository, with isolation defaulting to a private git worktree, and their roster, messages, and task state must survive crashes and restarts. Opt into `shared` isolation when members must edit one checkout together. Avoid it when several processes must coordinate over one team, or when a task owner should be released automatically — those are not supported. The team features need durable session storage to activate.
 
 ### Smallest working setup
 
@@ -48,7 +48,7 @@ With the tools installed, the model does the rest on request — for example, "c
 
 | Field | Default | Meaning |
 |---|---|---|
-| `maxMembers` | `8` | Maximum teammates a team may ever create, including failed ones |
+| `maxMembers` | `4` | Maximum teammates a team may ever create, including failed ones |
 | `maxTasks` | `256` | Maximum active tasks on the board |
 | `maxPendingMessagesPerMember` | `64` | Maximum queued messages for one member |
 | `maxMessageBytes` | `65,536` | Maximum size of one sent message |
@@ -66,7 +66,7 @@ Only the Lead can create teammates or interrupt them.
 
 ### Isolated teammates
 
-A teammate works in the Lead's own directory by default, where its edits are visible to everyone the moment they land. Ask for `worktree` isolation instead when the work rewrites files other members are reading: the teammate gets a private checkout of the current commit under `<DSH_HOME>/worktrees`, its edits stay invisible until they are merged, and the Lead's own edits stay invisible to it. It stands at the same depth inside that checkout as the Lead stands inside the repository, so a claim taken by either one names the same surface to the other. This needs a git repository with at least one commit; a workspace that cannot host a checkout refuses the request before anything is recorded, leaving the name free.
+A teammate works in a private git worktree of the current commit by default, so its edits stay invisible until they are merged and the Lead's own edits stay invisible to it. It stands at the same depth inside that checkout as the Lead stands inside the repository, so a claim taken by either one names the same surface to the other. This needs a git repository with at least one commit; a workspace that cannot host a checkout refuses the request before anything is recorded, leaving the name free. Pass `isolation: shared` to opt into the Lead's own directory, where edits are visible to everyone the moment they land.
 
 Merging is the way back, and the only one. It reports every file in the teammate's diff, refuses the whole diff when another member holds a claim on any of those files — naming each blocked path and its holder — and otherwise applies the patch whole. A checkout is removed when the Team runtime disposes.
 

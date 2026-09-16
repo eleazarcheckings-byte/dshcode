@@ -14,8 +14,8 @@ export type OrchestrateToggleProps =
 
 /**
  * Multi-task mode over the host-computed `orchestrate` projection. The button
- * renders both states — the mode is on by default, so a control that appears
- * only while active would hide the switch that turns it back on — and executes
+ * renders both states — the mode is off by default, so a control that appears
+ * only while active would hide the switch that turns it on — and executes
  * /orchestrate on|off through `command.execute`, so the click and the slash
  * command are one path with one logged result. `aria-pressed` reports the
  * state in force (never the queued target).

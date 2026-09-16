@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The session multi-task setting is logged and defaults to ON. `/orchestrate [on|off]` changes it, a change made during an active turn applies at the next accepted step, and resuming or forking a session retains its logged selection. The setting moves guidance, never the tool catalog.
+The session multi-task setting is logged and defaults to OFF. `/orchestrate [on|off]` changes it, a change made during an active turn applies at the next accepted step, and resuming or forking a session retains its logged selection. The setting moves guidance, never the tool catalog: tools stay registered either way.
 
 ## Table of Contents
 
@@ -27,7 +27,7 @@ Mount `@saturnai/dsh-orchestrate` on the host roster; the `/orchestrate` command
 
 ON states the shape of the mode first: the coordinator is the composer, and every task the user hands it gets a team — never a single agent. A team is at least two specialists with disjoint write scopes plus the independent reviewer, sized to the task, the smallest coherent team being the right one. It then directs the coordinator to assign independent work with concrete deliverables, context, disjoint file scopes, and verification requirements, preferring named Team members for ongoing shared work and one-shot subagents for bounded independent work, and states the rule that makes the arrangement trustworthy: the coordinator never grades its own team's work. When the pieces are in, the combined result goes to `review_definition_of_done`, which runs a fresh reviewer against the definition of done, and the contract is proven with that review's countersign or with the receipt of a run — never with the coordinator's own account of how it went. Once the verified result is delivered the coordinator stands by: it reports and waits for the next prompt, which gets its own team, rather than rolling itself into the next task. The reads that lock context stay in its own hand; solving the task belongs to the team.
 
-OFF asks the agent to work in one thread unless the user requests delegation, and says outright that this session-level instruction overrides the standing always-orchestrate posture.
+OFF asks the agent to work in one thread unless the user requests delegation. Delegation tools stay registered; this setting changes guidance only. Turn multi-task on when the work needs a team.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -35,7 +35,7 @@ OFF asks the agent to work in one thread unless the user requests delegation, an
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The `orchestrate` projection folds the session log with `init` active, so the standing posture holds on an empty log and only an `orchestrate/mode` event turns it off. A selection made while a turn is open is held in memory and committed at the next accepted in-turn pre-step, so the logged state never changes under an in-flight request, while the section reads the pending-or-logged value — the same shape plan mode uses.
+The `orchestrate` projection folds the session log with `init` inactive, so a fresh session is a single straight thread and only an `orchestrate/mode` event turns it on. A selection made while a turn is open is held in memory and committed at the next accepted in-turn pre-step, so the logged state never changes under an in-flight request, while the section reads the pending-or-logged value — the same shape plan mode uses.
 
 Off does not unregister the delegation tools. The request tool catalog stays stable across the toggle, per the plan-mode cache rule; only the guidance the next request reads changes.
 

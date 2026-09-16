@@ -56,7 +56,7 @@ Try it by asking the Lead model: "create a teammate named reviewer to check the 
 
 The ten tools group into four capabilities:
 
-- **Create a teammate** — `spawn_teammate` takes a name, a description, the initial task, and optionally `isolation`; only the Lead can call it. `isolation: worktree` gives the teammate a private checkout of the current commit instead of the Lead's directory.
+- **Create a teammate** — `spawn_teammate` takes a name, a description, the initial task, and optionally `isolation`; only the Lead can call it. Isolation defaults to `worktree` (a private checkout of the current commit). Pass `isolation: shared` to opt into the Lead's directory.
 - **Merge an isolated teammate** — `merge_teammate` reports every file in that teammate's diff and applies the whole diff, or none of it when another member's claim owns one of those files. A refusal arrives as a failed call naming each blocked path and its holder, because a denial the model reads as an ordinary result is a denial it will act as though it never got.
 - **Send messages** — `send_message` delivers information without waking an idle teammate; `followup_task` makes the message the recipient's next turn and wakes it when needed.
 - **See and wait** — `list_agents` shows the roster with live status; `wait_agent` waits for the next team change; `interrupt_agent` stops a teammate's current turn (Lead only).

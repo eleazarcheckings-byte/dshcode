@@ -56,7 +56,7 @@ kind: "package-reference"
 
 十个工具分为四类能力：
 
-- **创建 teammate**——`spawn_teammate` 接收名字、描述、初始任务，以及可选的 `isolation`；只有 Lead 可以调用它。`isolation: worktree` 会给该 teammate 当前提交的私有检出，而不是 Lead 的目录。
+- **创建 teammate**——`spawn_teammate` 接收名字、描述、初始任务，以及可选的 `isolation`；只有 Lead 可以调用它。隔离默认为 `worktree`（当前提交的私有检出）。传入 `isolation: shared` 可选择 Lead 的目录。
 - **merge 被隔离的 teammate**——`merge_teammate` 报告该 teammate diff 中的每个文件，并整体应用该 diff；若其中某个文件被别的成员 claim 占有，则一个也不应用。拒绝会以失败调用的形式到达，并指名每个被阻断的路径及其持有者——被模型当作普通结果读过去的拒绝，等于没有送达。
 - **发送消息**——`send_message` 在不唤醒 idle teammate 的情况下传达信息；`followup_task` 让消息成为接收方的下一个轮次，并在需要时唤醒它。
 - **查看与等待**——`list_agents` 显示带实时状态的 roster；`wait_agent` 等待下一次团队变化；`interrupt_agent` 停止 teammate 的当前轮次（仅限 Lead）。

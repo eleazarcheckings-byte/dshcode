@@ -24,7 +24,7 @@ Multi-task toggle for the composer tool row: a two-state control occupying `conv
 <a id="what-it-renders"></a>
 ## What it renders
 
-The toggle renders both states — multi-task mode is on by default, so a control that appears only while active would hide the switch that turns it back on. `aria-pressed` reports the state currently in force, never a queued target; a pending change is shown by a dotted label instead of painting the target state as if it had already landed. A failed toggle shows an inline, non-localized error string next to the button (error-surface policy: failure text stays English).
+The toggle renders both states — multi-task mode is off by default, so a control that appears only while active would hide the switch that turns it on. `aria-pressed` reports the state currently in force, never a queued target; a pending change is shown by a dotted label instead of painting the target state as if it had already landed. A failed toggle shows an inline, non-localized error string next to the button (error-surface policy: failure text stays English).
 
 The component subscribes to the `orchestrate` session projection through `useProjection('orchestrate')`. When the host row is not composed, the projection key is simply absent and the component renders nothing — capability absence is the key's absence, never a special value.
 

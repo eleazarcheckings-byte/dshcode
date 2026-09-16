@@ -16,7 +16,7 @@
 - id: system-prompt
   config:
     persona: >-
-      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+      You are Saturn AI — the agent harness that proves its work — powered by the {{model}} model. Your working directory is {{cwd}}. Done means proven: a receipt from a run, or an independent countersign — never your own account of how it went.
 
 # Full-text session search is opt-in (the base row's `openAt: never`). This
 # restatement keeps the Web values on one ephemeral in-memory index; a
@@ -296,9 +296,10 @@
     - id: saturn-done-strip
       name: '@saturnai/dsh-client-ui-done'
 
-    # Saturn AI always-orchestrate mode: the host plugin owns the `orchestrate`
+    # Saturn AI multi-task mode: the host plugin owns the `orchestrate`
     # projection, the `orchestrate:policy` prompt section, and the /orchestrate
-    # command; the client row is the composer multitask toggle.
+    # command; the client row is the composer multitask toggle. Default is off
+    # (`init.active: false`); tools stay registered either way.
     - id: saturn-orchestrate
       name: '@saturnai/dsh-orchestrate'
 
@@ -363,15 +364,16 @@
     # Saturn AI Agent Teams: the host plugin owns the implicit-root roster, the
     # durable peer mailbox, and the shared task DAG over the subagent lifecycle;
     # the tool row registers the Team-scoped model-facing tools; the client row
-    # renders the roster, task board, and teammate navigation. The same-named
-    # BASE rows stay disabled below (tool-subagent-control,
+    # renders the roster, task board, and teammate navigation. Isolation defaults
+    # to a private git worktree (`shared` is opt-in on spawn_teammate). Cap is 4.
+    # The same-named BASE rows stay disabled below (tool-subagent-control,
     # tool-subagent-list-agents, and both tool-subagent rows). Preset rows have
     # their own scope: the shipped standard/ptc/cordis delegation groups
     # conditionally omit legacy controls when the Team runtime is mounted.
     - id: agent-team
       name: '@saturnai/dsh-agent-team'
       config:
-        maxMembers: 8
+        maxMembers: 4
         maxTasks: 256
         maxPendingMessagesPerMember: 64
         maxMessageBytes: 65536

@@ -82,10 +82,15 @@ function execute(
   args: unknown,
   signal: AbortSignal = SIGNAL,
 ) {
+  // This suite tests Team tools, not isolation. Opt into shared so a missing
+  // git workspace does not fail every spawn; worktree-tools.spec.ts owns the default.
+  const arguments_ = name === 'spawn_teammate' && args !== null && typeof args === 'object' && !('isolation' in args)
+    ? { ...args, isolation: 'shared' }
+    : args
   return ctx.tools.execute({
     callId: ToolCallId(`team-call-${++callNumber}`),
     name,
-    arguments: args,
+    arguments: arguments_,
     signal,
     ...agent === undefined ? {} : { agent },
   })

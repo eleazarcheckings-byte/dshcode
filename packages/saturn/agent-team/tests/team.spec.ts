@@ -101,7 +101,7 @@ function spawn(
   ctx: Context,
   lead: Agent,
   name: string,
-  options: { context?: 'fresh' | 'fork'; provider?: string } = {},
+  options: { context?: 'fresh' | 'fork'; provider?: string; isolation?: 'shared' | 'worktree' } = {},
 ) {
   const context = options.context ?? 'fresh'
   return ctx.agentTeams.spawnTeammate(lead, {
@@ -110,6 +110,8 @@ function spawn(
     prompt: content(`${name} initial`),
     context,
     provider: options.provider ?? (context === 'fork' ? 'fork' : 'spawn'),
+    // This suite has no git workspace; opt into shared. worktree.spec.ts owns the default.
+    isolation: options.isolation ?? 'shared',
     signal: SIGNAL,
   })
 }
@@ -223,6 +225,20 @@ describe('Team identity and provisioning', () => {
     ])
     await expect(spawn(ctx, lead, 'third-worker')).rejects.toMatchObject({ code: 'TEAM_MEMBER_LIMIT' })
     await expect(spawn(ctx, lead, 'fresh-worker')).rejects.toMatchObject({ code: 'TEAM_MEMBER_NAME_TAKEN' })
+  })
+
+  it('caps the roster at four teammates unless the deployment raises maxMembers', async () => {
+    const { ctx, lead } = await setup([
+      textResponse('one'),
+      textResponse('two'),
+      textResponse('three'),
+      textResponse('four'),
+    ])
+    for (const name of ['one', 'two', 'three', 'four']) {
+      const started = await spawn(ctx, lead, name)
+      await waitNoAgent(ctx, started.member.id)
+    }
+    await expect(spawn(ctx, lead, 'five')).rejects.toMatchObject({ code: 'TEAM_MEMBER_LIMIT' })
   })
 
   it('flushes the accepted child prompt before committing the active roster edge', async () => {

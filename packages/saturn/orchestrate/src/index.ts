@@ -1,7 +1,7 @@
 /**
- * Multi-task (always-orchestrate) mode, host half. The per-session switch behind
- * the composer's multi-task toggle, and the ONE deployment-owned lever the
- * toggle actually moves.
+ * Multi-task mode, host half. The per-session switch behind the composer's
+ * multi-task toggle, and the ONE deployment-owned lever the toggle actually
+ * moves.
  *
  * The ON policy states the shape of the mode: the Lead composes a team for
  * every task — never a single agent — delivers the team's verified result, then
@@ -9,18 +9,16 @@
  * enforcement: the proof gate is what makes the result trustworthy.
  *
  * The `orchestrate` projection folds the session log, so resume and fork restore
- * the state: `init` is **active**, matching the standing posture of this harness
- * (`~/.dsh/SATURN-HARNESS-ADDENDUM.md` — always orchestrate), and only an
- * `orchestrate/mode` event turns it off. A user selection made while a turn is
- * open stays pending until the next accepted in-turn pre-step, so the logged
- * state never changes under an in-flight request; the `orchestrate:policy`
- * section reads the pending-or-logged value, exactly the plan-mode shape.
+ * the state: `init` is **inactive**. A fresh session is a single straight thread
+ * until `/orchestrate on` (or the composer toggle) turns the mode on. A user
+ * selection made while a turn is open stays pending until the next accepted
+ * in-turn pre-step, so the logged state never changes under an in-flight
+ * request; the `orchestrate:policy` section reads the pending-or-logged value,
+ * exactly the plan-mode shape.
  *
  * Off does not unregister the delegation tools — it changes the guidance the
  * next request reads (and the request tool catalog stays stable, per the
- * plan-mode cache rule). The off text is an explicit session-level override of
- * the standing posture, which is the honest lever: the posture itself lives in
- * the user-global AGENTS.md, which no plugin can retract.
+ * plan-mode cache rule). The tools stay registered either way.
  *
  * @module @saturnai/dsh-orchestrate
  */
@@ -75,11 +73,11 @@ const DEFAULT_ON = [
 ].join('\n')
 
 const DEFAULT_OFF = [
-  'Multi-task mode is OFF for this session — the user asked for a single straight thread.',
+  'Multi-task mode is OFF for this session — a single straight thread.',
   'Work with your own tools: read, edit, run, and verify yourself, and state the plan inline instead',
   'of routing it. Do not fan out to subagents and do not start background hands in this session',
-  'unless the user asks for exactly that in a message. This session-level instruction overrides the',
-  'standing always-orchestrate posture.',
+  'unless the user asks for exactly that in a message. Delegation tools stay registered; this setting',
+  'changes guidance only. Turn multi-task on when the work needs a team.',
 ].join('\n')
 
 /**
@@ -112,13 +110,13 @@ const orchestrateProjectionSchema: ZodType<{ active: boolean; pending: boolean }
   pending: zod.boolean(),
 })
 
-/** Logged per-session multi-task state; active on the empty log. */
+/** Logged per-session multi-task state; inactive on the empty log. */
 export const orchestrateProjectionDefinition = {
   key: 'orchestrate',
   stateVersion: 1,
   stateSchema: orchestrateUnitStateSchema,
-  // The standing posture: orchestrated unless a log says otherwise.
-  init: () => ({ active: true, activeAtLastHeader: null }),
+  // Product default: a fresh session is a single thread until the user turns it on.
+  init: () => ({ active: false, activeAtLastHeader: null }),
   apply: (state, event) => {
     if (event.type === 'orchestrate/mode') return { ...state, active: event.data.active }
     if (event.type === 'request/header') return { ...state, activeAtLastHeader: state.active }
@@ -234,7 +232,7 @@ export function apply(ctx: Context, config: OrchestrateModeConfig = {}): void {
   ctx.inject(['commands'], (commandCtx) => {
     commandCtx.commands.register({
       name: 'orchestrate',
-      description: 'Turn multi-task (always-orchestrate) mode on or off for this session',
+      description: 'Turn multi-task mode on or off for this session',
       input: { hint: '[on|off]' },
       handler: ({ agent, rawInput }) => {
         const argument = rawInput.trim().toLowerCase()

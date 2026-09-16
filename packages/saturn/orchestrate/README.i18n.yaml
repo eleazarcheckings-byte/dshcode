@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/saturn/orchestrate/README.md
-README.md: 5a497ac778ecb7d676428624df3f343907d9db0b
-README.zh.md: 277099588ef78fbef7a919e5c694e2522d6cc9e2
+README.md: 72847bca569ea5dd9edb72d6b4e0492112109aaf
+README.zh.md: 5ddcd50b6143721c956e45e96470df38e7b410c1

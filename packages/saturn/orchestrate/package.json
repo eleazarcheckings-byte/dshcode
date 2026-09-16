@@ -1,6 +1,6 @@
 {
   "name": "@saturnai/dsh-orchestrate",
-  "description": "Logged per-session multi-task (always-orchestrate) mode: the orchestrate projection, the orchestrate:policy prompt section, and the /orchestrate command",
+  "description": "Logged per-session multi-task mode (off by default): the orchestrate projection, the orchestrate:policy prompt section, and the /orchestrate command",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",

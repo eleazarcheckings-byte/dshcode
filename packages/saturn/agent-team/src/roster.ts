@@ -403,8 +403,9 @@ export class TeamRoster {
     const root = membership.root
     const name = this.memberName(request.name)
     const description = requiredText(request.description, 'description', 200)
+    const provider = requiredText(request.provider, 'provider', 200)
     const childId = brandString<SessionId>(randomUUID())
-    const isolation = request.isolation ?? 'shared'
+    const isolation = request.isolation ?? 'worktree'
     // Proved before anything durable is written: a workspace that cannot host a
     // checkout must leave the Team exactly as it was, with the name still free.
     const workspace = isolation === 'worktree' ? await this.isolatedWorkspace(root, signal) : undefined
@@ -412,7 +413,7 @@ export class TeamRoster {
       id: childId,
       name,
       description,
-      provider: requiredText(request.provider, 'provider', 200),
+      provider,
       context: request.context,
       phase: 'provisioning',
       isolation,

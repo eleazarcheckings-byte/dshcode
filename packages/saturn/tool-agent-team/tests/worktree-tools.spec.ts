@@ -110,10 +110,11 @@ it('offers isolation on spawn_teammate and merge_teammate to the Lead, and state
   expect(assembly.tools.map(schema => schema.name)).toContain('merge_teammate')
   const spawnSchema = assembly.tools.find(schema => schema.name === 'spawn_teammate')
   expect(JSON.stringify(spawnSchema)).toContain('worktree')
+  expect(JSON.stringify(spawnSchema)).toContain('Defaults to worktree')
   const prompt = renderPrompt(assembly)
   expect(prompt).toContain('merge_teammate')
-  // The shared-checkout warning stays true for the default isolation.
-  expect(prompt).toContain('Bash, formatters, code generators, and scripts are not fully protected')
+  expect(prompt).toContain('isolated in a private git worktree')
+  expect(prompt).toContain('Isolation "shared" is opt-in')
 })
 
 it('spawns an isolated teammate and merges its work back through the tool surface', async () => {
@@ -137,9 +138,27 @@ it('spawns an isolated teammate and merges its work back through the tool surfac
   expect(await readFile(join(repo, 'src', 'app.ts'), 'utf8')).toBe('from the isolated teammate\n')
 })
 
+it('defaults spawn_teammate to worktree isolation', async () => {
+  const { ctx, lead } = await setup()
+  const spawned = await execute(ctx, lead, 'spawn_teammate', {
+    name: 'default-writer',
+    description: 'default isolation',
+    prompt: 'stay available',
+  })
+  expect(spawned.isError, spawned.text).toBe(false)
+  const view = JSON.parse(spawned.text) as { member: { isolation?: string; worktree?: { path: string } } }
+  expect(view.member.isolation).toBe('worktree')
+  expect(view.member.worktree?.path).toBeDefined()
+})
+
 it('refuses merge_teammate for a teammate that shares the Lead checkout', async () => {
   const { ctx, lead } = await setup()
-  await execute(ctx, lead, 'spawn_teammate', { name: 'shared-mate', description: 'shared', prompt: 'stay available' })
+  await execute(ctx, lead, 'spawn_teammate', {
+    name: 'shared-mate',
+    description: 'shared',
+    prompt: 'stay available',
+    isolation: 'shared',
+  })
   const refused = await execute(ctx, lead, 'merge_teammate', { target: 'shared-mate' })
   expect(refused.isError).toBe(true)
   expect(refused.text).toContain('shared')

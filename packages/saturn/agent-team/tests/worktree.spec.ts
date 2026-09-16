@@ -174,12 +174,21 @@ describe('teammate isolation', () => {
     expect(ctx.agentTeams.listMembers(lead).find(row => row.name === 'isolated')?.worktree?.path).toBe(path)
   })
 
-  it('keeps the Lead checkout for the default shared isolation', async () => {
+  it('keeps the Lead checkout when shared isolation is opted in', async () => {
     const { ctx, lead } = await setup()
-    const { member } = await spawn(ctx, lead, 'shared-mate')
+    const { member } = await spawn(ctx, lead, 'shared-mate', 'shared')
     expect(member.isolation).toBe('shared')
     expect(member.worktree).toBeUndefined()
     expect(childCwd(ctx, member.id)).toBe(repo)
+  })
+
+  it('uses worktree isolation when the caller does not opt into shared', async () => {
+    const { ctx, lead } = await setup()
+    const { member } = await spawn(ctx, lead, 'default-isolated')
+    expect(member.isolation).toBe('worktree')
+    const path = member.worktree?.path
+    expect(path).toBeDefined()
+    expect(childCwd(ctx, member.id)).toBe(path)
   })
 
   it('refuses worktree isolation when the workspace is not a git repository', async () => {
@@ -253,7 +262,7 @@ describe('merge_teammate', () => {
 
   it('refuses to merge a teammate that has no worktree', async () => {
     const { ctx, lead } = await setup()
-    await spawn(ctx, lead, 'shared-mate')
+    await spawn(ctx, lead, 'shared-mate', 'shared')
     await expect(ctx.agentTeams.mergeTeammate(lead, { target: 'shared-mate', signal: SIGNAL }))
       .rejects.toThrow(TeamError)
   })

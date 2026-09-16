@@ -280,6 +280,7 @@ for (const backend of backends) {
         prompt: [{ type: 'text', text: 'finish before restart' }],
         context: 'fresh',
         provider: 'spawn',
+        isolation: 'shared',
         signal: SIGNAL,
       })
       await vi.waitFor(() => { expect(first.ctx.agents.get(started.member.id)).toBeUndefined() }, { timeout: 5_000 })
@@ -341,6 +342,7 @@ for (const backend of backends) {
         prompt: [{ type: 'text', text: 'finish before the crash window' }],
         context: 'fresh',
         provider: 'spawn',
+        isolation: 'shared',
         signal: SIGNAL,
       })
       await vi.waitFor(() => { expect(first.ctx.agents.get(started.member.id)).toBeUndefined() }, { timeout: 5_000 })

@@ -11,12 +11,10 @@
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /**
-     * Whether multi-task (always-orchestrate) mode is in force from this point
-     * on: log-only, non-surface, whole-value replace. The last
-     * `orchestrate/mode` wins; a log with none folds to **active** through the
-     * projection unit's init — the standing posture of this harness
-     * (`~/.dsh/SATURN-HARNESS-ADDENDUM.md`), so a fresh or resumed session is
-     * orchestrated unless someone turns it off.
+     * Whether multi-task mode is in force from this point on: log-only,
+     * non-surface, whole-value replace. The last `orchestrate/mode` wins; a log
+     * with none folds to **inactive** through the projection unit's init, so a
+     * fresh session is a single straight thread until someone turns it on.
      */
     'orchestrate/mode': { active: boolean }
   }
@@ -24,7 +22,7 @@ declare module '@deepseek-ai/dsh-session/types' {
 
 /**
  * The orchestrate projection's wire value. `active` is the logged state in
- * force (the last `orchestrate/mode`, **active** before the first); `pending`
+ * force (the last `orchestrate/mode`, **inactive** before the first); `pending`
  * is true while a queued selection targets a state other than `active` and no
  * later `orchestrate/mode` event has recorded that state. Capability absence
  * (this plugin not composed) is the key's absence, never a value.
@@ -36,7 +34,7 @@ export interface OrchestrateProjection {
 
 /** Host state used to derive {@link OrchestrateProjection}. */
 export interface OrchestrateUnitState {
-  /** Logged multi-task mode; true until an `orchestrate/mode` turns it off. */
+  /** Logged multi-task mode; false until an `orchestrate/mode` turns it on. */
   active: boolean
   /** Active state recorded by the latest `request/header`, or null before one. */
   activeAtLastHeader: boolean | null

@@ -44,9 +44,10 @@ export function TeamMessageId(id: string): TeamMessageId {
 export type TeamMemberPhase = 'provisioning' | 'active' | 'failed'
 
 /**
- * Where a teammate's files live. `shared` is the Lead's own workspace, which
- * every member sees at once; `worktree` is a git checkout of the Lead's HEAD
- * that only that member can see, whose work reaches the Lead through a merge.
+ * Where a teammate's files live. `worktree` (the default) is a git checkout of
+ * the Lead's HEAD that only that member can see, whose work reaches the Lead
+ * through a merge. `shared` is opt-in: the Lead's own workspace, which every
+ * member sees at once.
  */
 export type TeamIsolation = 'shared' | 'worktree'
 
@@ -152,7 +153,7 @@ declare module '@deepseek-ai/dsh-llm' {
 
 /** Team-service deployment limits. */
 export interface Config {
-  /** Maximum immutable teammate names retained by one Team. */
+  /** Maximum immutable teammate names retained by one Team. Defaults to 4. */
   readonly maxMembers?: number
   /** Maximum non-deleted tasks retained by one Team. */
   readonly maxTasks?: number
@@ -177,7 +178,7 @@ export interface SpawnTeammateRequest {
   readonly prompt: ContentBlock[]
   readonly context: 'fresh' | 'fork'
   readonly provider: string
-  /** Where the teammate works. Defaults to `shared`, the Lead's own workspace. */
+  /** Where the teammate works. Defaults to `worktree`; `shared` is opt-in. */
   readonly isolation?: TeamIsolation
   readonly signal: AbortSignal
 }

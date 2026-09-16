@@ -44,11 +44,23 @@ describe('the multi-task policy', () => {
     expect(on).not.toContain('review the combined result')
   })
 
-  it('reaches the model through the assembled prompt', async () => {
+  it('reaches the ON policy through the assembled prompt once the session turns it on', async () => {
     const { ctx, agent } = await setup()
+    agent.session.append('orchestrate/mode', { active: true })
     const assembly = await ctx.systemPrompt.assemble({ agent })
     const section = assembly.sections.find(entry => entry.name === ORCHESTRATE_SECTION)
     expect(section?.text).toContain('review_definition_of_done')
+  })
+
+  it('assembles the OFF policy on a fresh session', async () => {
+    const { ctx, agent } = await setup()
+    const state = ctx.sessionProjections.stateOf(agent.session, 'orchestrate')
+    expect(state?.active).toBe(false)
+    const assembly = await ctx.systemPrompt.assemble({ agent })
+    const section = assembly.sections.find(entry => entry.name === ORCHESTRATE_SECTION)
+    expect(section?.text).toContain('single straight thread')
+    expect(section?.text).not.toContain('review_definition_of_done')
+    expect(section?.text).toContain('Delegation tools stay registered')
   })
 
   it('keeps the straight-thread override free of delegation instructions', () => {
@@ -80,8 +92,9 @@ describe('team per task, then stand by', () => {
     expect(on).toMatch(/do not start the next task/iu)
   })
 
-  it('carries the standby rule through the assembled prompt', async () => {
+  it('carries the standby rule through the assembled prompt once the session turns it on', async () => {
     const { ctx, agent } = await setup()
+    agent.session.append('orchestrate/mode', { active: true })
     const assembly = await ctx.systemPrompt.assemble({ agent })
     const section = assembly.sections.find(entry => entry.name === ORCHESTRATE_SECTION)
     expect(section?.text).toMatch(/stands? by/iu)
