@@ -6,14 +6,17 @@ import {
   CLAUDE_AGENT_SDK_PACKAGE,
   claudeDistributionFromManifest,
   collectPythonDependencies,
+  excludedWorkspaceAreas,
   isOwnerAuthorizedRuntime,
   isPermissive,
   type Manifest,
   manifestPatterns,
+  OVERRIDES,
   parsePyprojectRequirements,
   parseVendoredRows,
   render,
   tierExternalDeps,
+  uninstalledDependencyNames,
   virtualManifest,
 } from './gen-third-party-notices.ts'
 
@@ -362,5 +365,26 @@ describe('manifestPatterns', () => {
       'native/landlock-run/package.json',
       'native/landlock-run/packages/*/package.json',
     ])
+  })
+})
+
+describe('excludedWorkspaceAreas', () => {
+  it('reads the `!area` members as the areas pnpm never installs', () => {
+    expect(excludedWorkspaceAreas(['packages/*/*', '!apps/mobile', 'apps/*'])).toEqual(['apps/mobile'])
+  })
+})
+
+describe('dependencies outside the installed workspace', () => {
+  // The Capacitor shell under `apps/mobile` is excluded from
+  // `pnpm-workspace.yaml`, so the repository install never creates a store
+  // entry for anything only it declares. A Linux CI checkout therefore has no
+  // manifest on disk to read a license off, while a developer machine that ran
+  // `npm install` inside `apps/mobile` does — the difference that made this
+  // generator pass locally and fail in CI. Metadata for those names has to come
+  // from OVERRIDES so both hosts render the same file.
+  it('resolves every one of them from OVERRIDES rather than from disk', () => {
+    const uninstalled = uninstalledDependencyNames()
+    expect(uninstalled).toContain('@capacitor/core')
+    expect(uninstalled.filter(name => OVERRIDES[name]?.license === undefined || OVERRIDES[name]?.repo === undefined)).toEqual([])
   })
 })
