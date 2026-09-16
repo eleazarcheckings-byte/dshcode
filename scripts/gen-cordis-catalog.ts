@@ -703,6 +703,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   ModelTier: 'model-routing tier identifier is owned by packages/saturn/model-router/src/types.ts',
   TierRoute: 'resolved provider/model/reasoning-effort route is owned by packages/saturn/model-router/src/types.ts',
   ExternalHarness: 'native product subagent harness identifier is owned by packages/saturn/model-router/src/types.ts',
+  RouteDecision: 'pre-dispatch vision-routing decision is owned by packages/saturn/model-router/src/types.ts',
+  RoutedRequest: 'request shape the router inspects for vision routing is owned by packages/saturn/model-router/src/types.ts',
   RemoteMode: 'remote-access listener mode (lan | tunnel) is owned by packages/saturn/remote-access/src/types.ts',
   RemoteStatus: 'remote-access listener, device, and tunnel status is owned by packages/saturn/remote-access/src/types.ts',
   RemotePairingPayload: 'remote-access QR pairing payload is owned by packages/saturn/remote-access/src/types.ts',

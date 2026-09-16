@@ -818,6 +818,16 @@ Owns the `saturn-model-router` settings namespace and answers tier and external-
 resolve(tier: ModelTier): TierRoute
 
 /**
+ * Pick a model that can see, when this request carries image content.
+ * Text-only requests, models that already accept images, models that
+ * declare no modalities, a missing llm service, and a provider with no
+ * image-capable catalog entry all leave the route unchanged. Never throws.
+ * @param request - the current provider/model plus the messages that may carry images.
+ * @returns the route to dispatch, with `switched` naming whether it changed.
+ */
+async resolveForRequest(request: RoutedRequest): Promise<RouteDecision>
+
+/**
  * Whether the deployment has opted into native product subagent providers.
  * @returns the current `externalHarnesses` config flag; independent of
  *   whether any harness CLI actually resolves on disk.

@@ -1331,6 +1331,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the provider, model, and optional reasoning effort to use.',
       },
       {
+        signature: 'async resolveForRequest(request: RoutedRequest): Promise<RouteDecision>',
+        description: 'Pick a model that can see, when this request carries image content. Text-only requests, models that already accept images, models that declare no modalities, a missing llm service, and a provider with no image-capable catalog entry all leave the route unchanged. Never throws.',
+        parameters: [{ name: 'request', description: 'the current provider/model plus the messages that may carry images.' }],
+        returns: 'the route to dispatch, with `switched` naming whether it changed.',
+      },
+      {
         signature: 'externalHarnessesEnabled(): boolean',
         description: 'Whether the deployment has opted into native product subagent providers.',
         parameters: [],
@@ -2209,6 +2215,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Replace one registered namespace\'s user section wholesale, validate, persist, then commit and emit. Keys absent from `section` fall back to the composition `base` and schema defaults — this is the removal/reset path a merge-only patch cannot express (`replace({})` re-inherits everything).',
         parameters: [{ name: 'ns', description: 'the registered namespace to replace.' }, { name: 'section', description: 'the complete next user section.' }, { name: 'expectedRevision', description: 'the descriptor `revision` the caller read; a namespace that moved past it rejects with {@link SettingsConflictError}.' }],
         throws: ['{TypeError} when `ns` is not a lowercase hyphenated identifier.'],
+      },
+      {
+        signature: 'async set<const Namespace extends string>( ns: Namespace & SettingsNamespaceInput<Namespace>, section: object, expectedRevision?: number, ): Promise<void>',
+        description: 'Write one registered namespace\'s user section wholesale. Same as replace; the name callers use for a complete put.',
+        parameters: [{ name: 'ns', description: 'the registered namespace to write.' }, { name: 'section', description: 'the complete next user section.' }, { name: 'expectedRevision', description: 'the descriptor `revision` the caller read; a namespace that moved past it rejects with {@link SettingsConflictError}.' }],
       },
       {
         signature: 'async mutate<const Namespace extends string>( ns: Namespace & SettingsNamespaceInput<Namespace>, ops: readonly SettingsPathOp[], expectedRevision?: number, ): Promise<void>',
@@ -5241,6 +5252,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResumeAgentOptions {\n    readonly resumeSessionId: SessionId;\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
   },
   {
+    name: 'RoutedBlock',
+    declaration: 'export interface RoutedBlock {\n    type: string;\n    content?: readonly RoutedBlock[];\n}',
+  },
+  {
+    name: 'RouteDecision',
+    declaration: 'export interface RouteDecision {\n    provider: string;\n    model: string;\n    switched: boolean;\n    reason?: VisionRouteReason;\n    reasoningEffort?: string;\n}',
+  },
+  {
+    name: 'RoutedMessage',
+    declaration: 'export interface RoutedMessage {\n    role?: string;\n    content: readonly RoutedBlock[];\n}',
+  },
+  {
+    name: 'RoutedRequest',
+    declaration: 'export interface RoutedRequest {\n    provider: string;\n    model: string;\n    messages: readonly RoutedMessage[];\n    reasoningEffort?: string;\n}',
+  },
+  {
     name: 'RunnerFailureRule',
     declaration: 'export interface RunnerFailureRule {\n    allowedExitCodes?: readonly number[];\n    fatalSignatures: readonly string[];\n    informationalLines?: readonly string[];\n}',
   },
@@ -6515,6 +6542,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'VerifiedWebhookDelivery',
     declaration: 'export interface VerifiedWebhookDelivery<K extends string = string> {\n    readonly kind: K;\n    readonly source: WebhookSourceId;\n    readonly deliveryId: WebhookDeliveryId;\n    readonly event: WebhookEventOf<K>;\n    readonly receivedAt: number;\n}',
+  },
+  {
+    name: 'VisionRouteReason',
+    declaration: 'export type VisionRouteReason = \'vision-tier\' | \'catalog\';',
   },
   {
     name: 'WebBootBatch',
