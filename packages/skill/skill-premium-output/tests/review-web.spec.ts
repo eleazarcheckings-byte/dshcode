@@ -85,7 +85,16 @@ interface ReviewReport {
   }[]
 }
 
-async function run(url: string, extra: string[] = []): Promise<{ report: ReviewReport; directory: string; exitCode: number }> {
+interface StdoutSummary {
+  directory: string
+  report: string
+  screenshots: { name: string; path: string }[]
+  lookNote: string
+}
+
+interface RunResult { report: ReviewReport; directory: string; exitCode: number; stdout: StdoutSummary }
+
+async function run(url: string, extra: string[] = []): Promise<RunResult> {
   const out = await mkdtemp(resolve(tmpdir(), 'saturn-browser-review-'))
   cleanup.push(() => rm(out, { recursive: true, force: true }))
   const args = [script, '--url', url, '--out', out, ...(!extra.includes('--timeout') ? ['--timeout', '5000'] : []), ...(browser && !extra.includes('--browser') ? ['--browser', browser] : []), ...extra]
@@ -99,8 +108,8 @@ async function run(url: string, extra: string[] = []): Promise<{ report: ReviewR
     stdout = failed.stdout
     exitCode = failed.code
   }
-  const output = JSON.parse(stdout) as { directory: string; report: string }
-  return { report: JSON.parse(await readFile(output.report, 'utf8')) as ReviewReport, directory: output.directory, exitCode }
+  const output = JSON.parse(stdout) as StdoutSummary
+  return { report: JSON.parse(await readFile(output.report, 'utf8')) as ReviewReport, directory: output.directory, exitCode, stdout: output }
 }
 
 describe('bundled browser review', () => {
@@ -181,6 +190,23 @@ describe('bundled browser review', () => {
     expect(report.views[2]?.dom.reducedMotion).toBe(true)
     expect((await readdir(directory)).sort()).toEqual(['desktop.png', 'mobile.png', 'reduced-motion.png', 'report.json', 'report.md'])
     expect(await readFile(resolve(directory, 'report.md'), 'utf8')).toContain('Automated checks do not assess visual quality')
+  }, 60000)
+
+  it.skipIf(!hasPlaywright)('prints captured screenshots as a labelled path list for read_image and names who must look', async () => {
+    const url = await fixture('<!doctype html><title>Look fixture</title><link rel="icon" href="data:,"><main><h1>Preview</h1></main>')
+    const { report, directory, stdout } = await run(url)
+    expect(report.status).toBe('checks-complete')
+    expect(stdout.screenshots).toHaveLength(3)
+    expect(stdout.screenshots.map(entry => entry.name).sort()).toEqual(['desktop', 'mobile', 'reduced-motion'])
+    for (const entry of stdout.screenshots) {
+      expect(entry.path).toBe(resolve(directory, `${entry.name}.png`))
+      expect(existsSync(entry.path)).toBe(true)
+    }
+    expect(stdout.lookNote).toContain('read_image')
+    const markdown = await readFile(resolve(directory, 'report.md'), 'utf8')
+    expect(markdown).toContain('## Screenshots to inspect')
+    for (const entry of stdout.screenshots) expect(markdown).toContain(entry.path)
+    expect(markdown).toContain('This script never looks at pixels itself — an agent must open every screenshot listed below with read_image')
   }, 60000)
 
   it.skipIf(!hasPlaywright)('waits for the requested visible content before inspecting a hydrated page', async () => {
