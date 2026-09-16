@@ -2,6 +2,11 @@
   "name": "@saturnai/dsh-client-ui-remote-access",
   "description": "Settings → Remote: turn remote access on, show the pairing QR, and manage the devices that hold a key to this harness",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/client/ui-remote-access"
+  },
   "type": "module",
   "main": "lib/index.js",
   "files": [
@@ -38,6 +43,9 @@
     "watch": "tsdown --watch"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"
   },

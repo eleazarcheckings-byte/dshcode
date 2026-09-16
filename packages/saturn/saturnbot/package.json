@@ -4,6 +4,14 @@
   "description": "Persistent role-bound SaturnBot execution cycles, approvals, and typed business tools",
   "type": "module",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/saturn/saturnbot"
+  },
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "exports": {

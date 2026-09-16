@@ -2,6 +2,11 @@
   "name": "@saturnai/dsh-client-ui-settings-account",
   "description": "Settings → Account: izzy.la identity and a user-initiated check against the Saturn AI desktop update feed",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/client/ui-settings-account"
+  },
   "type": "module",
   "main": "lib/index.js",
   "files": [
@@ -37,6 +42,9 @@
     "watch": "tsdown --watch"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"
   },
