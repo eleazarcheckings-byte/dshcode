@@ -78,7 +78,7 @@ describe('target-neutral Conversation apply wiring', () => {
     expect(b.runtime.slots.entries('settings.general.item').map(row => row.options.id))
       .toEqual(['composer-enter'])
     expect(b.runtime.slots.entries('shell.background')).toHaveLength(1)
-    expect(b.runtime.slots.entries('shell.overlay').map(row => row.options.id)).toEqual(['ambient-motion'])
+    expect(b.runtime.slots.entries('shell.overlay').map(row => row.options.id)).toEqual(['ambient-motion', 'deepseek-peak'])
     const sky = b.runtime.slots.entries('shell.background')[0]?.inject?.() as unknown as AmbientMotionInjected
     const control = b.runtime.slots.entries('shell.overlay')[0]?.inject?.() as unknown as AmbientMotionInjected
     expect(sky.hooks.ambientMotion).toBe(control.hooks.ambientMotion)

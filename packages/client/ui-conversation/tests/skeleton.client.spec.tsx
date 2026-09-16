@@ -473,6 +473,9 @@ describe('ConversationRoot resident composer', () => {
     expect(b.slotCalls).toContain('conversation.session.header.lineage')
     expect(b.slotCalls).toContain('conversation.session.header.actions')
     expect(b.slotCalls).toContain('conversation.session.header.utilities')
+    // The DeepSeek pricing lamp lives in the frame's top-right rail
+    // (shell.overlay), never in the composer's trailing row.
+    expect(b.view.queryByRole('img', { name: /高峰|低峰/ })).toBeNull()
   })
 
   it('sticky composer seat wraps the whole overlay chain, not only the fallback stack', () => {
@@ -498,6 +501,8 @@ describe('ConversationRoot resident composer', () => {
     expect(host).not.toBeNull()
     expect(header?.getAttribute('aria-hidden')).toBe('true')
     expect(b.view.getByText('构建非凡之作。')).toBeTruthy()
+    // Same on the hero: the pricing lamp is rail chrome, not composer chrome.
+    expect(b.view.queryByRole('img', { name: /高峰|低峰/ })).toBeNull()
     expect(b.view.getByText('Saturn')).toBeTruthy()
     expect(b.view.queryByTestId('view-chat')).toBeNull()
     // The same machine-backed textarea is live in the hero, and the
