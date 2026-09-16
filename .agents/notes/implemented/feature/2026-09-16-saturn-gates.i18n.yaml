@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-16-saturn-gates.md
-2026-09-16-saturn-gates.md: 9f08fede08c29b294cd220a6a19d313245936132
-2026-09-16-saturn-gates.zh.md: a71358d5fda37061a1285b5dba790bbf26346ed8
+2026-09-16-saturn-gates.md: 14a88f712677255763d4e0e9376efbba9c77e063
+2026-09-16-saturn-gates.zh.md: f1bb41ed60c8fbb8b9a97be9543250f48cad82e9

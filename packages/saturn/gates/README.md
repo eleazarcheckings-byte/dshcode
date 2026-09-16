@@ -46,7 +46,7 @@ Mount it in any deployment that hands an agent real capability. It injects `tool
 | `identity` | A domain or DNS record the operator is known by changes | `mcp__*__buy_domain`, `namecheap …`, `wrangler dns`, `vercel domains buy` |
 | `destructive` | The effect cannot be undone | `rm -rf` outside the workspace, `Remove-Item -Recurse -Force`, `git reset --hard`, `git clean -fdx`, `DROP TABLE` |
 
-Four rules are `deny` rather than `ask`, because no in-session approval should be able to buy them: a fork bomb, a recursive delete of the filesystem root or the home directory, a disk format, and a raw write to a block device. Everything else asks.
+Four rules are `deny` rather than `ask`, because no in-session approval should be able to buy them: a fork bomb, a recursive delete of the filesystem root or the home directory, a disk format, and a raw write to a block device. Everything else asks. Those four are also the rules `allow` cannot reach: a tool-name exemption buys quieter `ask` prompts and never a disarmed fork bomb.
 
 ### The two rule shapes
 
@@ -61,10 +61,11 @@ A **shell rule** additionally matches a regular expression against the call's co
 | `includeDefaults` | `true` | Keep the shipped rules. `false` leaves only `rules`. |
 | `rules` | `[]` | Rules appended after the shipped ones, matched in order. |
 | `disableRules` | `[]` | Ids of shipped rules to drop. An id that names no shipped rule fails the load. |
-| `allow` | `[]` | Tool-name patterns exempt from every rule, checked first. |
+| `allow` | `[]` | Tool-name patterns exempt from the `ask` rules. The four `deny` rules stay armed for an exempt tool. |
 | `commandFields` | `command`, `script`, `text`, `input`, `expression` | Argument fields a shell rule reads. |
-| `deferToSandboxEscalation` | `true` | Abstain on a call that already carries its own escalation (see below). |
+| `deferToSandboxEscalation` | `true` | Abstain on a call that already carries its own escalation (see below). `false` trades a second question for a prompt that names the class. |
 | `escalationTools` | `bash`, `pwsh` | The tools whose body resolves an escalation approval of its own. |
+| `escalationModes` | `workspace-write`, `danger-full-access` | The modes an escalation may name for that abstention to apply. A mode outside this list never reaches a human, so it does not excuse a Gate-class call. |
 
 One rule is `{ id, class, action?, tools, pattern?, reason }`. `tools` entries are wildcard patterns where `*` matches any run of characters and everything else is literal; `pattern` is a case-insensitive regular expression; `reason` is the sentence the model reads. A policy that cannot be compiled — an unknown class, a duplicate id, an empty tool list, an empty reason, an uncompilable pattern — fails the plugin load rather than gating nothing.
 
@@ -76,7 +77,7 @@ Three composition rules that listener keeps, all load-bearing:
 
 1. **An unclaimed call is delegated** with `next()`. The Gate narrows nothing it does not claim.
 2. **A claimed call is answered without delegating.** It is already going to a human; letting a later listener raise a second decision for the same call would put two questions in front of the user for one action.
-3. **A shell call that already carries a `sandbox_permissions` escalation is delegated even when a rule claims it**, because that call's own body resolves one approval through the same seam before it executes anything. Abstaining keeps the count at one question, and nothing runs unapproved either way: an escalating call that is refused, unanswerable, or agent-less fails before the command runs. A `deny` class is decided before this check, so an escalation request can never buy a pass.
+3. **A shell call that already carries a `sandbox_permissions` escalation is delegated even when an `ask` rule claims it**, because that call's own body resolves one approval through the same seam before it executes anything. Abstaining keeps the count at one question, and nothing runs unapproved either way: an escalating call that is refused, unanswerable, or agent-less fails before the command runs. Three things bound the abstention. A `deny` class is decided first, so an escalation can never buy a pass. The mode must be one of `escalationModes` — a request naming anything else is refused by the sandbox's own widening check without a human seeing it, so honouring it would let two invented arguments silence any `ask` rule. And the abstention is logged with the class and rule id, because it is the one path where the Gate claims a call and puts nothing of its own in front of the human — see Known Limitations.
 
 The plugin never calls `ctx.approval` itself. It returns `{ kind: 'ask' }` and the tool registry resolves it through the approval seam, which is what keeps one call to one question and puts the ask/decision pair in the session's own audit log. The one thing it reads from that seam is the effective policy — the session's override, else the deployment default — because an ask under `never` is answered `rejected` without anyone seeing it, and the model would otherwise report a refusal the user never made.
 
@@ -101,6 +102,7 @@ Independent: the text rides one tool result and never rewrites an earlier reques
 - **A shell rule reads command text with a regular expression.** It matches what the command says, not what it does: a Gate-class command assembled at runtime, base64-decoded, read from a file, or reached through a script this policy has never heard of is not classified. The shipped patterns are a catastrophe net for the commands an agent actually writes, not a sandbox.
 - **There is no network egress control anywhere in the harness**, and this package does not add one. The outbound rules name specific endpoints in a command line; a POST to an endpoint nobody listed, or from inside a program rather than a shell, is not seen. Egress control belongs to a layer that can observe the socket.
 - **An unknown MCP server passes through unless it is listed.** The wildcards catch the common effect names (`keychain_*`, `buy_*`, `deploy_*`, `publish_*`, `send_message`), but a Gate-class tool with a name nobody anticipated is not gated until someone adds a rule for it. Mounting a new server is therefore a policy event, not just a config one.
+- **A Gate-class shell call that carries its own sandbox escalation is approved through the sandbox's question, not the Gate's.** The single prompt reads `escalate sandbox to <mode>: <the model's own justification>`; the class, the rule id and the rule's sentence do not appear in it, so the human is consenting to a sandbox change while the gated act rides along. Nothing runs unapproved — a refusal still stops the command — but the consent is less informed than on every other path. The escalation must name a real mode from `escalationModes`, which stops an invented one from suppressing the Gate; a genuine escalation still hides the class. The remedy is `deferToSandboxEscalation: false`, which puts the Gate's own class-naming question back in front of the human at the cost of a second prompt for that one call. Closing the gap without that trade needs the escalating tool to carry a caller-supplied reason into its approval request, which is a change in `@deepseek-ai/dsh-tool-bash`, not here.
 - **The classes are about consequence, not intent.** `mcp__telegram-hive__stage` is deliberately NOT gated: staging writes a draft to an outbox that a human still has to approve, and the tool that actually sends — `send_approved` — is gated. A deployment that treats staging as outbound adds a rule for it.
 - **Nothing here reaches the deployment's preset.** The plugin can detect that approval prompts are disabled and say so, but it cannot switch `permission.defaultPreset` itself; until that switch happens, every Gate-class call denies instead of asking.
 
