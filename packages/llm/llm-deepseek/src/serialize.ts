@@ -18,15 +18,33 @@ import type {
   WireUserContentPart,
 } from './types.ts'
 
+/**
+ * Reasoning-effort literals the live DeepSeek API accepts on
+ * `reasoning_effort`. `off` is not in this list: it disables thinking and
+ * must never appear as a wire effort (the API rejects the literal).
+ */
+export const DEEPSEEK_WIRE_REASONING_EFFORTS = [
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+] as const
+
+/** One live `reasoning_effort` literal. */
+export type DeepSeekWireReasoningEffort = (typeof DEEPSEEK_WIRE_REASONING_EFFORTS)[number]
+
 /** Adapter-level request defaults (from plugin config). */
 export interface RequestDefaults {
   thinking?: 'enabled' | 'disabled' | undefined
-  reasoningEffort?: 'off' | 'low' | 'high' | 'max' | undefined
+  reasoningEffort?: 'off' | DeepSeekWireReasoningEffort | undefined
 }
 
 interface ResolvedThinking {
   thinking?: 'enabled' | 'disabled'
-  reasoningEffort?: 'low' | 'high' | 'max'
+  reasoningEffort?: DeepSeekWireReasoningEffort
 }
 
 /** Provider representation for every retained image in one request. */
@@ -68,11 +86,15 @@ export interface ImageWireLocation {
 
 const TOOL_RESULT_IMAGE_TEXT = 'Attached image(s) from tool result:'
 
+const WIRE_REASONING_EFFORTS = new Set<string>(DEEPSEEK_WIRE_REASONING_EFFORTS)
+
 /** Validate the adapter-owned effort before resolving its DeepSeek wire fields. */
-function reasoningEffort(effort: NonNullable<GenerateOptions['reasoningEffort']>): 'off' | 'low' | 'high' | 'max' {
-  if (effort === 'off' || effort === 'low' || effort === 'high' || effort === 'max') {
-    return effort as 'off' | 'low' | 'high' | 'max'
-  }
+function reasoningEffort(
+  effort: NonNullable<GenerateOptions['reasoningEffort']>,
+): 'off' | DeepSeekWireReasoningEffort {
+  const id = String(effort)
+  if (id === 'off') return 'off'
+  if (WIRE_REASONING_EFFORTS.has(id)) return id as DeepSeekWireReasoningEffort
   throw new LlmError(
     `DeepSeek does not support reasoning effort "${effort}"`,
     'UNSUPPORTED_REASONING_EFFORT',
@@ -92,7 +114,7 @@ function resolveThinking(options: GenerateOptions, defaults: RequestDefaults): R
     )
   }
   if (effort === 'off') return { thinking: 'disabled' }
-  if (effort === 'low' || effort === 'high' || effort === 'max') {
+  if (effort !== undefined && WIRE_REASONING_EFFORTS.has(effort)) {
     return { thinking: 'enabled', reasoningEffort: effort }
   }
   return defaults.thinking === undefined ? {} : { thinking: defaults.thinking }

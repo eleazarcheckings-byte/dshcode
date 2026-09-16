@@ -53,7 +53,7 @@ describe('first-light deepseek probe', () => {
 
     const models = await ctx.llm.discoverModels(NS, { provider: PROVIDER })
 
-    expect(models).toHaveLength(3)
+    expect(models).toHaveLength(4)
     expect(server.requests).toHaveLength(1)
     const request = server.requests[0] as { model: string; max_tokens: number; stream: boolean }
     expect(request.model).toMatch(/flash/i)

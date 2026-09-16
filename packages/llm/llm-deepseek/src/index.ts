@@ -44,6 +44,9 @@ import {
   DEFAULT_REQUEST_IMAGE_MAX_BYTES,
   DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET,
 } from './request-pricing.ts'
+import {
+  DEEPSEEK_WIRE_REASONING_EFFORTS,
+} from './serialize.ts'
 import { probeDeepSeekConnection } from './probe.ts'
 
 export {
@@ -85,6 +88,8 @@ export type { DeepSeekFileId as DeepSeekFileIdType } from './file-id.ts'
 export { DeepSeekUploadIndex, deepSeekFileScope } from './upload-index.ts'
 export type { DeepSeekUploadRecord } from './upload-index.ts'
 export type { RequestDefaults } from './serialize.ts'
+export { DEEPSEEK_WIRE_REASONING_EFFORTS } from './serialize.ts'
+export type { DeepSeekWireReasoningEffort } from './serialize.ts'
 export type * from './types.ts'
 
 export const name = 'llm-deepseek'
@@ -94,27 +99,41 @@ const NS = 'llm-deepseek'
 const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
 /** The single provider route this plugin owns. */
 const PROVIDER = 'deepseek-official'
+const FLASH_MAX_TOKENS = 384_000
+const WIRE_REASONING_LEVELS = new Set<string>(DEEPSEEK_WIRE_REASONING_EFFORTS)
 
-const DEFAULT_MODELS: DeepSeekCatalogModel[] = [
+/** Advisory catalog: live ids first, retired ids kept only as aliases of Flash. */
+export const DEFAULT_MODELS: DeepSeekCatalogModel[] = [
   {
-    id: 'deepseek-v4-flash',
-    name: 'DeepSeek-V4-Flash',
+    id: 'deepseek-flash',
+    name: 'DeepSeek-Flash',
     description: 'Fast, efficient, and economical; suited to focused, routine, or parallel tasks.',
     contextWindow: DEFAULT_CONTEXT_WINDOW,
+    maxTokens: FLASH_MAX_TOKENS,
+    inputModalities: ['text', 'image'],
   },
   {
     id: 'deepseek-v4-pro',
     name: 'DeepSeek-V4-Pro',
     description: 'Stronger agentic coding, knowledge, and difficult reasoning; suited to complex or quality-critical tasks at higher cost.',
     contextWindow: DEFAULT_CONTEXT_WINDOW,
+    inputModalities: ['text', 'image'],
+  },
+  {
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek-V4-Flash',
+    description: 'Alias of deepseek-flash. Fast, efficient, and economical; suited to focused, routine, or parallel tasks.',
+    contextWindow: DEFAULT_CONTEXT_WINDOW,
+    maxTokens: FLASH_MAX_TOKENS,
+    inputModalities: ['text', 'image'],
   },
   {
     id: 'deepseek-v4-flash-vision-exp',
     name: 'DeepSeek-V4-Flash-Vision-Exp',
+    description: 'Alias of deepseek-flash (legacy vision id).',
     contextWindow: DEFAULT_CONTEXT_WINDOW,
+    maxTokens: FLASH_MAX_TOKENS,
     inputModalities: ['text', 'image'],
-    imagePixelBudget: DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET,
-    imageMaxBytes: DEFAULT_REQUEST_IMAGE_MAX_BYTES,
   },
 ]
 
@@ -136,12 +155,12 @@ export interface Config {
   /** Deployment thinking policy; `disabled` limits every conversation request to `off`. */
   thinking?: 'enabled' | 'disabled'
   /** Default thinking effort (default `high`); `off` disables thinking per request. */
-  reasoningEffort?: 'off' | 'low' | 'high' | 'max'
+  reasoningEffort?: 'off' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   /** Default per-request output cap (default 256,000); a model's own cap and explicit request values win. */
   maxTokens?: number
   /** Positive context capacity used when the selected model has no exact value (default 1,000,000). */
   defaultContextWindow?: number
-  /** Advisory models shown by discovery consumers; defaults to V4 Flash, V4 Pro, and V4 Flash Vision Exp. */
+  /** Advisory models shown by discovery consumers; defaults to Flash, V4 Pro, and legacy Flash aliases. */
   models?: DeepSeekCatalogModel[]
   /** Maximum provider idle time while one stream read is outstanding (default five minutes). */
   streamIdleTimeoutMs?: number
@@ -184,7 +203,9 @@ const catalogModel: z<DeepSeekCatalogModel> = z.object({
   // default is the non-optional member type.
   reasoningEfforts: z.union([
     z.const(false),
-    z.dict(z.union([z.string(), z.const(null)]), z.union(['off', 'high', 'max'])),
+    z.dict(z.union([z.string(), z.const(null)]), z.union([
+      'off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+    ])),
   ]) as unknown as z<Exclude<DeepSeekCatalogModel['reasoningEfforts'], undefined>>,
   imagePixelBudget: z.union([z.number().step(1).min(1), 'low']),
   imageMaxBytes: z.number().step(1).min(1),
@@ -194,7 +215,7 @@ export const Config: z<Config> = z.object({
   apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_API_KEY_ENV),
   baseURL: z.string(),
   thinking: z.union(['enabled', 'disabled']),
-  reasoningEffort: z.union(['off', 'low', 'high', 'max']),
+  reasoningEffort: z.union(['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']),
   maxTokens: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_TOKENS),
   defaultContextWindow: z.number().step(1).min(1).default(DEFAULT_CONTEXT_WINDOW),
   models: z.array(catalogModel).default(DEFAULT_MODELS),
@@ -277,12 +298,12 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
     if (seen.has(model.id)) throw new Error(`llm-deepseek: duplicate catalog model "${model.id}"`)
     seen.add(model.id)
     if (model.reasoningEfforts !== undefined && model.reasoningEfforts !== false) {
-      // This wire route dispatches exactly three levels with fixed spellings:
-      // `off` is the empty spelling (thinking disabled), `high`/`max` are the
-      // `reasoning_effort` literals. Refusing anything else keeps a map that
-      // would be silently ignored from reaching a settings document.
+      // This wire route dispatches `off` (thinking disabled, empty spelling)
+      // plus every live `reasoning_effort` literal. Refusing anything else
+      // keeps a map that would be silently ignored from reaching a settings
+      // document.
       for (const [level, spelling] of Object.entries(model.reasoningEfforts)) {
-        if (level !== 'off' && level !== 'high' && level !== 'max') {
+        if (level !== 'off' && !WIRE_REASONING_LEVELS.has(level)) {
           throw new Error(`llm-deepseek: catalog model "${model.id}" reasoningEfforts names unsupported level "${level}"`)
         }
         if (level === 'off') {

@@ -46,7 +46,15 @@ import { translate } from './translate.ts'
 import type { WireError, WireRequest } from './types.ts'
 
 /** One reasoning level the direct DeepSeek wire route can dispatch. */
-export type DeepSeekReasoningLevel = 'off' | 'low' | 'high' | 'max'
+export type DeepSeekReasoningLevel =
+  | 'off'
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max'
 
 /** One optional model entry advertised by the direct-fetch adapter. */
 export interface DeepSeekCatalogModel {
@@ -67,8 +75,8 @@ export interface DeepSeekCatalogModel {
    * route default. `false` declares a non-reasoning model; a map declares the
    * offered levels (its keys) with their wire spellings, which for this wire
    * route are fixed — `off` uses the empty spelling (thinking disabled), and
-   * `low`/`high`/`max` are the `reasoning_effort` literals. Absent keeps the route's
-   * `reasoningEffort` for this model.
+   * every live API level is its own `reasoning_effort` literal. Absent keeps
+   * the route's `reasoningEffort` for this model.
    */
   reasoningEfforts?: false | Partial<Record<DeepSeekReasoningLevel, string | null>>
   /** Total-pixel budget for one deterministic request preview, or the 512-by-512 `low` preset. */
@@ -205,7 +213,19 @@ const OFF_ONLY_REASONING_EFFORTS = [
 ] as const
 
 /** DeepSeek reasoning levels in display order. */
-const REASONING_LEVELS = ['off', 'low', 'high', 'max'] as const
+const REASONING_LEVELS: readonly DeepSeekReasoningLevel[] = [
+  'off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+]
+const REASONING_STRENGTH: readonly DeepSeekReasoningLevel[] = [
+  'max', 'xhigh', 'high', 'medium', 'low', 'minimal', 'none', 'off',
+]
+
+/** Selector label for one reasoning level. */
+function reasoningLevelName(level: DeepSeekReasoningLevel): string {
+  if (level === 'off') return 'Off'
+  if (level === 'xhigh') return 'XHigh'
+  return `${level.charAt(0).toUpperCase()}${level.slice(1)}`
+}
 
 /** The selectable-reasoning metadata one model reports, per-model first. */
 function reasoningForModel(
@@ -228,13 +248,7 @@ function reasoningForModel(
     return {
       reasoning: {
         efforts: REASONING_EFFORTS,
-        defaultEffort: connection.defaults.reasoningEffort === 'off'
-          ? OFF_REASONING_EFFORT
-          : connection.defaults.reasoningEffort === 'low'
-            ? LOW_REASONING_EFFORT
-            : connection.defaults.reasoningEffort === 'max'
-              ? MAX_REASONING_EFFORT
-              : HIGH_REASONING_EFFORT,
+        defaultEffort: ReasoningEffortId(connection.defaults.reasoningEffort ?? 'high'),
       },
     }
   }
@@ -252,20 +266,12 @@ function reasoningForModel(
   const offered = REASONING_LEVELS.filter(level => declared[level] !== undefined)
   const efforts = offered.map(level => ({
     id: ReasoningEffortId(level),
-    name: level === 'off' ? 'Off' : level === 'low' ? 'Low' : level === 'high' ? 'High' : 'Max',
+    name: reasoningLevelName(level),
   }))
   const routeDefault = connection.defaults.reasoningEffort
   const defaultEffort = routeDefault !== undefined && offered.includes(routeDefault)
     ? routeDefault
-    : offered.includes('max')
-      ? 'max' as const
-      : offered.includes('high')
-        ? 'high' as const
-        : offered.includes('low')
-          ? 'low' as const
-          : offered.includes('off')
-            ? 'off' as const
-            : undefined
+    : REASONING_STRENGTH.find(level => offered.includes(level))
   return {
     reasoning: {
       efforts,

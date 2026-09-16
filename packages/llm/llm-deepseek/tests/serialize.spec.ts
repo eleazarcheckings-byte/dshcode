@@ -337,7 +337,7 @@ describe('serializeRequest', () => {
   it('rejects an effort outside the DeepSeek capability', () => {
     expect(() => serializeRequest(request({
       messages: history,
-      reasoningEffort: ReasoningEffortId('medium'),
+      reasoningEffort: ReasoningEffortId('turbo'),
     }))).toThrow(expect.objectContaining({ code: 'UNSUPPORTED_REASONING_EFFORT' }))
   })
 })

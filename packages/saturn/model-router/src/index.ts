@@ -28,6 +28,9 @@ import type {
   ExternalHarness,
   ModelRouterSettings,
   ModelTier,
+  RouteDecision,
+  RoutedBlock,
+  RoutedRequest,
   TierRoute,
   TierSetting,
 } from './types.ts'
@@ -41,8 +44,11 @@ export type {
   ExternalHarness,
   ModelRouterSettings,
   ModelTier,
+  RouteDecision,
+  RoutedRequest,
   TierRoute,
   TierSetting,
+  VisionRouteReason,
 } from './types.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -229,6 +235,61 @@ export class ModelRouterService extends Service {
   }
 
   /**
+   * Pick a model that can see, when this request carries image content.
+   * Text-only requests, models that already accept images, models that
+   * declare no modalities, a missing llm service, and a provider with no
+   * image-capable catalog entry all leave the route unchanged. Never throws.
+   * @param request - the current provider/model plus the messages that may carry images.
+   * @returns the route to dispatch, with `switched` naming whether it changed.
+   */
+  async resolveForRequest(request: RoutedRequest): Promise<RouteDecision> {
+    const keep: RouteDecision = {
+      provider: request.provider,
+      model: request.model,
+      switched: false,
+    }
+    if (!requestHasImage(request.messages)) return keep
+
+    const llm = catalogLlm(this.ctx.get('llm'))
+    if (llm === undefined) return keep
+
+    let current: CatalogModel
+    try {
+      current = await llm.resolveModelInfo(request.provider, request.model)
+    } catch {
+      return keep
+    }
+    if (current.inputModalities === undefined) return keep
+    if (current.inputModalities.includes('image')) return keep
+
+    const vision = this.scope.get().tiers.vision
+    if (vision !== 'default') {
+      return {
+        provider: vision.provider,
+        model: vision.model,
+        switched: true,
+        reason: 'vision-tier',
+        ...vision.reasoningEffort === undefined ? {} : { reasoningEffort: vision.reasoningEffort },
+      }
+    }
+
+    let catalog: readonly CatalogModel[]
+    try {
+      catalog = await llm.listModels(request.provider)
+    } catch {
+      return keep
+    }
+    const capable = catalog.find(entry => entry.inputModalities?.includes('image'))
+    if (capable === undefined) return keep
+    return {
+      provider: request.provider,
+      model: capable.id,
+      switched: true,
+      reason: 'catalog',
+    }
+  }
+
+  /**
    * Whether the deployment has opted into native product subagent providers.
    * @returns the current `externalHarnesses` config flag; independent of
    *   whether any harness CLI actually resolves on disk.
@@ -273,3 +334,49 @@ export class ModelRouterService extends Service {
 }
 
 export default ModelRouterService
+
+/** Catalog fields `resolveForRequest` reads from an llm service. */
+interface CatalogModel {
+  id: string
+  inputModalities?: readonly string[]
+}
+
+/** The two llm catalog verbs, duck-typed so a test fake can stand in. */
+interface CatalogLlm {
+  listModels: (provider: string) => Promise<readonly CatalogModel[]>
+  resolveModelInfo: (provider: string, model: string) => Promise<CatalogModel>
+}
+
+/**
+ * Whether `value` looks like the llm catalog surface `resolveForRequest` calls.
+ * @param value - `ctx.get('llm')`, which may be absent or a test fake.
+ * @returns the catalog verbs, or undefined when they are missing.
+ */
+function catalogLlm(value: unknown): CatalogLlm | undefined {
+  if (value === undefined || value === null || typeof value !== 'object') return undefined
+  const llm = value as Record<string, unknown>
+  if (typeof llm['listModels'] !== 'function' || typeof llm['resolveModelInfo'] !== 'function') {
+    return undefined
+  }
+  return value as CatalogLlm
+}
+
+/**
+ * True when typed content contains an image block, walking nested tool results.
+ * @param messages - the request's message list.
+ * @returns whether any nested block is an image.
+ */
+function requestHasImage(messages: readonly RoutedRequest['messages'][number][]): boolean {
+  return messages.some(message => blocksHaveImage(message.content))
+}
+
+/**
+ * True when any block in `blocks` is an image, including nested tool results.
+ * @param blocks - content blocks, possibly nested.
+ * @returns whether an image block is present.
+ */
+function blocksHaveImage(blocks: readonly RoutedBlock[] | undefined): boolean {
+  if (blocks === undefined) return false
+  return blocks.some(block =>
+    block.type === 'image' || (block.type === 'tool-result' && blocksHaveImage(block.content)))
+}

@@ -44,3 +44,55 @@ export interface ModelRouterSettings {
 
 /** Composition entry for `@saturnai/dsh-model-router`; the package takes no composition fields today. */
 export type Config = object
+
+/**
+ * The request facts `resolveForRequest` inspects: the current route plus the
+ * message list that may carry image blocks (including nested tool results).
+ */
+export interface RoutedRequest {
+  /** Registered provider route for this call. */
+  provider: string
+  /** Provider-owned model id currently selected for this call. */
+  model: string
+  /** Conversation the call would send; image blocks may nest inside tool results. */
+  messages: readonly RoutedMessage[]
+  /** Adapter-owned reasoning effort already on the call, when one is set. */
+  reasoningEffort?: string
+}
+
+/** One message `resolveForRequest` walks for image blocks. */
+export interface RoutedMessage {
+  /** Message role; unused for vision detection. */
+  role?: string
+  /** Content blocks, possibly nested through `tool-result`. */
+  content: readonly RoutedBlock[]
+}
+
+/** One content block, including nested tool-result content. */
+export interface RoutedBlock {
+  /** Discriminator; `image` trips vision routing. */
+  type: string
+  /** Nested blocks when `type` is `tool-result`. */
+  content?: readonly RoutedBlock[]
+}
+
+/** Why `resolveForRequest` switched the route, when it did. */
+export type VisionRouteReason = 'vision-tier' | 'catalog'
+
+/**
+ * The route `resolveForRequest` returns. `switched` is false when the current
+ * model already serves the request (text-only, already image-capable, unknown
+ * modalities, no catalog hit, or no llm service).
+ */
+export interface RouteDecision {
+  /** Provider to dispatch. */
+  provider: string
+  /** Model to dispatch. */
+  model: string
+  /** Whether this decision changed the incoming route. */
+  switched: boolean
+  /** Present only when `switched` is true. */
+  reason?: VisionRouteReason
+  /** Vision-tier effort, when that tier supplied one. */
+  reasoningEffort?: string
+}

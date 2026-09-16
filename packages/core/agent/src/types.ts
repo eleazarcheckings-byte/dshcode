@@ -62,5 +62,16 @@ declare module '@deepseek-ai/dsh-session/types' {
       inserted: UserMessage[]
       outcome?: 'canceled'
     }
+    /**
+     * Pre-dispatch vision reroute: the request carried image content the
+     * selected model cannot see, so the model router switched the wire route.
+     * Log-only: it never enters derived model history.
+     */
+    'model/vision-route': {
+      provider: string
+      model: string
+      from: { provider: string; model: string }
+      reason?: string
+    }
   }
 }

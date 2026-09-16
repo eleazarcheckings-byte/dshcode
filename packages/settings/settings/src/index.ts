@@ -587,6 +587,22 @@ export abstract class SettingsProvider extends Service {
   }
 
   /**
+   * Write one registered namespace's user section wholesale. Same as
+   * {@link replace}; the name callers use for a complete put.
+   * @param ns - the registered namespace to write.
+   * @param section - the complete next user section.
+   * @param expectedRevision - the descriptor `revision` the caller read; a
+   *   namespace that moved past it rejects with {@link SettingsConflictError}.
+   */
+  async set<const Namespace extends string>(
+    ns: Namespace & SettingsNamespaceInput<Namespace>,
+    section: object,
+    expectedRevision?: number,
+  ): Promise<void> {
+    return this.write(parseSettingsNamespace(ns), section, 'replace', expectedRevision)
+  }
+
+  /**
    * Apply path-addressed edits to one registered namespace's user section,
    * validate, persist, then commit and emit. The ops are applied to the
    * section as it stands when the write reaches the front of the queue, so a
