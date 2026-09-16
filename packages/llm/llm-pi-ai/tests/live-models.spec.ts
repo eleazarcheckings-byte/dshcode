@@ -293,7 +293,7 @@ describe('resolveProfiles with modelsEndpoint', () => {
 })
 
 describe('PiAiAdapter with a live route', () => {
-  function adapter(refresh = vi.fn(() => Promise.resolve())) {
+  function adapter(refresh = vi.fn((_provider: string) => Promise.resolve())) {
     const live = new LiveModelCache({ fetch: () => Promise.resolve(jsonResponse(200, listing)) })
     const providers = { huggingface: hfProfile() }
     const instance = new PiAiAdapter({
@@ -326,7 +326,7 @@ describe('PiAiAdapter with a live route', () => {
     await instance.listModels('huggingface')
     const suffixed = await instance.resolveModel('huggingface', 'openai/gpt-oss-120b:cheapest')
     expect(suffixed.id).toBe('openai/gpt-oss-120b:cheapest')
-    expect(suffixed.context.contextWindow).toBe(131072)
+    expect(suffixed.context?.contextWindow).toBe(131072)
     const typed = await instance.resolveModel('huggingface', 'someorg/unlisted-model:groq')
     expect(typed.id).toBe('someorg/unlisted-model:groq')
     expect(typed.inputModalities).toEqual(['text'])
