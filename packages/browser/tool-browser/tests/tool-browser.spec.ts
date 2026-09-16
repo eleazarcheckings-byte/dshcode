@@ -35,8 +35,23 @@ function installBrowser(): void {
       goto,
       url: () => href,
       title: async () => title,
-      locator: () => ({ ariaSnapshot: async () => tree }),
+      locator: (selector: string) => selector === 'html'
+        ? { ariaSnapshot: async () => tree }
+        : selector === 'body'
+          ? { innerText: async () => 'body text' }
+          : {
+            click: async () => {},
+            fill: async () => {},
+            pressSequentially: async () => {},
+            press: async () => {},
+            hover: async () => {},
+            scrollIntoViewIfNeeded: async () => {},
+          },
       screenshot: async () => png,
+      keyboard: { press: async () => {} },
+      evaluate: async () => {},
+      on: () => {},
+      close: async () => {},
     }),
     close,
   })
@@ -110,6 +125,10 @@ describe('resolveConfig', () => {
       snapshotMaxChars: 9,
       screenshotMaxBytes: 8,
       screenshotDir: '/tmp/shots',
+      pageTextMaxChars: 7,
+      consoleLimit: 6,
+      networkLimit: 5,
+      autoDownload: false,
     })).toEqual({
       headless: false,
       timeoutMs: 12,
@@ -118,6 +137,10 @@ describe('resolveConfig', () => {
       snapshotMaxChars: 9,
       screenshotMaxBytes: 8,
       screenshotDir: '/tmp/shots',
+      pageTextMaxChars: 7,
+      consoleLimit: 6,
+      networkLimit: 5,
+      autoDownload: false,
     })
     expect(() => tool.resolveConfig({ timeoutMs: 0 })).toThrow('browser: timeoutMs must be a positive safe integer')
     expect(() => tool.resolveConfig({ timeoutMs: 1.5 })).toThrow('browser: timeoutMs must be a positive safe integer')

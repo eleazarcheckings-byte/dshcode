@@ -49,8 +49,14 @@ async function boot(configLines: readonly string[]): Promise<Context> {
       },
       url: () => href,
       title: async () => 'Composed',
-      locator: () => ({ ariaSnapshot: async () => '- heading "Composed"' }),
+      locator: (selector: string) => selector === 'html'
+        ? { ariaSnapshot: async () => '- heading "Composed"' }
+        : { innerText: async () => 'body text' },
       screenshot: async () => Buffer.from('png'),
+      keyboard: { press: async () => {} },
+      evaluate: async () => {},
+      on: () => {},
+      close: async () => {},
     }),
     close: async () => {},
   })
