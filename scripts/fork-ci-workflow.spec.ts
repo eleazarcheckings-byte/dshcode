@@ -157,11 +157,14 @@ describe('Fork CI workflow', () => {
     for (const gate of [
       'pnpm run doc-sync',
       'pnpm run verify-runtime-closure',
+      'pnpm run verify-application-entrypoints',
       'pnpm run constraints',
+      'pnpm run verify-package-dependencies',
       'pnpm run verify-dsh-package-licenses',
       'pnpm run verify-package-invariants',
       'pnpm run verify-cordis-config',
       'pnpm run verify-optional-dependency-imports',
+      'pnpm run verify-client-packages',
       'pnpm run test:issue-management',
       'pnpm run verify-module-graph',
       'pnpm run verify-desktop-runtime-closure',
@@ -176,7 +179,7 @@ describe('Fork CI workflow', () => {
     expect(stepRuns(workflow.jobs.unit)).toContain('pnpm exec vitest run --maxWorkers=2')
   })
 
-  it('defers knip and duplication until their fork debt is fixed', () => {
+  it('defers knip, duplication, and the client i18n gate until their fork debt is fixed', () => {
     if (!isRecord(workflow.jobs)) throw new TypeError('Fork CI workflow must define jobs')
 
     // check:ci:static embeds knip, which fails on the fork's pre-existing
@@ -187,6 +190,38 @@ describe('Fork CI workflow', () => {
     expect(staticRuns).not.toContain('pnpm run check:ci:static')
     expect(staticRuns).not.toContain('pnpm run knip')
     expect(staticRuns).not.toContain('pnpm run duplication')
+    // The last shared static gate still held out: the fork's Saturn rebrand
+    // left 12 hard-coded UI strings (brand wordmarks, the desktop title bar's
+    // menu labels, the plugin-installer repair prompts). Untranslate them,
+    // then add the step alongside its shared-gate neighbours.
+    expect(staticRuns).not.toContain('pnpm run verify-client-ui-i18n')
+  })
+
+  it('reports every static gate in one run instead of stopping at the first failure', () => {
+    if (!isRecord(workflow.jobs)) throw new TypeError('Fork CI workflow must define jobs')
+
+    const staticJob = workflow.jobs.static
+    if (!isRecord(staticJob) || !Array.isArray(staticJob.steps)) throw new TypeError('static job must define steps')
+    const steps = staticJob.steps.filter(isRecord)
+    // Lint is the first gate that fails on the fork today; before this guard
+    // its failure aborted the job and no later gate had ever executed, so a
+    // red run reported one diagnostic instead of the full static picture.
+    const lintIndex = steps.findIndex(step => step.name === 'Lint')
+    expect(lintIndex).toBeGreaterThanOrEqual(0)
+    const laterSteps = steps.slice(lintIndex + 1)
+    expect(laterSteps.length).toBeGreaterThan(0)
+
+    for (const step of laterSteps) {
+      const name = String(step.name)
+      const condition = step.if
+      expect(typeof condition, `${name} must carry a status condition`).toBe('string')
+      // A bare `if:` (or none at all) implies success(); the explicit pair is
+      // what lets the step run after an earlier gate failed.
+      expect(String(condition), `${name} must still run after an earlier gate fails`).toContain('success() || failure()')
+      // Never always(): that also runs the gate through a cancellation, which
+      // turns every cancelled superseded run into a full 90-minute lane.
+      expect(String(condition), `${name} must not run through cancellation`).not.toContain('always()')
+    }
   })
 
   it('scopes the archive baseline to pull requests so the doc gates read the trusted base', () => {
@@ -200,11 +235,13 @@ describe('Fork CI workflow', () => {
     const prStep = staticJob.steps.filter(isRecord).find(step => step.name === 'Run documentation gates (pull request)')
     const pushStep = staticJob.steps.filter(isRecord).find(step => step.name === 'Run documentation gates (push)')
     // An empty string would be read as a literal ref instead of the HEAD default.
+    // The status pair is what keeps a Lint failure from hiding the doc gates;
+    // the event test still has to pick exactly one of the two steps.
     expect(prStep).toMatchObject({
-      if: "github.event_name == 'pull_request'",
+      if: "(success() || failure()) && github.event_name == 'pull_request'",
       env: { DSH_ARCHIVE_BASE_REF: '${{ github.event.pull_request.base.sha }}' },
     })
-    expect(pushStep).toMatchObject({ if: "github.event_name != 'pull_request'" })
+    expect(pushStep).toMatchObject({ if: "(success() || failure()) && github.event_name != 'pull_request'" })
     expect(pushStep?.env).toBeUndefined()
   })
 
