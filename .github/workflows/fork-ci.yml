@@ -32,11 +32,6 @@ name: Fork CI
 #   clones), so the upstream check:ci:static aggregate (which embeds knip)
 #   cannot run whole; this lane pins its green subset instead. Fix the debt,
 #   then rejoin via check:ci:static plus one duplication step.
-# - verify-client-ui-i18n: the last shared static gate still held out. The
-#   fork's Saturn rebrand left 12 hard-coded UI strings (the two brand
-#   wordmarks, the desktop title bar's menu label/title, the version caption,
-#   three model-editor labels, and the plugin-installer repair prompts).
-#   Untranslate them, then add the step next to `Client packages`.
 # - Snapshot replays (test:snapshot): their goldens are upstream-owned and
 #   drift on this fork; re-own them with a fork-side refresh before
 #   re-enabling (check:ci:snapshot after build).
@@ -192,6 +187,10 @@ jobs:
       - name: Client packages
         if: success() || failure()
         run: pnpm run verify-client-packages
+
+      - name: Client UI i18n
+        if: success() || failure()
+        run: pnpm run verify-client-ui-i18n
 
       - name: Issue management policy
         if: success() || failure()
