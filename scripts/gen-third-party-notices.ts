@@ -67,7 +67,7 @@ export function isOwnerAuthorizedRuntime(name: string): boolean {
  * Metadata overrides where the installed manifest is wrong or unreachable.
  * Each entry documents why the store cannot answer.
  */
-const OVERRIDES: Record<string, { license?: string; repo?: string }> = {
+export const OVERRIDES: Record<string, { license?: string; repo?: string }> = {
   // Rust workspaces publishing npm bins without `license` in package.json.
   'oxlint': { license: 'MIT', repo: 'https://github.com/oxc-project/oxc' },
   'oxlint-tsgolint': { license: 'MIT', repo: 'https://github.com/oxc-project/tsgolint' },
@@ -78,6 +78,24 @@ const OVERRIDES: Record<string, { license?: string; repo?: string }> = {
   // No repository field in the published manifest.
   '@linxin666/dsh-web-ui-all': { repo: 'https://github.com/zhu1090093659/dsh-web-ui' },
   'node-addon-require-builtin': { repo: 'https://www.npmjs.com/package/node-addon-require-builtin' },
+  // `apps/mobile` is a `!`-excluded workspace member (pnpm-workspace.yaml), so
+  // no repository install ever writes these into the store: a CI checkout has
+  // no manifest on disk to read, while a machine that ran an install inside the
+  // Capacitor shell does. Values are the upstream manifests' own `license` and
+  // normalized `repository`, so both hosts render the same rows.
+  '@aparajita/capacitor-biometric-auth': { license: 'MIT', repo: 'https://github.com/aparajita/capacitor-biometric-auth' },
+  '@capacitor/android': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor' },
+  '@capacitor/app': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor-plugins' },
+  '@capacitor/background-runner': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor-background-runner' },
+  '@capacitor/camera': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor-camera' },
+  '@capacitor/cli': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor' },
+  '@capacitor/core': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor' },
+  '@capacitor/ios': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor' },
+  '@capacitor/local-notifications': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor-local-notifications' },
+  '@capacitor/preferences': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor-plugins' },
+  '@capacitor/splash-screen': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor-plugins' },
+  '@capacitor/status-bar': { license: 'MIT', repo: 'https://github.com/ionic-team/capacitor-plugins' },
+  'jsqr': { license: 'Apache-2.0', repo: 'https://github.com/cozmo/jsQR' },
 }
 
 /**
@@ -152,6 +170,18 @@ function workspaceMembers(rel: string): string[] {
 }
 
 /**
+ * The areas a workspace file excludes with a leading `!`. Their manifests still
+ * belong in the disclosure — the Capacitor shell ships every dependency it
+ * declares — but `pnpm install` never resolves them, so nothing they alone name
+ * has installed metadata to harvest on any host.
+ * @param members - the `packages:` member globs as declared.
+ * @returns each excluded area, without its `!`.
+ */
+export function excludedWorkspaceAreas(members: readonly string[]): string[] {
+  return members.filter(member => member.startsWith('!')).map(member => member.slice(1))
+}
+
+/**
  * Every workspace manifest, keyed by repository-relative path, plus the set of
  * workspace package names. Paths are normalized to `/` at ingestion: Node's
  * `fs.globSync` returns OS-native separators, and the area matching in
@@ -172,6 +202,33 @@ function loadWorkspaceManifests(): { manifests: Map<string, Manifest>; names: Se
   }
   if (manifests.size < 100) throw new Error(`gen-third-party-notices: only ${manifests.size} workspace manifests found; the glob set is stale.`)
   return { manifests, names }
+}
+
+/**
+ * External dependencies only a pnpm-excluded area declares, so no install of
+ * this repository can resolve their license or repository from disk. Every one
+ * needs an `OVERRIDES` entry, which the spec enforces; without it the generator
+ * renders on a machine that installed the excluded area by hand and throws
+ * everywhere else.
+ * @returns the unresolvable dependency names, sorted.
+ */
+export function uninstalledDependencyNames(): string[] {
+  const excluded = excludedWorkspaceAreas(workspaceMembers('pnpm-workspace.yaml'))
+  const { manifests, names } = loadWorkspaceManifests()
+  const installed = new Set<string>()
+  const uninstalled = new Set<string>()
+  for (const [path, manifest] of manifests) {
+    const isExcluded = excluded.some(area => path === `${area}/package.json` || path.startsWith(`${area}/`))
+    for (const kind of ALL_KINDS) {
+      for (const [dep, range] of Object.entries(manifest[kind] ?? {})) {
+        if (names.has(dep) || range.startsWith('workspace:')) continue
+        ;(isExcluded ? uninstalled : installed).add(dep)
+      }
+    }
+  }
+  return [...uninstalled]
+    .filter(dep => !installed.has(dep) && !FIRST_PARTY.has(dep))
+    .sort((a, b) => a.localeCompare(b))
 }
 
 type VirtualManifest = Manifest & {
