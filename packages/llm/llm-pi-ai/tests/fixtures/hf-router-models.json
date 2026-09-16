@@ -1,0 +1,43 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "openai/gpt-oss-120b",
+      "object": "model",
+      "owned_by": "openai",
+      "architecture": { "input_modalities": ["text"], "output_modalities": ["text"] },
+      "providers": [
+        { "provider": "groq", "status": "live", "context_length": 131072, "pricing": { "input": 0.15, "output": 0.75 }, "supports_tools": true, "supports_structured_output": true },
+        { "provider": "cerebras", "status": "live", "context_length": 65536, "supports_tools": false },
+        { "provider": "novita", "status": "error", "context_length": 262144, "supports_tools": true }
+      ]
+    },
+    {
+      "id": "Qwen/Qwen2.5-VL-7B-Instruct",
+      "object": "model",
+      "architecture": { "input_modalities": ["text", "image"], "output_modalities": ["text"] },
+      "providers": [
+        { "provider": "hyperbolic", "status": "live", "context_length": 32768, "supports_tools": false }
+      ]
+    },
+    {
+      "id": "meta-llama/Llama-3.1-8B-Instruct",
+      "object": "model",
+      "providers": [
+        { "provider": "nebius", "status": "live", "supports_tools": true }
+      ]
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-R1",
+      "object": "model",
+      "providers": [
+        { "provider": "sambanova", "status": "error", "context_length": 163840, "supports_tools": false }
+      ]
+    },
+    {
+      "id": "",
+      "object": "model",
+      "providers": [{ "provider": "ghost", "status": "live" }]
+    }
+  ]
+}
