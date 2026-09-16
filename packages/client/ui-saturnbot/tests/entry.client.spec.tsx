@@ -17,17 +17,37 @@ function props(standalone: boolean, openWindow: () => Promise<boolean> = vi.fn(a
 beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
+/** Give the launcher seat a real box in jsdom: the reserved inset is measured, not guessed. */
+function stubLauncherWidth(width: number) {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function rect(this: HTMLElement) {
+    const isSeat = this.hasAttribute('data-saturnbot-launcher')
+    return { x: 0, y: 0, top: 0, left: 0, bottom: 0, right: 0, width: isSeat ? width : 0, height: isSeat ? 32 : 0, toJSON: () => ({}) }
+  })
+}
+
 it('reserves the main header space and invokes the separate-window launcher', async () => {
   const open = vi.fn(async () => false)
+  stubLauncherWidth(120)
   const view = render(<div data-frame=""><div data-shell-overlay=""><SaturnBotEntry {...props(false, open)} /></div></div>)
   const frame = view.container.querySelector<HTMLElement>('[data-frame]')
-  expect(frame?.style.getPropertyValue('--dsh-shell-trailing-inset')).toBe('134px')
+  // The launcher publishes its measured footprint: 18px corner inset + its own
+  // width + a 12px gap, so the header utilities and the pricing lamp stop
+  // short of it whatever the label's locale or length.
+  expect(frame?.style.getPropertyValue('--dsh-shell-trailing-inset')).toBe('150px')
   fireEvent.click(screen.getByRole('button', { name: en['launch.label'] }))
   expect(open).toHaveBeenCalledOnce()
   expect((await screen.findByRole('alert')).textContent).toBe(en['launch.blocked'])
   expect(view.container.querySelector('[data-saturnbot-dashboard]')).toBeNull()
   view.unmount()
   expect(frame?.style.getPropertyValue('--dsh-shell-trailing-inset')).toBe('')
+})
+
+it('reserves nothing while the phone sheet hides the launcher', () => {
+  stubLauncherWidth(0)
+  const view = render(<div data-frame=""><div data-shell-overlay=""><SaturnBotEntry {...props(false)} /></div></div>)
+  const frame = view.container.querySelector<HTMLElement>('[data-frame]')
+  expect(frame?.style.getPropertyValue('--dsh-shell-trailing-inset')).toBe('')
+  view.unmount()
 })
 
 it('reports a restore failure separately and permits another attempt', async () => {
