@@ -47,8 +47,8 @@ async function decodePhotoToPayload(dataUrl: string, canvas: HTMLCanvasElement):
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('could not read the captured photo'))
+    img.onload = () => { resolve(img) }
+    img.onerror = () => { reject(new Error('could not read the captured photo')) }
     img.src = src
   })
 }

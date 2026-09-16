@@ -62,7 +62,7 @@ function startEventsClient(session: DeviceSession): void {
   eventsClient = new RemoteEventsClient(
     session.hostUrl,
     event => void handleRemoteEvent(event),
-    err => console.warn('[saturn] events stream error', err),
+    (err) => { console.warn('[saturn] events stream error', err) },
   )
   eventsClient.start()
 }
@@ -77,7 +77,7 @@ async function enterPairedState(session: DeviceSession): Promise<void> {
 async function completePairing(payload: PairingPayload): Promise<void> {
   const device = {
     name: (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? 'device',
-    platform: (guessPlatform()) as 'ios' | 'android',
+    platform: guessPlatform(),
   }
   const response = await pairWithHost(payload, device)
   const session: DeviceSession = {
@@ -177,7 +177,7 @@ onNotificationTapped((extra) => {
   if (extra?.deepLink) deepLinkTo(extra.deepLink)
 })
 
-App.addListener('appStateChange', ({ isActive }) => {
+void App.addListener('appStateChange', ({ isActive }) => {
   if (!isActive) {
     eventsClient?.stop()
     return

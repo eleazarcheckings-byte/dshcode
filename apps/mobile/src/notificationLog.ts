@@ -16,7 +16,7 @@ export class NotificationLog {
     const raw = await this.storage.get(LOG_KEY)
     if (!raw) return []
     try {
-      const parsed = JSON.parse(raw)
+      const parsed: unknown = JSON.parse(raw)
       return Array.isArray(parsed) ? (parsed as LoggedNotification[]) : []
     } catch {
       return []

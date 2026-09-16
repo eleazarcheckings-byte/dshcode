@@ -1498,7 +1498,7 @@ export function buildCrashReport(input: CrashReportInput): CrashReport {
   if (death.certainty === 'window') {
     notes.push('Death time is a window, not an instant: the process was killed without running any handler, so the last heartbeat is the lower bound and this launch is the upper bound.')
   }
-  if (input.install.matchesExpected === false) {
+  if (!input.install.matchesExpected) {
     notes.push('The installed @deepseek-ai package count does not match the installer invariant; it was measured when this report was written, not at death time.')
   }
   if (repeat.consecutive >= 3) {
@@ -1619,7 +1619,7 @@ export function renderLatestSummary(report: CrashReport): string {
     `build      : ${report.build.productName} ${report.build.appVersion} / electron ${report.build.electron} / node ${report.build.node} / main.js sha256 ${shortSha(report.build.mainModuleSha256)}`,
     `install    : ${String(report.install.dshPackageCount)}/${String(report.install.expectedDshPackageCount)} @deepseek-ai packages, ${String(report.install.packagesMissingManifest)} missing package.json`,
     `launch     : ${report.launch.mode}${report.launch.debuggable ? ' (debuggable)' : ''}${report.launch.args.length === 0 ? '' : ` / ${report.launch.args.join(' ')}`}`,
-    `repeat     : ${report.repeat.isRepeat ? `yes - ${String(repeatLabel(report))}` : 'first report on this installation'}`,
+    `repeat     : ${report.repeat.isRepeat ? `yes - ${repeatLabel(report)}` : 'first report on this installation'}`,
     report.session === undefined
       ? 'session    : no session log found'
       : `session    : ${report.session.sessionId} (${String(Math.round(report.session.sizeBytes / 1024))} KB, last write ${report.session.modifiedAtLocal})`,

@@ -98,7 +98,7 @@ describe('RemoteEventsClient -- the foregrounded EventSource path', () => {
 
   it('stop() closes the stream, is safe before start(), and lets a later start() open a fresh one', () => {
     const { client } = makeClient()
-    expect(() => client.stop()).not.toThrow()
+    expect(() => { client.stop() }).not.toThrow()
     client.start()
     const first = FakeEventSource.instances[0]
     client.stop()
