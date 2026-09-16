@@ -1,7 +1,10 @@
 /**
  * App-side half of the background event poll (SPEC.md §8 M3 DELIVER item;
  * Mars r1 finding #2: `RemoteEventsClient.pollOnce()` existed with no OS
- * background-execution capability registered, so nothing invoked it).
+ * background-execution capability registered, so nothing invoked it; that
+ * method has since been deleted outright -- its one-shot `fetch` + `text()`
+ * of the SSE-only events route could never resolve, Mars r2 R2-F1's hang --
+ * see `tests/remoteApi.test.ts`).
  *
  * `@capacitor/background-runner` (official `@capacitor` scope) runs a
  * separate JS file — `apps/mobile/assets/background-runner.js`, copied

@@ -61,7 +61,6 @@ function startEventsClient(session: DeviceSession): void {
   eventsClient?.stop()
   eventsClient = new RemoteEventsClient(
     session.hostUrl,
-    session.deviceToken,
     event => void handleRemoteEvent(event),
     err => console.warn('[saturn] events stream error', err),
   )

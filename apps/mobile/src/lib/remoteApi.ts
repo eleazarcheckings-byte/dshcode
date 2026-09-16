@@ -63,16 +63,25 @@ export type RemoteEventListener = (event: RemoteEvent) => void;
  * `EventSource` cannot set an `Authorization` header, so this relies on the
  * session cookie the host sets during `pairWithHost` (`credentials: 'include'`
  * on that request) rather than the bearer token used for one-shot API calls.
- * `pollOnce` is the background-safe fallback used while the app is not
- * foregrounded (see README "Known Limitations" — neither OS keeps an
- * EventSource connection alive in the background without a push service).
+ * Reconnecting, and replaying what was missed via `Last-Event-ID`, is
+ * `EventSource`'s own behaviour.
+ *
+ * Foreground only. Neither OS keeps an `EventSource` alive once the app is
+ * backgrounded; that path is `backgroundSync.ts` plus the generated
+ * `assets/background-runner.js` (README "Background event delivery"), not
+ * a method here. This client deliberately has no one-shot poll: the host's
+ * events route is SSE-only and never closes on its own
+ * (`packages/saturn/remote-access/src/proxy.ts`'s `stream()`), and the
+ * router drops query strings before dispatch, so a `fetch` + `text()`
+ * "poll" of it never resolves -- the hang Mars r2 (R2-F1) found in the
+ * runner, and the trap a former `pollOnce()` here carried until it was
+ * removed. `tests/remoteApi.test.ts` pins that.
  */
 export class RemoteEventsClient {
   private source: EventSource | undefined;
 
   constructor(
     private readonly hostUrl: string,
-    private readonly deviceToken: string,
     private readonly onEvent: RemoteEventListener,
     private readonly onError?: (err: unknown) => void,
   ) {}
@@ -94,38 +103,6 @@ export class RemoteEventsClient {
     this.source?.close();
     this.source = undefined;
   }
-
-  /** One bearer-authenticated GET, used for a background poll tick instead of a held-open stream. */
-  async pollOnce(): Promise<RemoteEvent[]> {
-    const response = await fetch(`${this.hostUrl}/saturn/remote/events?since=poll`, {
-      headers: { authorization: `Bearer ${this.deviceToken}`, accept: 'application/json' },
-    });
-    if (!response.ok) {
-      throw new RemoteApiError(`events poll failed with status ${response.status}`, response.status);
-    }
-    const text = await response.text();
-    return parseSseOrJsonEvents(text);
-  }
-}
-
-/** Accepts either a JSON array (a poll-friendly host) or raw `data: {...}` SSE lines (the same stream, read once). */
-export function parseSseOrJsonEvents(payload: string): RemoteEvent[] {
-  const trimmed = payload.trim();
-  if (trimmed.length === 0) return [];
-  if (trimmed.startsWith('[')) {
-    return JSON.parse(trimmed) as RemoteEvent[];
-  }
-  const events: RemoteEvent[] = [];
-  for (const line of trimmed.split('\n')) {
-    const dataLine = line.trim();
-    if (!dataLine.startsWith('data:')) continue;
-    try {
-      events.push(JSON.parse(dataLine.slice(5).trim()) as RemoteEvent);
-    } catch {
-      // skip a malformed line rather than drop the whole poll
-    }
-  }
-  return events;
 }
 
 /** `GET <url>/` with the device token — used by the offline screen's "check again" and the pairing health check. */
