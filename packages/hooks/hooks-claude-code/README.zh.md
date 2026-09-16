@@ -48,8 +48,32 @@ kind: "package-reference"
 | `projectDir` | 会话工作区 | 替换 `${CLAUDE_PROJECT_DIR}` 并设置 `CLAUDE_PROJECT_DIR` 环境变量 |
 | `defaultTimeoutMs` | `600,000` | hook 未设置时的每 hook 超时（即 Claude Code 默认值） |
 | `stderrSummaryMaxChars` | `500` | 持久化 `hook/result` stderr 摘要的字符上限 |
+| `toolAliases` | 见[下文](#tool-name-aliasing) | Claude Code 工具名称 → 其所代指的 DSH 工具名称，供 `PreToolUse`／`PostToolUse` matcher 与 payload `tool_name` 使用 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-hooks-claude-code)是每个受支持字段的穷尽式真源。
+
+<a id="tool-name-aliasing"></a>
+### 工具名称别名
+
+未经修改的 Claude Code `hooks.json` 按 Claude Code 的方式为工具命名——`Bash`、`PowerShell`、`Edit`、`Write`、`MultiEdit`、`NotebookEdit`、`Read`、`Glob`、`Grep`、`WebFetch`、`WebSearch`——但本 harness 自身的工具命名方式不同（`bash`、`pwsh`、`edit`、`write`、`str_replace_editor`、`read`、`glob`、`grep`、`web_fetch`、`web_search`）。若没有转换层，像 `Bash|PowerShell` 或 `Edit|Write|MultiEdit` 这样的原样 matcher 永远不会选中 DSH 工具调用，且合成 payload 的 `tool_name` 会显示为 `bash`，而钩子脚本期望的是 `Bash`。
+
+`toolAliases` 弥合了这一差距。它把每个 Claude Code 工具名称映射到其所代指的 DSH 工具名称：
+
+| Claude Code 名称 | DSH 工具名称 |
+|---|---|
+| `Bash` | `bash` |
+| `PowerShell` | `pwsh` |
+| `Write` | `write` |
+| `Edit` | `edit`、`str_replace_editor` |
+| `MultiEdit` | `edit`、`str_replace_editor` |
+| `NotebookEdit` | `edit`、`str_replace_editor` |
+| `Read` | `read`、`read_image` |
+| `Glob` | `glob` |
+| `Grep` | `grep` |
+| `WebFetch` | `web_fetch` |
+| `WebSearch` | `web_search` |
+
+此表是内置默认值；已配置的 `toolAliases` 条目会替换该 Claude Code 名称对应的默认值，其余默认条目保持不变。`PreToolUse`／`PostToolUse` matcher 会同时针对原始 DSH 工具名称与代指它的每个 Claude Code 名称求值，因此 matcher 可以任一方式书写（`Bash|PowerShell` 与 `bash|pwsh` 都可用）。合成 payload 的 `tool_name` 会报告代指实际被调用的 DSH 工具的第一个（按表顺序）Claude Code 名称，若没有名称代指它——例如 `terminal_open`、某个 MCP 工具，或本表未命名的其他工具——则报告原始 DSH 名称。`tool_input` 即原样的 `exec.arguments`：DSH 的 `bash`／`pwsh`／`write`／`edit` 工具本身字段命名（`command`、`file_path`、`content`、`old_string`、`new_string` 等）已与 Claude Code 自身的工具 schema 一致，因此此处无需重命名字段。当 `toolAliases` 的值不是一个「每个值都是非空字符串数组」的对象时，插件加载时会拒绝该值。
 
 ### 你的钩子能做什么
 
@@ -113,7 +137,7 @@ matcher subject 是工具名称（`PreToolUse`／`PostToolUse`）、会话源（
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：配置校验、监听器注册、逐事件 payload、决策映射 |
-| [`src/config.ts`](src/config.ts) | Claude Code 配置解析：受支持事件、matcher 校验、命令替换 |
+| [`src/config.ts`](src/config.ts) | Claude Code 配置解析（受支持事件、matcher 校验、命令替换）与[工具名称别名表](#tool-name-aliasing)（`DEFAULT_TOOL_ALIASES`、`validateToolAliases`、`reverseToolAliases`、`toolMatchCandidates`、`claudeToolName`） |
 | — | 不发布运行时不变式伴生入口；`hook/*` 配对检查位于 `dsh-hook-protocol`。 |
 
 </details>
@@ -171,7 +195,7 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 
 这些限制描述你的 Claude Code 钩子目前还无法通过本桥接做到的事情，以及行为与参考工具的差异。它们是当前包约束，而非任务积压。
 
-- **不支持的 hook 事件（Claude Code 当前 30 项中的 23 项）**——`Setup`、`InstructionsLoaded`、`UserPromptExpansion`、`MessageDisplay`、`PermissionRequest`、`PostToolUseFailure`、`PostToolBatch`、`PermissionDenied`、`Notification`、`TaskCreated`、`TaskCompleted`、`StopFailure`、`TeammateIdle`、`ConfigChange`、`CwdChanged`、`FileChanged`、`WorktreeCreate`、`WorktreeRemove`、`PreCompact`、`PostCompact`、`SessionEnd`、`Elicitation` 与 `ElicitationResult`。这些事件的配置会在配置组解析前被忽略，因此不支持的事件既不会使配置失效，也不会注册 hook。比较基线是 Claude Code [官方 hook 事件参考](https://code.claude.com/docs/en/hooks#hook-events)。
+- **不支持的 hook 事件（Claude Code 当前 30 项中的 23 项）**——`Setup`、`InstructionsLoaded`、`UserPromptExpansion`、`MessageDisplay`、`PermissionRequest`、`PostToolUseFailure`、`PostToolBatch`、`PermissionDenied`、`Notification`、`TaskCreated`、`TaskCompleted`、`StopFailure`、`TeammateIdle`、`ConfigChange`、`CwdChanged`、`FileChanged`、`WorktreeCreate`、`WorktreeRemove`、`PreCompact`、`PostCompact`、`SessionEnd`、`Elicitation` 与 `ElicitationResult`（含 `SessionEnd` 与 `PreCompact`）。这些事件的配置 key 永远不会被检视——既不会使配置失效，也不会注册 hook——但桥接现在会在加载时为每个不支持的事件 key 记录一条警告并指名该事件，因此引用了它们的配置不再悄无声息地空转。比较基线是 Claude Code [官方 hook 事件参考](https://code.claude.com/docs/en/hooks#hook-events)。
 - **`SessionStart` 只支持部分功能**——会消费 JSON `additionalContext`，但不支持纯 stdout 上下文、`initialUserMessage`、`sessionTitle`、`watchPaths`、`reloadSkills` 与 `CLAUDE_ENV_FILE`。hook 脱离运行，因此上下文可能错过第一个请求，payload 会省略 `model`、`agent_type` 与 `session_title` 等可选字段。
 - **`UserPromptSubmit` 只支持部分功能**——支持阻塞与 JSON `additionalContext`，但不支持纯 stdout 上下文、`sessionTitle` 与 `suppressOriginalPrompt`。除非被覆盖，否则桥接还会使用自身 600 秒默认值，而非 Claude Code 的事件特定 30 秒 command 超时。
 - **`PreToolUse` 只支持部分功能**——`deny` 与 `ask` 决策可用；`allow` 不会预审批，`defer` 不受支持，`additionalContext` 会被忽略，`updatedInput` 会被记录 + 警告但不应用（见 [pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.zh.md)）。

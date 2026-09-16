@@ -35,7 +35,16 @@ import {
 // Pulls in the declaration-merged subagent events and the identity pairing their
 // start/end edges.
 import type { SubagentRunId } from '@deepseek-ai/dsh-subagent'
-import { parseClaudeCodeConfig, type ClaudeCodeHookConfig } from './config.ts'
+import {
+  claudeToolName,
+  DEFAULT_TOOL_ALIASES,
+  parseClaudeCodeConfig,
+  reverseToolAliases,
+  toolMatchCandidates,
+  validateToolAliases,
+  type ClaudeCodeHookConfig,
+  type ToolAliases,
+} from './config.ts'
 
 export const name = 'hooks-claude-code'
 // `shell` runs hooks and `sessionProjections` supplies turn numbers; the rest
@@ -68,6 +77,16 @@ export interface Config {
   defaultTimeoutMs?: number
   /** Character cap for the `hook/result` event's persisted stderr summary. */
   stderrSummaryMaxChars?: number
+  /**
+   * Claude Code tool name → the DSH tool names it aliases (e.g. `Bash: ['bash']`,
+   * `Edit: ['edit', 'str_replace_editor']`). A `PreToolUse`/`PostToolUse` matcher evaluates
+   * against both the raw DSH tool name and every configured Claude name aliasing it, and a
+   * synthesised payload's `tool_name` reports the first (key-order) aliasing Claude name, else the
+   * raw DSH name. A configured entry REPLACES the default of the same Claude name; every other
+   * default entry (`DEFAULT_TOOL_ALIASES`) is kept. Rejected at load when a value is not an object
+   * of non-empty string arrays.
+   */
+  toolAliases?: ToolAliases
 }
 
 export const Config: z<Config> = z.object({
@@ -76,6 +95,10 @@ export const Config: z<Config> = z.object({
   projectDir: z.string(),
   defaultTimeoutMs: z.number().default(DEFAULT_HOOK_TIMEOUT_MS),
   stderrSummaryMaxChars: z.number().default(DEFAULT_STDERR_SUMMARY_MAX_CHARS),
+  // Loosely typed here: `apply()` runs the authoritative validation (`validateToolAliases`) so the
+  // rejection message is stable and identical whether the plugin is mounted through schemastery or
+  // called directly (the "schema bypass" apply() path the coverage suite exercises).
+  toolAliases: z.any(),
 })
 
 /** A stable per-handler id so an invoked/result pair correlates in the log. */
@@ -99,6 +122,11 @@ export function apply(ctx: Context, config: Config): void {
   const stderrSummaryMaxChars = config.stderrSummaryMaxChars ?? DEFAULT_STDERR_SUMMARY_MAX_CHARS
   assertPositiveInteger('stderrSummaryMaxChars', stderrSummaryMaxChars)
   const defaultTimeoutMs = config.defaultTimeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS
+  // A configured entry replaces the default of the same Claude name; every other default is kept.
+  // validateToolAliases throws (naming the offending key) on a malformed value, rejecting the whole
+  // plugin load rather than silently dropping or partially applying it.
+  const toolAliases: ToolAliases = { ...DEFAULT_TOOL_ALIASES, ...validateToolAliases(config.toolAliases ?? {}) }
+  const reverseAliases = reverseToolAliases(toolAliases)
   // Parse once at load. A read or parse failure logs and registers nothing.
   let parsed: ClaudeCodeHookConfig = {}
   try {
@@ -109,7 +137,9 @@ export function apply(ctx: Context, config: Config): void {
     })
     parsed = result.config
     for (const s of result.skipped) {
-      ctx.logger.warn(`hooks-claude-code: skipping unsupported "${s.type}" hook on ${s.event} (only command hooks run)`)
+      ctx.logger.warn(s.reason === 'unsupported event'
+        ? `hooks-claude-code: skipping unsupported event "${s.event}" (${s.reason} — this bridge does not implement it)`
+        : `hooks-claude-code: skipping unsupported "${s.type}" hook on ${s.event} (only command hooks run)`)
     }
   } catch (error: unknown) {
     ctx.logger.warn(`hooks-claude-code: could not load hook config "${config.configPath}": ${String(error)} — no hooks registered`)
@@ -127,17 +157,18 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => () => detached.drain(), 'hooks-claude-code: drain detached hook runs')
 
   /**
-   * Run every command hook configured for `point` whose matcher selects
-   * `matchQuery`, with the per-event `payload` on stdin, and fold the results.
+   * Run every command hook configured for `point` whose matcher selects ANY of
+   * `matchCandidates`, with the per-event `payload` on stdin, and fold the results.
    * Writes a `hook/invoked`/`hook/result` pair per hook when `opts.turn` names
    * an open turn. Detached lifecycle points omit the pair. Returns the merged outcome (a neutral,
    * already-most-restrictive view) for the caller to map onto its extension point
-   * decision. `matchQuery` is the event's matcher subject (tool name, session
-   * source, …); `''` for events that ignore matchers.
+   * decision. `matchCandidates` are the event's matcher subject candidates (a tool call's raw DSH
+   * name plus every Claude name aliasing it, a session source, …) — `['']` for events that ignore
+   * matchers.
    */
   async function runPoint(
     point: string,
-    matchQuery: string,
+    matchCandidates: readonly string[],
     payload: unknown,
     opts: { agent?: Agent; turn?: number; readonly signal: AbortSignal },
   ): Promise<MergedHookOutcome> {
@@ -151,7 +182,7 @@ export function apply(ctx: Context, config: Config): void {
     const projectDir = config.projectDir ?? workdir
     const hookEnv = projectDir !== undefined ? { CLAUDE_PROJECT_DIR: projectDir } : undefined
     for (const group of groups) {
-      if (!matchesMatcher(group.matcher, matchQuery, 'claude-code')) continue
+      if (!matchCandidates.some(candidate => matchesMatcher(group.matcher, candidate, 'claude-code'))) continue
       for (const hook of group.hooks) {
         const handlerId = nextHandlerId(point)
         const session = opts.agent?.session
@@ -205,7 +236,7 @@ export function apply(ctx: Context, config: Config): void {
   // may miss the first request.
   // TODO(session-start-gating): add a startup gate before promising first-turn delivery.
   ctx.on('agent/session-start', ({ agent, source }) => {
-    detached.track(runPoint('SessionStart', source, sessionStartPayload(ctx, agent, source), { agent, signal: detached.signal })
+    detached.track(runPoint('SessionStart', [source], sessionStartPayload(ctx, agent, source), { agent, signal: detached.signal })
       .then((merged) => {
         const context = contextFrom(merged)
         if (context) agent.inject(context)
@@ -220,7 +251,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('agent/pre-step', async ({ agent, messages, turn, signal }, next): Promise<PreStepDecision> => {
     if (messages.length === 0) return next()
     const content = messages.flatMap(message => message.content)
-    const merged = await runPoint('UserPromptSubmit', '', promptPayload(ctx, agent, content), { agent, turn, signal })
+    const merged = await runPoint('UserPromptSubmit', [''], promptPayload(ctx, agent, content), { agent, turn, signal })
     if (merged.decision === 'deny') {
       return { kind: 'reject' }
     }
@@ -235,19 +266,25 @@ export function apply(ctx: Context, config: Config): void {
     }
   })
 
-  // --- PreToolUse → PreToolDecision. Matcher subject is the tool name. ---
+  // --- PreToolUse → PreToolDecision. Matcher subject is the tool name — the raw DSH name
+  // plus every Claude name aliasing it (toolAliases), so an unmodified Claude Code matcher
+  // (`Bash`) fires against the DSH tool call (`bash`) just as a DSH-native matcher would. ---
   ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
     const turn = lastTurn(ctx, exec.agent)
-    const merged = await runPoint('PreToolUse', exec.name, preToolPayload(ctx, exec), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
+    const candidates = toolMatchCandidates(exec.name, reverseAliases)
+    const toolName = claudeToolName(exec.name, reverseAliases)
+    const merged = await runPoint('PreToolUse', candidates, preToolPayload(ctx, exec, toolName), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
     if (merged.decision === 'deny') return { kind: 'deny', reason: merged.reason ?? 'blocked by PreToolUse hook' }
     if (merged.decision === 'ask') return { kind: 'ask', ...merged.reason !== undefined ? { reason: merged.reason } : {} }
     return next()
   })
 
-  // --- PostToolUse → PostToolDecision. Matcher subject is the tool name. ---
+  // --- PostToolUse → PostToolDecision. Matcher subject is the tool name (see PreToolUse above). ---
   ctx.on('tools/post-execute', async (exec, result, next): Promise<PostToolDecision> => {
     const turn = lastTurn(ctx, exec.agent)
-    const merged = await runPoint('PostToolUse', exec.name, postToolPayload(ctx, exec, result), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
+    const candidates = toolMatchCandidates(exec.name, reverseAliases)
+    const toolName = claudeToolName(exec.name, reverseAliases)
+    const merged = await runPoint('PostToolUse', candidates, postToolPayload(ctx, exec, result, toolName), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
     const context = contextFrom(merged)
     if (merged.decision === 'deny') {
       return { kind: 'block', feedback: [{ type: 'text', text: merged.reason ?? 'blocked by PostToolUse hook' }], ...context ? { additionalContexts: [context] } : {} }
@@ -269,7 +306,7 @@ export function apply(ctx: Context, config: Config): void {
   // machine observe pending input and run another step.
   // TODO(stop-loop-guard): cap consecutive forced continuations; hooks must self-limit meanwhile.
   ctx.on('agent/turn-stopping', async ({ agent, turn, signal }): Promise<void> => {
-    const merged = await runPoint('Stop', '', stopPayload(ctx, agent), { agent, turn, signal })
+    const merged = await runPoint('Stop', [''], stopPayload(ctx, agent), { agent, turn, signal })
     if (merged.decision === 'deny') {
       // A blocking Stop hook forces continuation.
       const text = merged.reason ?? 'continue: blocked by Stop hook'
@@ -282,7 +319,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('subagent/start', (info) => {
     const child = ctx.get('agents')?.get(info.id)
     if (child !== undefined) subagentChildren.set(info.runId, child)
-    detached.track(runPoint('SubagentStart', SUBAGENT_TYPE, subagentPayload(ctx, 'SubagentStart', info, child), { ...child ? { agent: child } : {}, signal: detached.signal })
+    detached.track(runPoint('SubagentStart', [SUBAGENT_TYPE], subagentPayload(ctx, 'SubagentStart', info, child), { ...child ? { agent: child } : {}, signal: detached.signal })
       .then((merged) => {
         const context = contextFrom(merged)
         if (context && child) child.inject(context)
@@ -292,7 +329,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('subagent/end', (info) => {
     const child = subagentChildren.get(info.runId) ?? ctx.get('agents')?.get(info.id)
     subagentChildren.delete(info.runId)
-    detached.track(runPoint('SubagentStop', SUBAGENT_TYPE, subagentPayload(ctx, 'SubagentStop', info, child), { ...child ? { agent: child } : {}, signal: detached.signal }))
+    detached.track(runPoint('SubagentStop', [SUBAGENT_TYPE], subagentPayload(ctx, 'SubagentStop', info, child), { ...child ? { agent: child } : {}, signal: detached.signal }))
   })
 }
 
@@ -336,11 +373,19 @@ function sessionStartPayload(ctx: Context, agent: Agent, source: string): Record
 function promptPayload(ctx: Context, agent: Agent, content: ContentBlock[]): Record<string, unknown> {
   return { ...base(ctx, agent, 'UserPromptSubmit'), prompt: blocksToText(content) }
 }
-function preToolPayload(ctx: Context, exec: ToolExecution): Record<string, unknown> {
-  return { ...base(ctx, exec.agent, 'PreToolUse'), tool_name: exec.name, tool_input: exec.arguments, tool_use_id: exec.callId }
+/**
+ * `tool_name` is the CALLER-RESOLVED Claude-facing name ({@link claudeToolName} against
+ * `toolAliases`, else the raw DSH name) — not `exec.name` — so a hook script written against
+ * Claude Code's `Bash`/`Edit`/… reads `tool_name` the way it expects. `tool_input` is
+ * `exec.arguments` unchanged: the DSH bash/pwsh/write/edit tools already name their fields
+ * (`command`, `file_path`, `content`, `old_string`, `new_string`, …) identically to Claude Code's
+ * own tool schemas, so no field renaming is needed here.
+ */
+function preToolPayload(ctx: Context, exec: ToolExecution, toolName: string): Record<string, unknown> {
+  return { ...base(ctx, exec.agent, 'PreToolUse'), tool_name: toolName, tool_input: exec.arguments, tool_use_id: exec.callId }
 }
-function postToolPayload(ctx: Context, exec: ToolExecution, result: ToolExecutionResult): Record<string, unknown> {
-  return { ...base(ctx, exec.agent, 'PostToolUse'), tool_name: exec.name, tool_input: exec.arguments, tool_use_id: exec.callId, tool_response: blocksToText(result.content) }
+function postToolPayload(ctx: Context, exec: ToolExecution, result: ToolExecutionResult, toolName: string): Record<string, unknown> {
+  return { ...base(ctx, exec.agent, 'PostToolUse'), tool_name: toolName, tool_input: exec.arguments, tool_use_id: exec.callId, tool_response: blocksToText(result.content) }
 }
 function stopPayload(ctx: Context, agent: Agent): Record<string, unknown> {
   return { ...base(ctx, agent, 'Stop'), stop_hook_active: false }

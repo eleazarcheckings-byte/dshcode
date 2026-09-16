@@ -1,8 +1,10 @@
 /**
- * Parse Claude Code's event-to-matcher-group hook format into shared {@link MatcherGroup}s.
- * Only command hooks run; other hook types are returned as skipped so the
- * bridge can warn. Plugin-root and project-directory substitutions are applied
- * to commands at parse time.
+ * Parse Claude Code's event-to-matcher-group hook format into shared {@link MatcherGroup}s, and the
+ * Claude-name ↔ DSH-name tool alias table that lets an unmodified Claude Code matcher and payload
+ * `tool_name` work against DSH's own tool names. Only command hooks on a supported event run; a
+ * non-command hook and an entire unsupported top-level event are both returned as skipped so the
+ * bridge can warn. Plugin-root and project-directory substitutions are applied to commands at parse
+ * time.
  * @module @deepseek-ai/dsh-hooks-claude-code/config
  */
 
@@ -17,14 +19,107 @@ const CLAUDE_EVENTS = [
   'SubagentStart',
   'SubagentStop',
 ] as const
+const SUPPORTED_EVENTS: ReadonlySet<string> = new Set(CLAUDE_EVENTS)
 
 /** A parsed CC config: event name → its matcher groups (command hooks only). */
 export type ClaudeCodeHookConfig = Record<string, MatcherGroup[]>
 
-/** A skipped non-command hook, surfaced so the bridge can warn about it. */
+/**
+ * A skipped hook or event, surfaced so the bridge can warn about it. `reason` is present for a
+ * whole unsupported top-level event (`'unsupported event'`, `type` is the sentinel `'event'` since
+ * its hooks were never inspected); absent for a skipped non-command hook within a supported event
+ * (`type` is that hook's own `type`, e.g. `'prompt'`, `'http'`).
+ */
 export interface SkippedHook {
   event: string
   type: string
+  reason?: string
+}
+
+/**
+ * One Claude Code tool name mapped to the DSH tool names it aliases, in matcher/`tool_name`
+ * precedence order (see {@link claudeToolName}).
+ */
+export type ToolAliases = Record<string, string[]>
+
+/**
+ * The reference tool alias table (INV-harness-tools.json + mars-gap-plan corrections 3-4): the DSH
+ * tool inventory names its shell/fs/search tools differently than Claude Code's matcher and
+ * `tool_name` vocabulary, so an unmodified `Bash|PowerShell` or `Edit|Write|MultiEdit` matcher never
+ * fires against a DSH tool call, and a synthesised payload's `tool_name` never reads as the name a
+ * hook script written for Claude Code expects. Key order is precedence order for
+ * {@link claudeToolName} when more than one Claude name aliases the same DSH tool (e.g.
+ * `str_replace_editor` under `Edit`, `MultiEdit`, and `NotebookEdit`).
+ */
+export const DEFAULT_TOOL_ALIASES: ToolAliases = {
+  Bash: ['bash'],
+  PowerShell: ['pwsh'],
+  Write: ['write'],
+  Edit: ['edit', 'str_replace_editor'],
+  MultiEdit: ['edit', 'str_replace_editor'],
+  NotebookEdit: ['edit', 'str_replace_editor'],
+  Read: ['read', 'read_image'],
+  Glob: ['glob'],
+  Grep: ['grep'],
+  WebFetch: ['web_fetch'],
+  WebSearch: ['web_search'],
+}
+
+/**
+ * Validate a configured `toolAliases` value: every key's value must be a non-empty array of
+ * non-empty DSH tool name strings. Throws a `TypeError` naming the offending key, so a malformed
+ * config is rejected at load rather than silently dropped or partially applied.
+ * @param value - the raw configured `toolAliases` value (or `{}` when the caller has none).
+ * @returns the value, unchanged, once every entry is confirmed well-formed.
+ */
+export function validateToolAliases(value: unknown): ToolAliases {
+  const obj = asObject(value)
+  if (!obj) {
+    throw new TypeError('hooks-claude-code: toolAliases must be an object mapping Claude Code tool names to arrays of DSH tool names')
+  }
+  const result: ToolAliases = {}
+  for (const [claudeName, dshNames] of Object.entries(obj)) {
+    if (!Array.isArray(dshNames) || dshNames.length === 0 || !dshNames.every((n): n is string => typeof n === 'string' && n.length > 0)) {
+      throw new TypeError(`hooks-claude-code: toolAliases.${claudeName} must be a non-empty array of non-empty DSH tool name strings`)
+    }
+    result[claudeName] = dshNames
+  }
+  return result
+}
+
+/**
+ * Build the DSH-name → Claude-names reverse index a bridge evaluates matchers and payload
+ * `tool_name` against. A DSH name's Claude names keep {@link ToolAliases} key order (its
+ * precedence order).
+ */
+export function reverseToolAliases(aliases: ToolAliases): Map<string, string[]> {
+  const reverse = new Map<string, string[]>()
+  for (const [claudeName, dshNames] of Object.entries(aliases)) {
+    for (const dshName of dshNames) {
+      const existing = reverse.get(dshName)
+      if (existing) existing.push(claudeName)
+      else reverse.set(dshName, [claudeName])
+    }
+  }
+  return reverse
+}
+
+/**
+ * Every matcher subject a DSH tool call may be selected under: its own raw DSH name, plus every
+ * Claude name aliasing it (empty when nothing does). A `PreToolUse`/`PostToolUse` matcher group
+ * fires when ANY of these matches, so an unmodified Claude Code `hooks.json` matcher (`Bash`) and a
+ * DSH-native one (`bash`) both work.
+ */
+export function toolMatchCandidates(dshName: string, reverse: ReadonlyMap<string, string[]>): string[] {
+  return [dshName, ...reverse.get(dshName) ?? []]
+}
+
+/**
+ * The `tool_name` a synthesised payload reports for a DSH tool call: the first (precedence-order)
+ * Claude name aliasing it, else the raw DSH name unchanged.
+ */
+export function claudeToolName(dshName: string, reverse: ReadonlyMap<string, string[]>): string {
+  return reverse.get(dshName)?.[0] ?? dshName
 }
 
 /** The outcome of parsing one config file: the runnable groups + what was skipped. */
@@ -63,17 +158,20 @@ export function substituteCommand(command: string, vars: SubstitutionVars): stri
 
 /**
  * Parse either a settings `hooks` value or a bare `hooks.json` event map. Malformed entries are
- * ignored rather than failing boot; unsupported events are ignored before their groups are parsed,
- * non-command hooks are returned in `skipped`, and substitutions are applied to every surviving
- * command. Matcher fields on UserPromptSubmit and Stop are discarded because those events have no
- * matcher subject. A matcher-bearing supported runnable group with an invalid regex throws a
- * `SyntaxError`, allowing the bridge to reject the complete config before listener registration.
+ * ignored rather than failing boot; an unsupported top-level event key (e.g. `ConfigChange`,
+ * `PreCompact`) is recorded in `skipped` with reason `'unsupported event'` — its hooks are never
+ * inspected, so it cannot invalidate or register anything, but the bridge warns about it — and a
+ * non-command hook within a supported event is likewise returned in `skipped`. Substitutions are
+ * applied to every surviving command. Matcher fields on UserPromptSubmit and Stop are discarded
+ * because those events have no matcher subject. A matcher-bearing supported runnable group with an
+ * invalid regex throws a `SyntaxError`, allowing the bridge to reject the complete config before
+ * listener registration.
  *
  * @param raw - the parsed JSON config: a settings object with a `hooks` key, or the bare
  *   event map.
  * @param vars - substitution values applied to every surviving `command` (defaults to
  *   none).
- * @returns the runnable per-event groups plus the skipped non-command hooks.
+ * @returns the runnable per-event groups plus the skipped hooks/events.
  */
 export function parseClaudeCodeConfig(raw: unknown, vars: SubstitutionVars = {}): ParsedClaudeConfig {
   const config: ClaudeCodeHookConfig = {}
@@ -83,7 +181,11 @@ export function parseClaudeCodeConfig(raw: unknown, vars: SubstitutionVars = {})
   const hooksMap = root ? asObject(root.hooks) ?? root : undefined
   if (!hooksMap) return { config, skipped }
 
-  for (const event of CLAUDE_EVENTS) {
+  for (const event of Object.keys(hooksMap)) {
+    if (!SUPPORTED_EVENTS.has(event)) {
+      skipped.push({ event, type: 'event', reason: 'unsupported event' })
+      continue
+    }
     const rawGroups = hooksMap[event]
     if (!Array.isArray(rawGroups)) continue
     const groups: MatcherGroup[] = []

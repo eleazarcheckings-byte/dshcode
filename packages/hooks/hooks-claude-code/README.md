@@ -48,8 +48,32 @@ Use it when you own a Claude Code `hooks.json` (or a settings file whose `hooks`
 | `projectDir` | session workspace | Replaces `${CLAUDE_PROJECT_DIR}` and sets the `CLAUDE_PROJECT_DIR` env var |
 | `defaultTimeoutMs` | `600,000` | Per-hook timeout when a hook sets none (the Claude Code default) |
 | `stderrSummaryMaxChars` | `500` | Character cap on the persisted `hook/result` stderr summary |
+| `toolAliases` | see [below](#tool-name-aliasing) | Claude Code tool name → the DSH tool names it aliases, for `PreToolUse`/`PostToolUse` matchers and payload `tool_name` |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-hooks-claude-code) is the exhaustive source for every accepted field.
+
+<a id="tool-name-aliasing"></a>
+### Tool name aliasing
+
+An unmodified Claude Code `hooks.json` names tools the way Claude Code does — `Bash`, `PowerShell`, `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Read`, `Glob`, `Grep`, `WebFetch`, `WebSearch` — but this harness's own tools are named differently (`bash`, `pwsh`, `edit`, `write`, `str_replace_editor`, `read`, `glob`, `grep`, `web_fetch`, `web_search`). Without a translation layer, a stock matcher like `Bash|PowerShell` or `Edit|Write|MultiEdit` would never select a DSH tool call, and a synthesised payload's `tool_name` would read `bash` where a hook script expects `Bash`.
+
+`toolAliases` closes that gap. It maps each Claude Code tool name to the DSH tool names it aliases:
+
+| Claude Code name | DSH tool names |
+|---|---|
+| `Bash` | `bash` |
+| `PowerShell` | `pwsh` |
+| `Write` | `write` |
+| `Edit` | `edit`, `str_replace_editor` |
+| `MultiEdit` | `edit`, `str_replace_editor` |
+| `NotebookEdit` | `edit`, `str_replace_editor` |
+| `Read` | `read`, `read_image` |
+| `Glob` | `glob` |
+| `Grep` | `grep` |
+| `WebFetch` | `web_fetch` |
+| `WebSearch` | `web_search` |
+
+This table is the built-in default; a configured `toolAliases` entry replaces the default for that Claude Code name, and every other default entry is kept. A `PreToolUse`/`PostToolUse` matcher is evaluated against both the raw DSH tool name and every Claude Code name aliasing it, so a matcher can be written either way (`Bash|PowerShell` and `bash|pwsh` both work). A synthesised payload's `tool_name` reports the first (table-order) Claude Code name aliasing the DSH tool that was actually called, or the raw DSH name when nothing aliases it — `terminal_open`, an MCP tool, or any other tool this table does not name. `tool_input` is `exec.arguments` unchanged: the DSH `bash`/`pwsh`/`write`/`edit` tools already name their own fields (`command`, `file_path`, `content`, `old_string`, `new_string`, …) identically to Claude Code's own tool schemas, so no field renaming is needed there. An invalid `toolAliases` value — anything other than an object whose every value is a non-empty array of non-empty strings — is rejected when the plugin loads.
 
 ### What your hooks can do
 
@@ -113,7 +137,7 @@ The [hook-bridges Agent Note](../../../.agents/notes/implemented/feature/2026-06
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: config validation, listener registration, per-event payloads, decision mapping |
-| [`src/config.ts`](src/config.ts) | Claude Code config parsing: supported events, matcher validation, command substitution |
+| [`src/config.ts`](src/config.ts) | Claude Code config parsing (supported events, matcher validation, command substitution) and the [tool name alias table](#tool-name-aliasing) (`DEFAULT_TOOL_ALIASES`, `validateToolAliases`, `reverseToolAliases`, `toolMatchCandidates`, `claudeToolName`) |
 | — | No runtime invariant companion is published; this bridge publishes hook-protocol session events, whose companion owns which invocation event each result cites. |
 
 </details>
@@ -171,7 +195,7 @@ A blocked prompt sends no request and invalidates nothing. Denial, feedback, and
 
 These limits describe what your Claude Code hooks cannot do through this bridge yet, and where behavior differs from the reference tool. They are current package constraints, not a task backlog.
 
-- **Unsupported hook events (23 of Claude Code's current 30)** — `Setup`, `InstructionsLoaded`, `UserPromptExpansion`, `MessageDisplay`, `PermissionRequest`, `PostToolUseFailure`, `PostToolBatch`, `PermissionDenied`, `Notification`, `TaskCreated`, `TaskCompleted`, `StopFailure`, `TeammateIdle`, `ConfigChange`, `CwdChanged`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`, `PreCompact`, `PostCompact`, `SessionEnd`, `Elicitation`, and `ElicitationResult`. Config for these events is ignored before group parsing, so an unsupported event cannot invalidate or register hooks. The comparison baseline is Claude Code's [official hook-event reference](https://code.claude.com/docs/en/hooks#hook-events).
+- **Unsupported hook events (23 of Claude Code's current 30)** — `Setup`, `InstructionsLoaded`, `UserPromptExpansion`, `MessageDisplay`, `PermissionRequest`, `PostToolUseFailure`, `PostToolBatch`, `PermissionDenied`, `Notification`, `TaskCreated`, `TaskCompleted`, `StopFailure`, `TeammateIdle`, `ConfigChange`, `CwdChanged`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`, `PreCompact`, `PostCompact`, `SessionEnd`, `Elicitation`, and `ElicitationResult` (SessionEnd and PreCompact included). A config key for one of these events is never inspected — it cannot invalidate or register hooks — but the bridge now logs one warning per unsupported event key at load, naming the event, so a config that references one is not silently no-op. The comparison baseline is Claude Code's [official hook-event reference](https://code.claude.com/docs/en/hooks#hook-events).
 - **`SessionStart` is partial** — JSON `additionalContext` is consumed, but plain stdout context, `initialUserMessage`, `sessionTitle`, `watchPaths`, `reloadSkills`, and `CLAUDE_ENV_FILE` are unsupported. The hook runs detached, so context can miss the first request, and the payload omits optional fields such as `model`, `agent_type`, and `session_title`.
 - **`UserPromptSubmit` is partial** — blocking and JSON `additionalContext` work, but plain stdout context, `sessionTitle`, and `suppressOriginalPrompt` are unsupported. Unless overridden, the bridge also uses its 600-second default instead of Claude Code's event-specific 30-second command timeout.
 - **`PreToolUse` is partial** — `deny` and `ask` decisions work; `allow` does not pre-approve, `defer` is unsupported, `additionalContext` is ignored, and `updatedInput` is logged + warned but not honored ([the pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)).
