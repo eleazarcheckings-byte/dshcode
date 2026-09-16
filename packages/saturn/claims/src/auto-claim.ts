@@ -60,11 +60,15 @@ export function refreshClaimLeases(
 ): ClaimLedger {
   const ids = new Set(claimIds)
   let changed = false
-  const claims = ledger.claims.map((claim) => {
-    if (!ids.has(claim.id)) return claim
+  const claims: Claim[] = []
+  for (const claim of ledger.claims) {
+    if (!ids.has(claim.id)) {
+      claims.push(claim)
+      continue
+    }
     changed = true
-    return { ...claim, expiresAt: now + ttlMs, revision: claim.revision + 1 }
-  })
+    claims.push({ ...claim, expiresAt: now + ttlMs, revision: claim.revision + 1 })
+  }
   return changed ? { ...ledger, claims } : ledger
 }
 
