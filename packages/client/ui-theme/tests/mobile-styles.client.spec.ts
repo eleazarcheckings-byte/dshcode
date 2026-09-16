@@ -114,4 +114,12 @@ describe('ui-theme mobile.css behavior', () => {
     expect(valuesOf('overflow-x')).toContain('hidden')
     expect(valuesOf('max-width')).toContain('100%')
   })
+
+  it('stands the SaturnBot launcher down on a phone (the dashboard is a desktop window)', () => {
+    const rule = parseRules(source).find(rule =>
+      rule.selectors.some(selector => selector.includes('[data-saturnbot-launcher]')))
+    expect(rule, 'launcher rule').toBeDefined()
+    expect(rule!.selectors.every(selector => selector.includes('[data-shell-frame][data-mobile]'))).toBe(true)
+    expect(rule!.declarations).toEqual(expect.arrayContaining([['display', 'none']]))
+  })
 })

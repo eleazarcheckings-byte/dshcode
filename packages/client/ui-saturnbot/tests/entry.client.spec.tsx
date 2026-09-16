@@ -54,3 +54,10 @@ it('titles the standalone window and makes the covered harness inert with cleanu
   expect(covered.inert).toBe(false)
   expect(document.title).toBe('Saturn AI')
 })
+
+it('marks the launcher seat with a durable anchor the phone sheet can stand down', () => {
+  const view = render(<div data-shell-overlay=""><SaturnBotEntry {...props(false)} /></div>)
+  const seat = view.container.querySelector('[data-saturnbot-launcher]')
+  expect(seat).not.toBeNull()
+  expect(seat?.querySelector('button')).not.toBeNull()
+})
