@@ -674,6 +674,51 @@ const SERVICE_ROLES: ServiceRole[] = [
     consumers: ['tool-cordis'],
     note: 'Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport.',
   },
+  {
+    key: 'claims',
+    pkg: 'claims',
+    title: 'Cross-process workspace file-ownership ledger',
+    mode: 'core',
+    consumers: ['agent-team'],
+    note: "Enforces exclusive claim leases across the write/edit/str_replace_editor tools and scanned shell mutations before dispatch, denying a peer's colliding write; agent-team's roster reads live conflicts before assigning a teammate's task.",
+  },
+  {
+    key: 'designBrain',
+    pkg: 'design-brain',
+    title: 'Optional SaturnAI design connector',
+    mode: 'core',
+    note: 'Projects a durable per-profile opt-in onto one Host-owned MCP connection to the SaturnAI design service; fresh profiles make no connection request and register no tool until Settings → Models opts in.',
+  },
+  {
+    key: 'media',
+    pkg: 'tool-media',
+    title: 'Model-facing media generation seam',
+    mode: 'seam',
+    consumers: ['saturnbot'],
+    note: "Resolves the gemini, openai, and higgsfield provider backends per call and gates every billable request behind ctx.approval or the agentless ctx.userQuestions fallback before the network call fires; SaturnBot's creative.generate is the pinned duck-typed consumer with no Agent in its own model.",
+  },
+  {
+    key: 'modelRouter',
+    pkg: 'model-router',
+    title: 'Deployment model-tier routing service',
+    mode: 'core',
+    consumers: ['agent', 'saturnbot'],
+    note: "Owns the coordinator/specialist/bulk/vision tiering namespace behind resolve(); a tier left at 'default' follows agent-default-model, so vision routing and SaturnBot's own model selection both track a raised deployment default automatically.",
+  },
+  {
+    key: 'remoteAccess',
+    pkg: 'remote-access',
+    title: 'Opt-in remote harness access',
+    mode: 'core',
+    note: 'Owns the pinned-certificate LAN listener or bring-your-own cloudflared tunnel, device-token pairing, and the Server-Sent-Events notification stream that proxies into the existing web server; off by default and every state change is journalled.',
+  },
+  {
+    key: 'saturnbot',
+    pkg: 'saturnbot',
+    title: 'Persistent business-task bot runtime',
+    mode: 'bundle',
+    note: 'The one concrete SaturnBot runtime; it composes the existing LLM, session-persistence, and subprocess services plus the optional web-server, media, model-router, remote-access, and design-brain services through duck-typed lookups rather than being depended on itself.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {
