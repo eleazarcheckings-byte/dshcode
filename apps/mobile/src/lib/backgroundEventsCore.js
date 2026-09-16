@@ -1,6 +1,7 @@
 /**
  * Pure helpers behind the background-events poll (SPEC.md §8 M3 DELIVER
- * item; Mars r2 findings R2-F2/R2-F3/R2-F4 on M3-apps-mobile-r2.md).
+ * item; Mars r2 findings R2-F2/R2-F3/R2-F4 on M3-apps-mobile-r2.md; Mars r3
+ * finding R3-F1 on M3-apps-mobile-r3.md).
  *
  * Shared, at build time, between:
  *   - assets/background-runner.entry.js's OS-tick wiring, inlined by
@@ -16,45 +17,84 @@
  *     file and this module (plus background-runner.entry.js) ever disagree.
  *
  * Mirrors, deliberately, rather than reimplements differently:
- *   - src/lib/remoteApi.ts's parseSseOrJsonEvents (frame parsing)
  *   - src/lib/eventsMapper.ts's mapEventToNotification / deepLinkFor
  *     (title rules, and the `extra` shape a tapped notification deep-links
  *     from -- see main.ts's onNotificationTapped)
  * A mismatch here only affects the *backgrounded* notification path; the
  * foregrounded EventSource path (src/main.ts) imports eventsMapper.ts
  * directly and is unaffected.
+ *
+ * Mars r3 R3-F1: the tick previously read the host's held-open
+ * `GET /saturn/remote/events` SSE stream with `response.body.getReader()`.
+ * @capacitor/background-runner's own shipped Swift source
+ * (node_modules/@capacitor/background-runner/ios/Sources/RunnerEngine/
+ * JSResponse.swift) proves that isolate's `Response` has no `body` at all --
+ * only `ok`/`status`/`url`/`text()`/`json()` -- and JSFetch.swift resolves
+ * the fetch promise itself only once the whole body has buffered
+ * (URLSession's completion handler), so a fetch against a stream the host
+ * never closes on its own never resolves. The tick now consumes the bounded
+ * replay contract (SPEC.md §8: `GET .../events/replay?after=&limit=`,
+ * `{ events, newest, truncated, gap? }`) with a single `response.json()`
+ * per page instead -- no `body`/`ReadableStream` access anywhere in this
+ * path, on either platform.
  */
 
 /**
- * One SSE payload -> the events it carries: `data: {...}` lines (a real
- * frame from packages/saturn/remote-access/src/proxy.ts's stream()), or a
- * bare JSON array for a poll-friendly host. Tolerant of a buffer that ends
- * mid-frame -- a bounded background read stopped mid-stream -- by skipping
- * an unterminated or malformed line rather than throwing.
- * @param {string} payload
+ * `GET .../events/replay`'s JSON body -> the events it carries. Tolerant of
+ * a malformed or absent `events` array -- a background tick never trusts a
+ * host response enough to throw on it -- so a bad payload just yields no
+ * notifications this tick rather than crashing the poll.
+ * @param {unknown} payload
  * @returns {Array<Record<string, unknown>>}
  */
-export function parseSseFrames(payload) {
-  const trimmed = (payload || '').trim();
-  if (trimmed.length === 0) return [];
-  if (trimmed.charAt(0) === '[') {
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return [];
-    }
-  }
-  const events = [];
-  for (const line of trimmed.split('\n')) {
-    const t = line.trim();
-    if (t.indexOf('data:') !== 0) continue;
-    try {
-      events.push(JSON.parse(t.slice(5).trim()));
-    } catch {
-      // skip a malformed/truncated line rather than drop the whole frame
-    }
-  }
-  return events;
+export function parseReplayEvents(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
+  const events = /** @type {{ events?: unknown }} */ (payload).events;
+  return Array.isArray(events) ? events : [];
+}
+
+/**
+ * Whether the replay response's `after` cursor was older than the host's
+ * ring buffer retains, i.e. some events between the last poll and this one
+ * were dropped and this page starts from the oldest retained event instead
+ * (SPEC.md §8 replay contract). Nothing else in this tick reacts to a gap
+ * specially -- the page is still processed and the cursor still advances --
+ * this only makes the condition observable and testable.
+ * @param {unknown} payload
+ * @returns {boolean}
+ */
+export function hasReplayGap(payload) {
+  return Boolean(payload && typeof payload === 'object' && /** @type {{ gap?: unknown }} */ (payload).gap);
+}
+
+/**
+ * Whether more than `limit` events were available, i.e. this tick should
+ * fetch another page (with `after` advanced to this page's `newest`) rather
+ * than stopping after one.
+ * @param {unknown} payload
+ * @returns {boolean}
+ */
+export function isReplayTruncated(payload) {
+  return Boolean(payload && typeof payload === 'object' && /** @type {{ truncated?: unknown }} */ (payload).truncated);
+}
+
+/**
+ * The `after` cursor to persist once a replay page has been processed: the
+ * host-reported `newest` id when it parses as numerically at or ahead of
+ * `observedNewest` (the highest id this page actually scheduled a
+ * notification for, or the prior cursor if the page was empty), else
+ * `observedNewest` -- so a missing or malformed `newest` field, or one that
+ * (incorrectly) reports behind what this page just delivered, can never
+ * regress the persisted cursor.
+ * @param {unknown} reportedNewest - the replay response's `newest` field, verbatim.
+ * @param {string} observedNewest
+ * @returns {string}
+ */
+export function resolveReplayCursor(reportedNewest, observedNewest) {
+  const reported = reportedNewest === undefined || reportedNewest === null ? '' : String(reportedNewest);
+  if (!reported) return observedNewest;
+  if (!observedNewest) return reported;
+  return compareEventIds(reported, observedNewest) >= 0 ? reported : observedNewest;
 }
 
 /**

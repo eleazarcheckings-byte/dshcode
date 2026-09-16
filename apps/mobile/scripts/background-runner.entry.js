@@ -8,27 +8,42 @@
 // checks against a fresh render.
 //
 // SPEC.md §8 M3 DELIVER item; Mars r1 finding #2 (background poll -> local
-// notifications) and Mars r2 (M3-apps-mobile-r2.md) R2-F1..R2-F3:
-//   - R2-F1: `fetch(.../events?since=poll').then(r => r.text())` never
-//     resolved, because the host's route is SSE-only and never closes on its
-//     own (packages/saturn/remote-access/src/proxy.ts's stream() -- the
-//     query string is stripped by the router and always lands there) --
-//     the tick hung until the OS killed it, with no notification ever
-//     scheduled.
+// notifications), Mars r2 (M3-apps-mobile-r2.md) R2-F2..R2-F4, and Mars r3
+// (M3-apps-mobile-r3.md) R3-F1:
 //   - R2-F2: event ids were compared as strings, silently dropping every id
 //     from 10 through 89 once `lastSeen` passed "9".
 //   - R2-F3: scheduled notifications carried no `extra`, so a tap on one
 //     threw in main.ts's onNotificationTapped handler.
+//   - R3-F1 (this round): the previous fix for R2-F1 replaced a
+//     query-string poll with a `Last-Event-ID`-driven read of the host's
+//     held-open `GET /saturn/remote/events` SSE stream via
+//     `response.body.getReader()`. That is unreachable on iOS:
+//     @capacitor/background-runner's own shipped Swift source
+//     (node_modules/@capacitor/background-runner/ios/Sources/RunnerEngine/
+//     JSResponse.swift) exposes only `ok`/`status`/`url`/`text()`/`json()`
+//     on its isolate's `Response` -- no `body`, no `ReadableStream` -- and
+//     JSFetch.swift resolves the fetch promise itself only once the whole
+//     response body has buffered inside URLSession's completion handler. A
+//     fetch against a stream the host never closes on its own therefore
+//     never resolves at all: the identical hang R2-F1 flagged, just
+//     relocated from `response.text()` to the `fetch()` call itself. This
+//     tick now consumes the bounded replay contract (SPEC.md §8:
+//     `GET .../events/replay?after=&limit=100` -> `{ events, newest,
+//     truncated, gap? }`) with a single `response.json()` per page --
+//     nothing in this path touches `response.body` on either platform.
 
 const KV_HOST_URL_KEY = 'saturn.bg.hostUrl';
 const KV_DEVICE_TOKEN_KEY = 'saturn.bg.deviceToken';
 const KV_LAST_EVENT_ID_KEY = 'saturn.bg.lastEventId';
 
-// Bounds one tick's read of the host's held-open SSE stream. Comfortably
-// inside iOS's ~30s per-task budget (see @capacitor/background-runner's
-// README, "Limitations of Background Tasks" -> iOS), with headroom for the
-// fetch call itself and CapacitorKV/CapacitorNotifications round-trips.
-const READ_DEADLINE_MS = 8000;
+// SPEC.md §8 replay contract: "limit=<1..200, default 100>". One page
+// covers the common case (well under a device's typical event volume
+// between two 15-minute ticks); `MAX_REPLAY_PAGES` bounds how many more the
+// tick will fetch in a row when the response comes back `truncated: true`,
+// so a pathological backlog can't turn one OS-scheduled tick into an
+// unbounded loop.
+const REPLAY_PAGE_LIMIT = 100;
+const MAX_REPLAY_PAGES = 5;
 
 // src/lib/backgroundSync.ts's syncBackgroundSession() dispatches this after
 // pairing, after a revoke/forget-host (with empty details, clearing below),
@@ -64,70 +79,51 @@ addEventListener('checkRemoteEvents', (resolve, reject) => {
         return;
       }
 
-      const lastSeenRaw = CapacitorKV.get(KV_LAST_EVENT_ID_KEY).value;
-      const lastSeen = lastSeenRaw || '';
-      let newestId = lastSeen;
+      const lastSeenRaw = CapacitorKV.get(KV_LAST_EVENT_ID_KEY).value || '';
+      const headers = { authorization: 'Bearer ' + deviceToken, accept: 'application/json' };
 
-      // Last-Event-ID (not the `?since=poll` query, which the router ignores
-      // entirely -- proxy.ts strips the query before routing) asks the bus to
-      // replay only what this device missed (events.ts's EventBus.attach()).
-      const headers = { authorization: 'Bearer ' + deviceToken, accept: 'text/event-stream' };
-      if (lastSeen) headers['last-event-id'] = lastSeen;
+      let after = lastSeenRaw || '0';
+      let cursor = lastSeenRaw;
+      let page = 0;
 
-      const response = await fetch(hostUrl + '/saturn/remote/events', { method: 'GET', headers });
-      if (!response.ok || !response.body || typeof response.body.getReader !== 'function') {
-        // A rejected/expired token surfaces to the user next time they open
-        // the app (tokenStore + the offline screen already handle that) -- a
-        // background tick just stays quiet. No streaming reader (an older
-        // plugin build, or a response with no body) is treated the same way
-        // rather than falling back to response.text(), which never resolves
-        // against a stream this host never closes on its own.
-        resolve();
-        return;
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let timedOut = false;
-      const deadline = setTimeout(() => {
-        timedOut = true;
-        // Closes the connection from our side so the host's req/res 'close'
-        // handlers free the stream immediately rather than waiting on it.
-        reader.cancel().catch(() => {});
-      }, READ_DEADLINE_MS);
-
-      try {
-        while (!timedOut) {
-          let chunk;
-          try {
-            chunk = await reader.read();
-          } catch (err) {
-            if (timedOut) break; // the deadline's own cancel() rejected this read -- expected
-            throw err;
-          }
-          if (chunk.done) break;
-          buffer += decoder.decode(chunk.value, { stream: true });
-          const frames = buffer.split('\n\n');
-          buffer = frames.pop() || '';
-          for (const frameText of frames) {
-            for (const event of parseSseFrames(frameText + '\n\n')) {
-              const id = String(event.id);
-              if (!isNewerEventId(id, lastSeen)) continue;
-              const descriptor = mapBackgroundEvent(event);
-              CapacitorNotifications.schedule([
-                { id: descriptor.id, title: descriptor.title, body: descriptor.body, extra: descriptor.extra },
-              ]);
-              if (compareEventIds(id, newestId) > 0) newestId = id;
-            }
-          }
+      while (page < MAX_REPLAY_PAGES) {
+        page += 1;
+        const url =
+          hostUrl + '/saturn/remote/events/replay?after=' + encodeURIComponent(after) + '&limit=' + REPLAY_PAGE_LIMIT;
+        const response = await fetch(url, { method: 'GET', headers });
+        if (!response.ok) {
+          // A rejected/expired token surfaces to the user next time they
+          // open the app (tokenStore + the offline screen already handle
+          // that) -- a background tick just stays quiet and tries again
+          // next time.
+          break;
         }
-      } finally {
-        clearTimeout(deadline);
+
+        const payload = await response.json();
+        const events = parseReplayEvents(payload);
+        let observedNewest = cursor;
+
+        for (const event of events) {
+          const id = String(event.id);
+          if (!isNewerEventId(id, lastSeenRaw)) continue;
+          const descriptor = mapBackgroundEvent(event);
+          CapacitorNotifications.schedule([
+            { id: descriptor.id, title: descriptor.title, body: descriptor.body, extra: descriptor.extra },
+          ]);
+          if (compareEventIds(id, observedNewest) > 0) observedNewest = id;
+        }
+
+        cursor = resolveReplayCursor(payload && payload.newest, observedNewest);
+        if (!isReplayTruncated(payload)) break;
+        // gap: true just means this page started at the ring's oldest
+        // retained event instead of `after` -- still processed above like
+        // any other page; the cursor still advances to what the host
+        // reports as newest.
+        after = cursor || after;
       }
 
-      if (newestId && newestId !== lastSeen) {
-        CapacitorKV.set(KV_LAST_EVENT_ID_KEY, newestId);
+      if (cursor && cursor !== lastSeenRaw) {
+        CapacitorKV.set(KV_LAST_EVENT_ID_KEY, cursor);
       }
       resolve();
     } catch (err) {
