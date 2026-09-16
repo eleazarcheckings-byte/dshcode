@@ -9,8 +9,21 @@ import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type { DesignBrainStatus } from './types.ts'
+import { DEFAULT_THUMBNAIL_BASE_URL, registerStudyReferencesTool } from './study-references.ts'
 
 export type { DesignBrainStatus } from './types.ts'
+export {
+  DEFAULT_THUMBNAIL_BASE_URL,
+  MAX_SLUGS,
+  MAX_THUMBNAIL_BYTES,
+  SLUG_PATTERN,
+  assertValidSlugs,
+  fetchOneThumbnail,
+  registerStudyReferencesTool,
+  sniffThumbnailMediaType,
+  studyReferencesSummary,
+} from './study-references.ts'
+export type { FetchedThumbnail, MissedThumbnail, StudyReferencesArgs, StudyReferencesValue, ThumbnailMediaType } from './study-references.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context { designBrain: DesignBrainService }
@@ -26,6 +39,8 @@ export interface Config {
   toolCallTimeoutMs: number
   /** Optional deployment headers, redacted from settings and status responses. */
   headers: Record<string, string>
+  /** Base URL (trailing slash) `design_study_references` fetches `<slug>.jpg` thumbnails from. */
+  thumbnailBaseUrl: string
 }
 
 const PREFIX = 'mcp__saturnai__'
@@ -40,6 +55,7 @@ export default class DesignBrainService extends TypertRemoteService {
     connectTimeoutMs: Schema.number().step(1).min(100).max(60_000).default(15_000),
     toolCallTimeoutMs: Schema.number().step(1).min(100).max(600_000).default(120_000),
     headers: Schema.dict(String).role('secret').default({}),
+    thumbnailBaseUrl: Schema.string().default(DEFAULT_THUMBNAIL_BASE_URL),
   })
 
   private readonly preference: SettingsScope<{ enabled: boolean }>
@@ -60,9 +76,10 @@ export default class DesignBrainService extends TypertRemoteService {
       name: 'saturn:design-brain', order: ctx.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA') + 110,
       text: ({ scope }) => {
         if (!mcpClient.isServerConnected(ctx, 'saturnai') || !ctx.tools.schemas(scope).some(tool => tool.name.startsWith(PREFIX))) return ''
-        return 'SaturnAI design and brand tools are available through the mcp__saturnai__ namespace. For relevant design work, use the available tools according to their schemas and the user’s brief. Reuse supplied context for focused edits; ask only for decisions that materially affect the result. These tools provide guidance and evaluate the evidence you supply; they do not automatically inspect a rendered website. Render and inspect the actual output, provide observed evidence for review, and report tool failures honestly. If a tool becomes unavailable, continue with the bundled premium-output guidance and the tools still available.'
+        return 'SaturnAI design and brand tools are available through the mcp__saturnai__ namespace. For relevant design work, use the available tools according to their schemas and the user’s brief. Reuse supplied context for focused edits; ask only for decisions that materially affect the result. After compose/search/pick returns reference slugs, call design_study_references to fetch their thumbnails as real images and study them with eyes — named structural moves, never mood adjectives — before writing a direction. Review evaluates the evidence you supply; it does not look at pixels itself, so read your own built screenshots with read_image before calling it, and report tool failures honestly. If a tool becomes unavailable, continue with the bundled premium-output guidance and the tools still available.'
       },
     })
+    registerStudyReferencesTool(ctx, { thumbnailBaseUrl: config.thumbnailBaseUrl })
     ctx.effect(() => async () => {
       this.stopped = true
       await this.child?.dispose()

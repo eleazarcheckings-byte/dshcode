@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Connect SaturnAI design guidance and evidence-based review tools to the agents in a web or desktop profile. Users opt in during First Light or from Settings → Models, then retain that choice across restarts. Fresh profiles make no connection request. The bundled premium output guides remain available without this service; tool calls send the selected brief and evidence to the configured external endpoint.
+Connect SaturnAI design guidance and evidence-based review tools to the agents in a web or desktop profile. Users opt in during First Light or from Settings → Models, then retain that choice across restarts. Fresh profiles make no connection request. The bundled premium output guides remain available without this service; tool calls send the selected brief and evidence to the configured external endpoint. The package also registers `design_study_references`, a small first-party tool (not an `mcp__saturnai__*` MCP call) that fetches design-library reference thumbnails as real images so the model studies them with eyes; it stays registered independent of the MCP connection lifecycle above.
 
 ## Table of Contents
 
@@ -33,6 +33,7 @@ A same-scope MCP profile row named `saturnai` owns its own connection. The conne
 | `connectTimeoutMs` | `15000` | Deadline for handshake, initialized notification, and initial tool registration |
 | `toolCallTimeoutMs` | `120000` | Deadline for each subsequent MCP tool invocation |
 | `headers` | `{}` | Optional deployment credentials; never returned in connection status |
+| `thumbnailBaseUrl` | `https://saturnai.tools/design/thumbnails/` | Host base `design_study_references` fetches `<slug>.jpg` from |
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -50,8 +51,9 @@ The connector supplies its timeout to the MCP supervisor, which closes the actua
 ## Further Exploration
 
 - [MCP client](../../mcp/mcp-client/README.md) — transport lifecycle and tool semantics.
-- [Premium output guides](../../skill/skill-premium-output/README.md) — bundled workflows available without an external connection.
+- [Premium output guides](../../skill/skill-premium-output/README.md) — bundled workflows available without an external connection, including the "Study the references with eyes" and "Look at what you built" steps this tool feeds.
 - [Models settings](../../client/ui-settings-models/README.md) — provider and connection controls.
+- [`describe-image`](../../vision/tool-describe-image/README.md) and [`tool-fs`'s `read_image`](../../fs/tool-fs/README.md) — the redirect-refusing HTTPS client and durable-image-block conventions `design_study_references` follows.
 
 <a id="model-experience"></a>
 ## Model Experience
@@ -60,15 +62,29 @@ The connector supplies its timeout to the MCP supervisor, which closes the actua
 
 #### What the model sees
 
-When SaturnAI is connected and its tools are visible in the requesting scope, the `saturn:design-brain` section directs the model to use their schemas for relevant work, reuse existing context for focused edits, inspect actual rendered output, and report failures honestly. Tool definitions and results follow the MCP client's ordinary registration and execution path. The service reviews supplied evidence; it does not independently inspect a rendered website.
+When SaturnAI is connected and its tools are visible in the requesting scope, the `saturn:design-brain` section directs the model to use their schemas for relevant work, reuse existing context for focused edits, and report failures honestly. It now also names two concrete follow-ups: call `design_study_references` on the slugs `compose`/`search`/`pick` return, and read its own built screenshots with `read_image` before calling `review` — `review` grades the evidence supplied to it; it does not look at rendered pixels itself. Tool definitions and results follow the MCP client's and the tool registry's ordinary registration and execution path.
 
 #### Token effect
 
-The connected section adds one fixed paragraph. Available MCP schemas and explicitly requested tool results add their normal context cost. Disabled connections add no design-brain text or tools.
+The connected section adds one fixed paragraph. Available MCP schemas and explicitly requested tool results add their normal context cost. Disabled connections add no `saturn:design-brain` prompt text, but `design_study_references` itself stays registered — its own description carries that fixed cost regardless of connection state, detailed in the next model-context entry below.
 
 #### KV Cache effect
 
 The section is stable while connection state and tool visibility stay the same. Connecting, disconnecting, or losing availability can change the assembled prompt and tool set. Ordinary request/header and tool-result records remain the evidence of what the model received.
+
+### Study references with eyes
+
+#### What the model sees
+
+`design_study_references({ slugs, prompt? })` accepts 1-6 design-library slugs — exactly what a prior `compose`/`search`/`pick` call returned, never invented — and fetches each `https://<thumbnailBaseUrl>/<slug>.jpg` over a redirect-refusing HTTPS client bounded to 10 MiB, gated to JPEG/PNG/WebP by magic bytes. Every fetched image is written under `<workspace>/.saturn/refs/<slug>.jpg` and returned as a real image content block (via `ctx.attachments.saveImage`, when an attachment store is mounted — the tool fails closed with a clear error otherwise), alongside one text block naming every fetched and missed slug. A slug with no published thumbnail (HTTP 404, or any other non-2xx status, or an unrecognized body) is one miss line, never a thrown call; a redirect or an over-the-cap response IS a thrown refusal of the whole call, since both leave the host's stated contract.
+
+#### Token effect
+
+Fixed tool-schema cost when registered (see Token effect above), plus per call: one summary line per requested slug and one image per fetched thumbnail — bounded by the 1-6 slug limit, so a call costs at most 6 images.
+
+#### KV Cache effect
+
+Each call's result is a genuinely new turn (fetched bytes and image attachment ids differ call to call); there is nothing to cache across calls. The tool schema itself is stable for the KV-cache boundary described above.
 
 ## Known Limitations and Deferred Work
 
@@ -76,6 +92,8 @@ The section is stable while connection state and tool visibility stay the same. 
 - Existing profile rows remain deployment-owned. Failed profile connections must be corrected or restarted through that configuration.
 - The endpoint is Host-controlled. Browser users cannot supply arbitrary URLs or read deployment headers through this API.
 - External reviews use caller-supplied evidence. The harness does not silently capture or upload project files, screenshots, or conversation history when connecting.
+- `design_study_references` requires a mounted `ctx.attachments` service; a deployment without one gets a clear per-call error, not a silent no-op. It never falls back to describing an image in text.
+- `design_study_references` always registers — it is not gated behind the `mcp__saturnai__` MCP connection above, since it talks directly to the fixed thumbnail host. It has no toggle of its own yet; disabling it deployment-wide is deferred (would need a settings field mirroring `saturn-design-brain.enabled`).
 
 <a id="dev-note"></a>
 ### Dev Note
@@ -83,6 +101,6 @@ The section is stable while connection state and tool visibility stay the same. 
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-The [decision record](../../../.agents/notes/implemented/feature/2026-09-15-host-owned-design-brain.md) explains ownership and the bounded transport deadline.
+The [decision record](../../../.agents/notes/implemented/feature/2026-09-15-host-owned-design-brain.md) explains ownership and the bounded transport deadline. The [study-with-eyes note](../../../.agents/notes/implemented/feature/2026-09-15-design-brain-study-with-eyes.md) explains why `design_study_references` is a first-party tool rather than a hosted MCP call, and why it stays registered independent of the connection lifecycle.
 
 </details>

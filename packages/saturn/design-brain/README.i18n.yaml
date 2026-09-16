@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/saturn/design-brain/README.md
-README.md: 4f70561087dcde0dd867f1d2b8a15d69035534da
-README.zh.md: 8ad29752f94e720ec68718bb58c1bdf9ed2287d5
+README.md: 677a0568de0a20c89c567ea2165057c9a0364cda
+README.zh.md: 43d99a5415284bd16844dfe3392c18c1b94d3bee

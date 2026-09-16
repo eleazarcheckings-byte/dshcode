@@ -1,0 +1,29 @@
+# Agent Note: Design brain study-with-eyes
+
+Status: implemented
+
+English | [中文](2026-09-15-design-brain-study-with-eyes.zh.md)
+
+## Problem
+
+The design brain's own system prompt told the agent, verbatim, that its tools "do not automatically inspect a rendered website" — true of `compose`/`review`, but the sentence also read as a blanket disclaimer against ANY visual inspection anywhere in the flow. Nothing in `compose`'s response (reference slugs, a text direction, steal/avoid lists) ever became an actual image the model looked at, and `review-web.mjs`'s captured screenshots stayed local files a script printed a path to, never content the model saw. A model following only the prompt and the skill text had no way to put a reference thumbnail, or its own built screenshot, in front of itself as pixels — it could only read prose describing them. Vision-capable routing already landed on master (`7ee514a0f2`, `packages/core/agent/src/model-selection.ts`): any image content block a request carries is now served by an image-capable model automatically. The missing piece was not routing — it was that nothing ever attached an image.
+
+## Decision
+
+Add `design_study_references({ slugs, prompt? })`, a first-party tool (`packages/saturn/design-brain/src/study-references.ts`), not an `mcp__saturnai__*` MCP call — it talks straight to the public `https://saturnai.tools/design/thumbnails/<slug>.jpg` host, so it works whether or not the MCP connection is live. It validates every slug against `/^[a-z0-9][a-z0-9-]{0,80}$/` before any network call (no path traversal, no invented slugs), fetches over a redirect-refusing HTTPS client bounded to 10 MiB with a JPEG/PNG/WebP magic-byte gate (the `packages/vision/tool-describe-image` convention, copied rather than imported — design-brain has no dependency on that sibling package), writes each fetched thumbnail under `<workspace>/.saturn/refs/<slug>.jpg`, and commits it through `ctx.attachments.saveImage` (the `packages/fs/tool-fs/src/read-image.ts` convention for a durable `ImageBlock`) so it rides the very next model turn as a real image, not a filename. One text block lists every fetched and missed slug; a 404, another non-2xx status, or an unrecognized body is one miss line, never a thrown error — one bad reference among up to six must not fail the whole study. A redirect or an over-the-cap response IS a thrown refusal of the whole call: both mean the fetch left the host's stated contract, which is a different failure class than "this slug has no thumbnail yet."
+
+The tool is registered unconditionally in `DesignBrainService`'s constructor, independent of the `mcp__saturnai__` connect/disconnect lifecycle the rest of the class manages — it has its own failure mode (no `ctx.attachments` mounted) instead. `Config.thumbnailBaseUrl` (default the real host) lets tests and future deployments point it elsewhere without touching the fetch code.
+
+The system-prompt section (`index.ts`) drops the blanket disclaimer and instead names two concrete follow-ups: call `design_study_references` on the slugs `compose`/`search`/`pick` returned, and read the agent's own built screenshots with `read_image` before calling `review` — `review` grades the evidence supplied to it; it does not look at pixels itself. `packages/skill/skill-premium-output`'s `premium-web-experience/SKILL.md` gains a "Study the references with eyes" step after "Establish the direction" and a "Look at what you built" step after the `review-web.mjs` step, and `review-web.mjs` now prints its screenshot paths as a labelled list stdout can hand to `read_image`, naming who must look (the agent, never the script).
+
+## Alternatives considered
+
+**Route reference study through a nested vision-model call inside the tool itself.** Rejected: the harness already resolves an image-capable model for any request carrying an image block (the landed pre-dispatch hook), so a second, tool-internal LLM call would duplicate that routing and hide the study from the calling agent's own context — the whole point is that the AGENT looks, not a hidden sub-call.
+
+**Add a `thumb` URL field to `compose`'s response and let the agent `describe_image` it.** Rejected for this cell: `compose`/`review` are hosted MCP tools outside this package's write scope, and `describe_image` never returns an image block to the conversation (by design, so a described image never re-enters context) — the wrong tool for "the agent should look," right tool for "summarize this image in text."
+
+**Gate `design_study_references`'s registration behind the same connect/disconnect lifecycle as the MCP tools.** Considered, then rejected: profile-managed MCP rows connect through a fiber this class does not own, so mirroring that lifecycle precisely would need brittle cross-cutting hooks for a capability that has nothing to do with the MCP transport (a plain HTTPS fetch). The tool instead fails closed on its own missing dependency (`ctx.attachments`), which is the real precondition for it to do anything useful.
+
+## Consequences
+
+A model studying references now sees real pixels before writing a direction, and sees its own built screenshots before calling `review` — matching what the skill text always told it to do for its own output, extended to the brain's references. `composition.spec.ts`'s tool-count assertions now filter to the `mcp__saturnai__` prefix where they mean the MCP surface specifically, since `design_study_references` coexists with it rather than sharing its lifecycle. A deployment without a mounted attachment store gets a clear per-call error instead of a silent no-op or a text-only fallback — this tool never degrades to describing an image in words. Disabling `design_study_references` deployment-wide (mirroring `saturn-design-brain.enabled`) is deferred; today it always registers.

@@ -58,7 +58,10 @@ it('keeps fresh profiles offline, connects real tools, dispatches, persists opt-
   expect((await h.ctx.systemPrompt.assemble()).sections.some(section => section.name === 'saturn:design-brain' && section.text.length > 0)).toBe(false)
   const connected = await h.ctx.designBrain.connect()
   expect(connected).toMatchObject({ state: 'connected', enabled: true, source: 'managed', issue: 'none', tools: ['mcp__saturnai__compose', 'mcp__saturnai__review'] })
-  expect(h.ctx.tools.schemas().map(tool => tool.name)).toEqual(connected.tools)
+  // design_study_references is design-brain's own tool, independent of the mcp__saturnai__ MCP
+  // connection lifecycle these assertions otherwise exercise — see study-references.spec.ts.
+  expect(h.ctx.tools.schemas().map(tool => tool.name).filter(name => name.startsWith('mcp__saturnai__'))).toEqual(connected.tools)
+  expect(h.ctx.tools.schemas().map(tool => tool.name)).toContain('design_study_references')
   const result = await h.ctx.tools.execute({ callId: ToolCallId('brain-fixture'), name: 'mcp__saturnai__compose', arguments: {}, signal: new AbortController().signal })
   expect(result.isError).toBe(false)
   expect(result.content).toEqual([{ type: 'text', text: 'Executed compose' }])
@@ -75,7 +78,8 @@ it('keeps fresh profiles offline, connects real tools, dispatches, persists opt-
   await h.boot()
   expect(h.ctx.designBrain.status().state).toBe('connected')
   expect(await h.ctx.designBrain.disconnect()).toMatchObject({ state: 'disabled', enabled: false, tools: [] })
-  expect(h.ctx.tools.schemas()).toEqual([])
+  // design_study_references stays registered independent of the mcp__saturnai__ MCP connection.
+  expect(h.ctx.tools.schemas().map(tool => tool.name)).toEqual(['design_study_references'])
   expect((await h.ctx.systemPrompt.assemble()).sections.some(section => section.name === 'saturn:design-brain' && section.text.length > 0)).toBe(false)
   expect(await readFile(h.settings, 'utf8')).toContain('enabled: false')
 })
