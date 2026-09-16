@@ -8,7 +8,7 @@
  */
 import { createServer } from 'node:http'
 import type { Socket } from 'node:net'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -21,7 +21,7 @@ import Tools from '@deepseek-ai/dsh-tools'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { stringify } from 'yaml'
 import { afterEach, describe, expect, it } from 'vitest'
-import DesignBrain from '../src/index.ts'
+import DesignBrain, { DESIGN_BRAIN_PROMPT_SECTION_TEXT } from '../src/index.ts'
 import {
   MAX_SLUGS,
   MAX_THUMBNAIL_BYTES,
@@ -201,6 +201,11 @@ async function brainHarness(options: { thumbnailBaseUrl: string }) {
     { id: 'brain', name: 'cordis:brain-connector', config: { endpoint: 'http://127.0.0.1:1/mcp', connectTimeoutMs: 100, thumbnailBaseUrl: options.thumbnailBaseUrl } },
   ]
   await (await import('node:fs/promises')).writeFile(path, stringify(rows))
+  // design_study_references registers only once design brain is opted in (see index.ts's
+  // syncStudyTool) — pre-seed that opt-in so these tool-behavior tests reach a registered tool
+  // without depending on a real mcp__saturnai__ connection, which this fixture's endpoint
+  // (127.0.0.1:1) never provides.
+  await writeFile(settings, stringify({ 'saturn-design-brain': { enabled: true } }))
   await ctx.loader.root.update([{ id: 'composition', name: 'cordis:brain-include', config: { path: pathToFileURL(path).href } }])
   await ctx.loader.await()
   const mounted = ctx.loader.resolve('composition').fiber!
@@ -271,6 +276,9 @@ describe('design_study_references (registered tool)', () => {
       { id: 'settings', name: 'cordis:brain-settings', config: { path: settings, watch: false } },
       { id: 'brain', name: 'cordis:brain-connector', config: { endpoint: 'http://127.0.0.1:1/mcp', connectTimeoutMs: 100, thumbnailBaseUrl: fixture.baseUrl } },
     ]))
+    // Same opt-in pre-seed as brainHarness above — this test's own tool call needs the tool
+    // registered even though it deliberately never mounts an attachment store.
+    await writeFile(settings, stringify({ 'saturn-design-brain': { enabled: true } }))
     await ctx.loader.root.update([{ id: 'composition', name: 'cordis:brain-include', config: { path: pathToFileURL(path).href } }])
     await ctx.loader.await()
     const mounted = ctx.loader.resolve('composition').fiber!
@@ -281,5 +289,14 @@ describe('design_study_references (registered tool)', () => {
     })
     expect(result.isError).toBe(true)
     void h
+  })
+})
+
+describe('saturn:design-brain system-prompt section text', () => {
+  it('names design_study_references and read_image, and drops the old disclaimer', () => {
+    expect(DESIGN_BRAIN_PROMPT_SECTION_TEXT).toContain('design_study_references')
+    expect(DESIGN_BRAIN_PROMPT_SECTION_TEXT).toContain('read_image')
+    expect(DESIGN_BRAIN_PROMPT_SECTION_TEXT).toContain('.saturn/reference-study.md')
+    expect(DESIGN_BRAIN_PROMPT_SECTION_TEXT).not.toContain('do not automatically inspect')
   })
 })

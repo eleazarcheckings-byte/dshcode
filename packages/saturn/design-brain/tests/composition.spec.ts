@@ -56,12 +56,14 @@ it('keeps fresh profiles offline, connects real tools, dispatches, persists opt-
   expect(h.fixture.requests).toBe(0)
   expect(h.ctx.designBrain.status().state).toBe('disabled')
   expect((await h.ctx.systemPrompt.assemble()).sections.some(section => section.name === 'saturn:design-brain' && section.text.length > 0)).toBe(false)
+  // A fresh, never-opted-in profile registers no tool at all — not even design_study_references —
+  // so it never pays a tool-schema token cost for a feature it hasn't turned on.
+  expect(h.ctx.tools.schemas()).toEqual([])
   const connected = await h.ctx.designBrain.connect()
   expect(connected).toMatchObject({ state: 'connected', enabled: true, source: 'managed', issue: 'none', tools: ['mcp__saturnai__compose', 'mcp__saturnai__review'] })
-  // design_study_references is design-brain's own tool, independent of the mcp__saturnai__ MCP
-  // connection lifecycle these assertions otherwise exercise — see study-references.spec.ts.
-  expect(h.ctx.tools.schemas().map(tool => tool.name).filter(name => name.startsWith('mcp__saturnai__'))).toEqual(connected.tools)
-  expect(h.ctx.tools.schemas().map(tool => tool.name)).toContain('design_study_references')
+  // design_study_references registers alongside the mcp__saturnai__ tools once opted in, and is
+  // torn down with them on disconnect below — it tracks the same opt-in state, not a separate one.
+  expect(h.ctx.tools.schemas().map(tool => tool.name).sort()).toEqual([...connected.tools, 'design_study_references'].sort())
   const result = await h.ctx.tools.execute({ callId: ToolCallId('brain-fixture'), name: 'mcp__saturnai__compose', arguments: {}, signal: new AbortController().signal })
   expect(result.isError).toBe(false)
   expect(result.content).toEqual([{ type: 'text', text: 'Executed compose' }])
@@ -78,8 +80,8 @@ it('keeps fresh profiles offline, connects real tools, dispatches, persists opt-
   await h.boot()
   expect(h.ctx.designBrain.status().state).toBe('connected')
   expect(await h.ctx.designBrain.disconnect()).toMatchObject({ state: 'disabled', enabled: false, tools: [] })
-  // design_study_references stays registered independent of the mcp__saturnai__ MCP connection.
-  expect(h.ctx.tools.schemas().map(tool => tool.name)).toEqual(['design_study_references'])
+  // design_study_references is torn down with the mcp__saturnai__ tools on opt-out.
+  expect(h.ctx.tools.schemas()).toEqual([])
   expect((await h.ctx.systemPrompt.assemble()).sections.some(section => section.name === 'saturn:design-brain' && section.text.length > 0)).toBe(false)
   expect(await readFile(h.settings, 'utf8')).toContain('enabled: false')
 })
