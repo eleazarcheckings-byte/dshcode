@@ -75,6 +75,23 @@ JAVA_HOME="C:/Java/jdk-21.0.11+10" ANDROID_HOME="C:/Android" ./gradlew.bat assem
 
 具体产物路径以本次会话的构建记录为准：`apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk` —— 该 debug APK 未签名（使用 Gradle 自动生成的 debug 密钥库），可直接 `adb install app-debug.apk` 侧载安装，无需 Play 管理中心账号或签名密钥。
 
+#### Play（签名发布版，CI —— 可选接入）
+
+`.github/workflows/mobile-android.yml` 每次运行都会无条件执行
+`assembleDebug`（也就是上面的侧载路径，不需要任何 secret）。当仓库 secret
+中 `ANDROID_KEYSTORE` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` /
+`ANDROID_KEY_PASSWORD` 四项全部存在时（GitHub → 仓库 → Settings →
+Secrets and variables → Actions），它还会额外构建 `bundleRelease`
+（Play 管理中心需要的 `.aab`，通过 Android Gradle Plugin 自带的
+`-Pandroid.injected.signing.*` 属性签名 —— 与 Android Studio
+“Generate Signed Bundle” 菜单项用的是同一套机制）以及用 Android SDK 自带的
+`apksigner` 工具签名的 `assembleRelease` `.apk`，两者都作为 workflow
+artifact 上传。`ANDROID_KEYSTORE` 是发布用 `.keystore`/`.jks` 文件的
+base64（`base64 -i release.keystore`）；另外三项是创建密钥库时设置的别名和
+两个密码（`keytool -genkeypair` 或 Android Studio 的密钥生成器）。把生成的
+`.aab` 实际上传到 Play 管理中心是单独的人工步骤，这个 workflow 不会代劳
+——Play 管理中心的访问权限不是这个仓库能持有的 secret。
+
 ### iOS —— Mac 上的步骤（本机无法运行）
 
 `npx cap add ios` 已经用 **Swift Package Manager** 生成了 `ios/App`，而非 CocoaPods —— 这里没有 `Podfile`，**不需要**执行 `pod install`。在装有 Xcode 的 Mac 上：
@@ -91,7 +108,22 @@ open ios/App/App.xcodeproj      # or: npx cap open ios
 3. **签名**：项目设置 → Signing & Capabilities → 选择你的 Team；使用个人 Apple ID 时 Xcode 会自动管理开发证书。即便只是真机调试，这一步也是必需的，早于 TestFlight。
 4. **证书锁定**（见上文“安全模型”）：添加一个 `WKNavigationDelegate`，在 `didReceive challenge` 中拦截 `NSURLAuthenticationMethodServerTrust`，取出叶证书的 DER 字节（`SecCertificateCopyData`）、做 SHA-256，与 Android 端 `PinningWebViewClient` 读取的同一枚指纹比对（从 `UserDefaults` 的 `CapacitorStorage` group 中取 —— 这是 `@capacitor/preferences` 在 iOS 上的存储位置 —— 键名 `saturn.remote.session`，取其中的 `fingerprint` 字段）。将其接入 `ios/App/App/AppDelegate.swift` 或 Capacitor 桥接视图控制器上的 `WKUIDelegate`。
 5. **Background Modes 能力**（见下文“后台事件投递”）：Signing & Capabilities → **+ Capability** → **Background Modes** → 勾选 **Background fetch** 与 **Background processing**。`Info.plist` 的 `BGTaskSchedulerPermittedIdentifiers` 与 `AppDelegate.swift` 中的 `BackgroundRunnerPlugin` 调用已经提交；这个勾选框是唯一必须由 Xcode 写入 `.pbxproj` 的部分。
-6. **TestFlight**：这正是 SPEC.md §8 点名的资金关卡（Gate）—— 需要先有 Apple 开发者计划会员资格（每年 99 美元），Xcode 才能创建 App Store Connect 记录。在做出这个决定之前，以上所有步骤都无需付费会员资格。做出决定后：Product → Archive，通过 App Store Connect 分发，再到 App Store Connect → TestFlight 中添加构建版本与测试人员。
+6. **TestFlight**：截至 2026-09-15，izzy 的 Apple 开发者计划会员资格（每年 99 美元）已经付费 —— 这一步不会产生新的花费。在 Mac 上：Product → Archive，通过 App Store Connect 分发，再到 App Store Connect → TestFlight 中添加构建版本与测试人员。以上所有步骤都无需再考虑付费会员资格这件事。
+
+#### TestFlight（CI —— 可选接入）
+
+`.github/workflows/mobile-ios.yml`（macos-15）做的是同一套 archive-and-upload
+流程，只是不需要一台 Mac 在场。没有配置 App Store Connect API key 时，它会
+构建一个**未签名**的 `.xcarchive` 并作为 workflow artifact 上传 ——
+不需要任何 secret，与上面的侧载等价路径一致。当仓库 secret 中
+`ASC_KEY_ID` / `ASC_ISSUER_ID` / `ASC_KEY_P8`（以及 `APPLE_TEAM_ID`）存在时
+——GitHub → 仓库 → Settings → Secrets and variables → Actions，名字和
+`apps/desktop/RELEASE.md` 里 macOS 签名表用的是同一套 App Store Connect
+API key，所以只需要填一次就能同时解锁这里和桌面端的公证通道——它会用自动
+签名方式 archive（`xcodebuild -allowProvisioningUpdates
+-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID`），
+导出 `.ipa`，再用 `xcrun altool --upload-app --apiKey --apiIssuer`
+上传到 TestFlight。
 
 ## 为什么用 npm 而不是 pnpm
 

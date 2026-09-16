@@ -73,6 +73,25 @@ JAVA_HOME="C:/Java/jdk-21.0.11+10" ANDROID_HOME="C:/Android" ./gradlew.bat assem
 
 See the build log this session captured for the exact result: `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk` — the debug APK is unsigned (the debug keystore Gradle generates automatically) and installs directly with `adb install app-debug.apk`; no Play Console account or signing key needed for sideloading.
 
+#### Play (signed release, CI — opt-in)
+
+`.github/workflows/mobile-android.yml` runs `assembleDebug` unconditionally
+(the sideload path above, zero secrets) on every run. When
+`ANDROID_KEYSTORE` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` /
+`ANDROID_KEY_PASSWORD` are all present as repo secrets (GitHub → the repo →
+Settings → Secrets and variables → Actions), it additionally builds
+`bundleRelease` (the `.aab` Play Console wants, signed via the Android
+Gradle Plugin's own `-Pandroid.injected.signing.*` properties — the same
+mechanism Android Studio's "Generate Signed Bundle" menu item uses) and an
+`assembleRelease` `.apk` signed with the Android SDK's own `apksigner`
+tool, uploading both as workflow artifacts. `ANDROID_KEYSTORE` is the
+base64 of your release `.keystore`/`.jks` file (`base64 -i release.keystore`);
+the other three are the alias and both passwords you set when you created
+it (`keytool -genkeypair` or Android Studio's key generator). Uploading the
+resulting `.aab` to Play Console itself is a separate, manual step this
+workflow does not perform — Play Console access is not a secret this repo
+can hold.
+
 ### iOS — Mac steps (cannot run on this machine)
 
 `npx cap add ios` already generated `ios/App` using **Swift Package Manager**, not CocoaPods — there is no `Podfile` and `pod install` is **not needed**. On a Mac with Xcode installed:
@@ -89,7 +108,23 @@ open ios/App/App.xcodeproj      # or: npx cap open ios
 3. **Signing**: Project settings → Signing & Capabilities → pick your Team; Xcode manages a development certificate automatically for a personal Apple ID. A physical-device build needs this even before TestFlight.
 4. **Certificate pinning** (see "Security model" above): add a `WKNavigationDelegate` that intercepts `didReceive challenge` for `NSURLAuthenticationMethodServerTrust`, extracts the leaf certificate's DER bytes (`SecCertificateCopyData`), SHA-256-hashes them, and compares against the same pinned fingerprint the Android `PinningWebViewClient` reads (fetch it from `UserDefaults` under the `CapacitorStorage` suite — `@capacitor/preferences`'s iOS storage — key `saturn.remote.session`, field `fingerprint`). Wire it in `ios/App/App/AppDelegate.swift` or via `WKUIDelegate` on the Capacitor bridge view controller.
 5. **Background Modes capability** (see "Background event delivery" above): Signing & Capabilities → **+ Capability** → **Background Modes** → check **Background fetch** and **Background processing**. `Info.plist`'s `BGTaskSchedulerPermittedIdentifiers` and `AppDelegate.swift`'s `BackgroundRunnerPlugin` calls are already committed; this checkbox is the one piece Xcode itself has to write into the `.pbxproj`.
-6. **TestFlight**: this is the money Gate SPEC.md §8 calls out — an Apple Developer Program membership ($99/yr) is required before Xcode can create an App Store Connect record. Once that decision is made: Product → Archive, distribute via App Store Connect, then add build/testers in App Store Connect → TestFlight. Nothing above this line needs the paid membership.
+6. **TestFlight**: izzy's Apple Developer Program membership ($99/yr) is already paid as of 2026-09-15 — this step costs nothing new. On a Mac: Product → Archive, distribute via App Store Connect, then add build/testers in App Store Connect → TestFlight. Nothing above this line needs the paid membership.
+
+#### TestFlight (CI — opt-in)
+
+`.github/workflows/mobile-ios.yml` (macos-15) does the same archive-and-upload
+without a Mac in the loop. With no App Store Connect API key configured it
+builds an **unsigned** `.xcarchive` and uploads that as a workflow artifact
+— zero secrets, matching the sideload-equivalent path above. With
+`ASC_KEY_ID` / `ASC_ISSUER_ID` / `ASC_KEY_P8` (and `APPLE_TEAM_ID`) present
+as repo secrets — GitHub → the repo → Settings → Secrets and variables →
+Actions, same names and same App Store Connect API key as
+`apps/desktop/RELEASE.md`'s macOS signing table, so entering it once
+unlocks both this and the desktop notarization lane — it archives with
+automatic signing (`xcodebuild -allowProvisioningUpdates
+-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID`),
+exports a `.ipa`, and uploads it to TestFlight with
+`xcrun altool --upload-app --apiKey --apiIssuer`.
 
 ## Why npm, not pnpm
 
