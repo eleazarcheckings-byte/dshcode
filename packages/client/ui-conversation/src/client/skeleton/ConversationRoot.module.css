@@ -44,10 +44,14 @@
   --dsh-chat-prose-measure: 70ch;
 }
 
+/* The right padding is the frame's trailing inset (the SaturnBot launcher
+   publishes its width there) plus whatever the top-right rail reserves on top
+   of it (the DeepSeek pricing lamp publishes `--dsh-shell-trailing-extra`),
+   so the right-aligned utilities always stop short of the rail chrome. */
 .header {
   position: relative;
   flex: none;
-  padding: 12px var(--dsh-shell-trailing-inset, 28px) 0 20px;
+  padding: 12px calc(var(--dsh-shell-trailing-inset, 28px) + var(--dsh-shell-trailing-extra, 0px)) 0 20px;
   border-bottom: 1px solid transparent;
 }
 

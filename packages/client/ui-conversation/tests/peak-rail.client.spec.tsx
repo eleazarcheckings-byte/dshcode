@@ -9,7 +9,7 @@
  * underneath it.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en } from '../src/client/locales.ts'
 import { PeakRail, PEAK_RAIL_GAP } from '../src/client/skeleton/PeakChip.tsx'
@@ -24,7 +24,6 @@ const RAIL_WIDTH = 72
 
 let frame: HTMLDivElement
 let overlay: HTMLDivElement
-const originalRect = HTMLElement.prototype.getBoundingClientRect
 
 function mountRail(now: number, previousInset?: string) {
   vi.setSystemTime(now)
@@ -43,19 +42,19 @@ beforeEach(() => {
   vi.useFakeTimers()
   // jsdom lays nothing out; give the rail a real footprint so the reserved
   // inset is a measured number, not the 0 that would hide a broken measure.
-  HTMLElement.prototype.getBoundingClientRect = function rect() {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function rect(this: HTMLElement) {
     const isRail = this.hasAttribute('data-peak-rail')
     return {
       x: 0, y: 0, top: 0, left: 0, bottom: 0, right: 0,
       width: isRail ? RAIL_WIDTH : 0, height: isRail ? 32 : 0, toJSON: () => ({}),
-    } as DOMRect
-  }
+    }
+  })
 })
 
 afterEach(() => {
   cleanup()
   frame?.remove()
-  HTMLElement.prototype.getBoundingClientRect = originalRect
+  vi.restoreAllMocks()
   vi.useRealTimers()
 })
 
@@ -96,7 +95,8 @@ describe('PeakRail', () => {
     // Monday 03:59 UTC: last minute of the first peak window.
     const view = mountRail(Date.UTC(2024, 0, 1, 3, 59))
     expect(view.getByRole('img').textContent).toBe('Peak')
-    vi.advanceTimersByTime(60_000)
+    // The minute tick lands outside React's event path; act() flushes it.
+    act(() => { vi.advanceTimersByTime(60_000) })
     expect(view.getByRole('img').textContent).toBe('Off-peak')
   })
 })

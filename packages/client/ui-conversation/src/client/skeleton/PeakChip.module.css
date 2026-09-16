@@ -1,9 +1,15 @@
 /**
  * PeakChip — DeepSeek API pricing tier indicator.
- * Sits in the composer trailing row, beside the model selector.
+ * Sits in the frame's top-right rail, beside the SaturnBot launcher.
  *
  * Design notes:
- *   - Capsule form matches the model selector chip height (22px).
+ *   - The rail seat is absolutely positioned in the shell overlay layer and
+ *     centres the 22px capsule on the launcher's 32px line (top 14px), so the
+ *     two read as one row of frame chrome. Its right edge is the frame's
+ *     trailing inset: the launcher publishes its own width there, and with no
+ *     launcher the lamp takes the corner itself (18px, the launcher's inset).
+ *   - Capsule form matches the launcher's 11px label and the model chip's
+ *     22px height it used to sit beside.
  *   - It is a status light, not a badge: the dot is the lamp — PEAK is a red
  *     light, OFF-PEAK is a green light — and the fill, hairline border and
  *     label colour are all derived from that same hue so the capsule reads as
@@ -14,6 +20,19 @@
  *     still spells the tier, which is what carries for red/green colour
  *     blindness.
  */
+
+.rail {
+  position: absolute;
+  top: 14px;
+  right: var(--dsh-shell-trailing-inset, 18px);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  /* The frame's title strip is a drag region on desktop; the lamp's tooltip
+     needs real pointer events to open. */
+  -webkit-app-region: no-drag;
+}
 
 .chip {
   position: relative;

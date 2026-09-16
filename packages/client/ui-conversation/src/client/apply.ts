@@ -30,6 +30,7 @@ import { ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
 import { InputBar } from './skeleton/InputBar.tsx'
 import { AmbientSky, AmbientMotionControl } from './skeleton/AmbientSky.tsx'
+import { PeakRail } from './skeleton/PeakChip.tsx'
 import { createAmbientMotion } from './skeleton/ambient-motion.ts'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { resolveActiveView } from './view-selection.ts'
@@ -208,6 +209,16 @@ export function apply(ctx: Context): void {
     locale: NS,
     inject: () => ambientMotion,
   }, AmbientMotionControl))
+  // The DeepSeek pricing lamp: frame chrome in the top-right rail beside the
+  // SaturnBot launcher, visible on the hero and in every session. Overlay
+  // seats position themselves, so `order` only fixes DOM order: it follows the
+  // ambient-motion control, which stays the overlay's first entry.
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'deepseek-peak',
+    order: 110,
+    locale: NS,
+  }, PeakRail))
 
   const registerConversationRoot = () => slots.register({
     name: 'conversation',

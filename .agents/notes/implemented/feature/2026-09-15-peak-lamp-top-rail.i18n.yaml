@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-15-peak-lamp-top-rail.md
+2026-09-15-peak-lamp-top-rail.md: 560f04c46a786c4e8924a8eb8d6e9cd8f89cbb40
+2026-09-15-peak-lamp-top-rail.zh.md: a51e1b046f2092de8a6ff68119d095e410a5f75b
